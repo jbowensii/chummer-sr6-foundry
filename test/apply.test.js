@@ -84,6 +84,15 @@ test('replace: update without play state, new items, then old flagged ones delet
   expect(doc.items.map(x => x.name)).toEqual(['GM item', 'Made-up Booster'])
 })
 
+test('replace: Eden’s own Unarmed item (unflagged, genesisID unarmed) is kept once, never deleted or made again', async () => {
+  const eden = { name: 'Unarmed', type: 'gear', flags: {}, system: { genesisID: 'unarmed', subtype: 'UNARMED' } }
+  const doc = new FakeActor({ name: 'Mara', flags: flags({ id: 'r1' }), items: [eden, { name: 'old', old: true, flags: flags({ id: 'w' }) }] })
+  const unarmedId = doc.items[0].id
+  await applyRunner(player(), 'replace')
+  expect(doc.items.filter(i => i.system?.genesisID === 'unarmed').map(i => i.id)).toEqual([unarmedId])
+  expect(log.find(([k]) => k === 'items')[1].some(i => i.system?.genesisID === 'unarmed')).toBe(false)
+})
+
 test('replace: deleting the old items failing removes the new ones again', async () => {
   const doc = new FakeActor({ name: 'Mara', flags: flags({ id: 'r1' }), items: [{ name: 'old', old: true, flags: flags({ id: 'w' }) }] }, true)
   const res = await applyRunner(player(), 'replace')
