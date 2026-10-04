@@ -26,14 +26,15 @@ export const bonusChanges = bonuses => (bonuses ?? []).filter(b => b.target === 
   .map(b => ({ key: BONUS_KEY(b.target), value: String(num(b.value)), mode: 2 }))
 
 const ref = x => (x.source ? `Chummer: ${x.source}${x.page ? ` p.${x.page}` : ''}` : 'Chummer: custom item')
-// The fields every item carries: Eden's genesis template, our flags, the description with the entry's text and its source.
-function base(x, type, ctx, extra = []) {
+// The fields every item carries: Eden's genesis template, our flags, the description with the entry's text and its source
+// (ctx.ref: a book's "See SRC p.N" in place of the runner's "Chummer: SRC p.N").
+export function base(x, type, ctx, extra = []) {
   return {
     name: x.name, type,
     flags: { [MODULE_ID]: { id: x.uid ?? x.id, catalogId: x.id ?? null, source: x.source ?? null, page: x.page ?? null, canon: !!x.canon,
       exportedAt: ctx.exportedAt, appVersion: ctx.appVersion } },
     system: { genesisID: '', product: x.source ?? '', page: x.page ?? 0,
-      description: ctx.sanitize(x.description) + extra.filter(Boolean).map(t => ctx.sanitize(t)).join('') + ctx.sanitize(ref(x)) },
+      description: ctx.sanitize(x.description) + extra.filter(Boolean).map(t => ctx.sanitize(t)).join('') + ctx.sanitize((ctx.ref ?? ref)(x)) },
   }
 }
 const withEffects = (doc, x) => {
@@ -98,7 +99,8 @@ function focus(p, ctx, extra) {
 }
 
 const RITUAL_FEATURES = ['anchored', 'material_link', 'minion', 'spell', 'spotter']
-function pickItem(x, ctx) {
+/** A spell, ritual, adept power, complex form, metamagic or echo (x.pick: its kind) -> Eden item data. */
+export function pickItem(x, ctx) {
   const a = x.attrs ?? {}, v = x.values ?? {}
   const type = { spells: 'spell', rituals: 'ritual', adeptpowers: 'adeptpower', complexforms: 'complexform', metamagics: 'metamagic', echoes: 'echo' }[x.pick]
   const doc = base(x, type, ctx)
@@ -116,6 +118,18 @@ function pickItem(x, ctx) {
   return icon(withEffects(doc, x), x, ctx)
 }
 
+/** A quality ({ positive, free?, level?, note? } on a runner; a book's entry sets positive from attrs.kind) -> Eden item data. */
+export function qualityItem(q, ctx) {
+  const doc = base(q, 'quality', ctx, [q.free && 'Metatype trait.'])
+  Object.assign(doc.system, { category: q.positive ? 'ADVANTAGE' : 'DISADVANTAGE', level: yes(q.attrs?.perLevel), value: num(q.level), explain: q.note ?? '' })
+  return icon(doc, q, ctx)
+}
+/** A critter power entry's Eden fields (Eden's critterpower sheet: type, action, range, duration). */
+export function critterPowerFields(e) {
+  const a = e.attrs ?? {}
+  return { type: /^\s*m/i.test(a.type ?? '') ? 'mana' : 'physical', action: activationKey(a.action), range: rangeKey(a.range), duration: durationKey(a.duration) }
+}
+
 // Everything a runner file holds as items, for runners and NPCs alike (an NPC's build is usually blank).
 function runnerItems(r, ctx) {
   const { sanitize } = ctx, items = []
@@ -124,11 +138,7 @@ function runnerItems(r, ctx) {
     items.push(icon({ name: k.name, type: 'skill', flags: flag(`${k.kind}:${k.name}`),
       system: { genesisID: k.kind === 'language' ? 'language' : 'knowledge', points: k.native ? 4 : num(k.rank) } }, k, ctx))
 
-  for (const q of r.qualities ?? []) {
-    const doc = base(q, 'quality', ctx, [q.free && 'Metatype trait.'])
-    Object.assign(doc.system, { category: q.positive ? 'ADVANTAGE' : 'DISADVANTAGE', level: yes(q.attrs?.perLevel), value: num(q.level), explain: q.note ?? '' })
-    items.push(icon(doc, q, ctx))
-  }
+  for (const q of r.qualities ?? []) items.push(qualityItem(q, ctx))
   for (const p of r.picks ?? []) items.push(pickItem(p, ctx))
 
   const addLine = (p, parent) => {
@@ -276,11 +286,7 @@ export function beingActor(npc, { name, flags, sanitize = escapeText, icons = nu
     const doc = e ? base({ ...e, name: p, uid: `power:${p}` }, powerType, ctx, [optional])
       : { name: p, type: powerType, flags: { [MODULE_ID]: { id: `power:${p}`, exportedAt: f.exportedAt, appVersion: f.appVersion } },
         system: { genesisID: '', description: optional ? sanitize(optional) : '' } }
-    if (e && powerType === 'critterpower') {
-      const a = e.attrs ?? {}
-      Object.assign(doc.system, { type: /^\s*m/i.test(a.type ?? '') ? 'mana' : 'physical', action: activationKey(a.action),
-        range: rangeKey(a.range), duration: durationKey(a.duration) })
-    }
+    if (e && powerType === 'critterpower') Object.assign(doc.system, critterPowerFields(e))
     items.push(icon(doc, e, ctx))
   }
 
