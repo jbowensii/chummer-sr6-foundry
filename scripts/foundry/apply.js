@@ -48,12 +48,27 @@ export function effectData(e) {
 // an item from translate.js with its effects as ActiveEffect data (world actors and pack actors alike)
 export const itemData = i => (i.effects ? { ...i, effects: i.effects.map(effectData) } : i)
 
+// Eden's own Unarmed weapon (genesisID 'unarmed', never flagged by this module). Eden's Actor _onCreate adds one to every
+// new Player/NPC on every connected client, check-then-create without waiting, so two can land. Keep the oldest, delete
+// the rest. Idempotent, touches nothing else, never throws (a failure is logged). Returns how many it deleted.
+// ponytail: runs once after our writes; an Unarmed from another client landing later stays until the next import.
+export const isEdenUnarmed = i => !flagOf(i) && i.system?.genesisID === 'unarmed'
+export async function dedupeUnarmed(actor) {
+  const age = i => i._stats?.createdTime ?? 0
+  const extra = (actor.items?.filter(isEdenUnarmed) ?? []).sort((a, b) => age(a) - age(b)).slice(1).map(i => i.id)
+  if (!extra.length) return 0
+  try { await actor.deleteEmbeddedDocuments('Item', extra); return extra.length } catch (e) {
+    console.error(`${MODULE_ID} | ${actor.name}: removing a duplicate Unarmed item failed`, e)
+    return 0
+  }
+}
+
 /** Eden's specialization labels as Foundry loaded them: { [skill]: { [specKey]: label } } (never shipped: Eden is GPL-3). */
 export const edenSpecLabels = () => game.i18n.translations.shadowrun6?.special ?? game.i18n._fallback?.shadowrun6?.special ?? {}
 
 // Replace in place: rebuild the translated fields and every flagged embedded item; unflagged items and play state stay,
 // and so does art the user chose, on the actor and its rebuilt items (lib/plan.js replaceUpdate, keepItemArt).
-// Update first, then new items, old items deleted last. If deleting the old ones fails, the new items are removed again,
+// One actor update (translated fields and token together), then new items, old items deleted last: three writes. If deleting the old ones fails, the new items are removed again,
 // so a failure never leaves the actor without its Chummer items or with them twice. Throws on failure.
 async function replaceDoc(doc, actor, items, token) {
   const old = doc.items.filter(i => flagOf(i)).map(i => i.id)
@@ -87,6 +102,7 @@ export async function applyRunner(t, choice, { portrait, token, exportedAt, fold
       const doc = findExisting(runnerId)
       if (!doc) throw new Error(`${t.actor.name}: nothing to replace`)
       await replaceDoc(doc, actor, items, tokenImg)
+      await dedupeUnarmed(doc)
       return { actor: doc, action: 'replace' }
     }
 
@@ -97,6 +113,7 @@ export async function applyRunner(t, choice, { portrait, token, exportedAt, fold
     created = await Actor.create({ ...actor, name, folder: root?.id ?? null,
       prototypeToken: { ...actor.prototypeToken, ...src ? { texture: { src } } : {} } })
     if (items.length) await created.createEmbeddedDocuments('Item', items)
+    await dedupeUnarmed(created)
     return { actor: created, action: choice === 'new' ? 'new' : 'create' }
   } catch (error) {
     // A replaced actor cleans up its own new items (replaceDoc); ponytail: its update already applied stays, and

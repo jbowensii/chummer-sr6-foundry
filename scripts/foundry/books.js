@@ -4,7 +4,7 @@ import { MODULE_ID } from '../lib/constants.js'
 import { planBookPacks } from '../lib/books.js'
 import { keepArt, mergeActorItems, mergeJournalPages, planPack } from '../lib/plan.js'
 import { replaceable } from '../lib/icons.js'
-import { COMPENDIUM_FOLDER, ensureFolder, FOLDER, itemData, uploadPortrait } from './apply.js'
+import { COMPENDIUM_FOLDER, dedupeUnarmed, ensureFolder, FOLDER, itemData, uploadPortrait } from './apply.js'
 
 const CHUNK = 100
 
@@ -80,7 +80,8 @@ export const portraitsAfter = (portraits = {}, tokens = {}, say) => async (docs,
 // fails, what this run made is deleted and the replaced entries are put back, so a failure never loses them.
 // A replaced journal keeps the pages the GM added to it, a replaced actor the GM's own items, and a replaced entry
 // (and a replaced actor's rebuilt items) the image the user chose (lib/plan.js keepArt). Entries not in the file stay.
-// after(docs, op): run once everything is written, while the pack is still unlocked.
+// after(docs, op): run once everything is written, while the pack is still unlocked; then an actor pack's duplicate
+// Unarmed items go (apply.js dedupeUnarmed).
 async function writePack(pack, incoming, after) {
   const Doc = pack.documentClass, op = { pack: pack.collection }
   const { replace, create, duplicates, ...plan } = planPack(new Set(pack.index.keys()), incoming)
@@ -115,6 +116,7 @@ async function writePack(pack, incoming, after) {
       throw e
     }
     await after?.(docs, op)
+    if (pack.documentName === 'Actor') for (const d of made) await dedupeUnarmed(d)  // Eden's Unarmed, once per actor
     return { label: pack.title, created: create.length, replaced: replace.length, duplicates: duplicates.map(d => d.name ?? d._id) }
   } finally {
     if (locked) await pack.configure({ locked: true })

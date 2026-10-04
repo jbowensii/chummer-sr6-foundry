@@ -6,7 +6,7 @@ import { MODULE_ID } from '../lib/constants.js'
 import { readExport } from '../lib/read.js'
 import { escapeText, translateRunner } from '../lib/translate.js'
 import { defaultChoice, newVersionName } from '../lib/plan.js'
-import { applyRunner, COMPENDIUM_FOLDER, edenSpecLabels, findExisting } from './apply.js'
+import { applyRunner, COMPENDIUM_FOLDER, edenSpecLabels, findExisting, isEdenUnarmed as edenUnarmed } from './apply.js'
 import { planBookPacks, translateBook } from '../lib/books.js'
 import { docId } from '../lib/ids.js'
 import { iconFor, MODULE_ICON_ROOT } from '../lib/icons.js'
@@ -47,8 +47,6 @@ async function cleanUp(tag, folder) {
   if (ids.length) await Actor.deleteDocuments(ids)
   if (folder && game.folders.get(folder.id)) await folder.delete({ deleteSubfolders: true, deleteContents: true })
 }
-// Eden's own Unarmed weapon: added to every new Player/NPC by Eden itself (genesisID 'unarmed'), never by this module.
-const edenUnarmed = i => !flagOf(i) && i.system?.genesisID === 'unarmed'
 const ours = actor => actor.items.filter(i => !edenUnarmed(i))
 const itemsOf = (actor, type) => actor.items.filter(i => i.type === type)
 const byName = (actor, name) => actor.items.find(i => i.name === name)
@@ -103,6 +101,7 @@ export function registerQuench(quench) {
       })
       it('has its mortype', () => assert.equal(mara.system.mortype, 'mysticadept'))
       it('has every item, per type', () => assert.deepEqual(count(ours(mara)), count(t.items)))
+      it('has at most one of Eden’s Unarmed items', () => assert.isAtMost(mara.items.filter(edenUnarmed).length, 1))
       it('keeps the genesisID of knowledge and language skills only', () => {
         assert.sameMembers(itemsOf(mara, 'skill').map(i => i.system.genesisID), ['knowledge', 'language', 'language'])
         for (const i of ours(mara).filter(i => i.type !== 'skill')) assert.equal(i.system.genesisID ?? '', '', i.name)
