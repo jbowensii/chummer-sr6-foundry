@@ -1,6 +1,7 @@
 // One Chummer SR6 runner (chummer-anarchy2 docs/sr6-export-format.md) -> shadowrun6-eden 4.x document data. Pure: no Foundry calls.
 // Raw inputs only (attribute bases, skill points, items with their fields): Eden derives pools, monitors, initiative and essence.
 import { MODULE_ID } from './constants.js'
+import { iconFor, itemIconKey, npcIconKey, withIcon } from './icons.js'
 import {
   ATTRS, MOR, SKILLS, SPELL_CATEGORIES, activationKey, armorSubtype, augmentType, durationKey, electronicsSubtype, gearType,
   lifestyleKey, normKey, rangeKey, sinQuality, skillKey, specKey, spellFields, spiritKey, spriteKey, vehicleType, weaponType,
@@ -13,8 +14,9 @@ export const escapeText = s => String(s ?? '').split(/\r?\n\s*\r?\n/).map(p => p
 
 const num = v => (Number.isFinite(v) ? v : 0)
 const yes = v => v === true || v === 'true'
-// ponytail: no icons until M5; then icon(doc, x) = withIcon(doc, itemIconKey(doc), x?.source ?? null, iconSet)
-const icon = doc => doc
+// flags.icon on every item, and img when the index (ctx.icons: Set or array, or null for none) has an icon for it
+const icon = (doc, x, ctx) => withIcon(doc, itemIconKey(doc), x?.source ?? null, ctx.icons ?? null)
+const iconSet = i => (i ? new Set(i) : null)
 
 // Augmentation bonuses -> ActiveEffect changes Eden applies itself (mode 2 = ADD). Edge: Eden's own effect key for the
 // template actors (Player, NPC, Critter, Spirit) is system.edge.max (config.js ACTIVE_EFFECT_OPTIONS); Eden moves it to
@@ -87,12 +89,12 @@ export function lineItem(p, ctx) {
   const doc = base(p, 'gear', ctx, extra), qty = p.qty ?? 1
   Object.assign(doc.system, gear, { price: num(v.cost), priceDef: a.cost ?? '', avail: num(v.avail), availDef: a.avail ?? '',
     count: qty, countable: qty > 1, needsRating: rating != null, rating: num(rating) })
-  return icon(withEffects(doc, p), p)
+  return icon(withEffects(doc, p), p, ctx)
 }
 function focus(p, ctx, extra) {
   const doc = base(p, 'focus', ctx, extra)
   doc.system.rating = num(p.values?.rating)
-  return icon(withEffects(doc, p), p)
+  return icon(withEffects(doc, p), p, ctx)
 }
 
 const RITUAL_FEATURES = ['anchored', 'material_link', 'minion', 'spell', 'spotter']
@@ -111,7 +113,7 @@ function pickItem(x, ctx) {
   } else if (type === 'complexform') {
     Object.assign(doc.system, { duration: durationKey(a.duration), fading: num(v.fade) })
   }
-  return icon(withEffects(doc, x), x)
+  return icon(withEffects(doc, x), x, ctx)
 }
 
 // Everything a runner file holds as items, for runners and NPCs alike (an NPC's build is usually blank).
@@ -120,12 +122,12 @@ function runnerItems(r, ctx) {
   const flag = id => ({ [MODULE_ID]: { id, exportedAt: ctx.exportedAt, appVersion: ctx.appVersion } })
   for (const k of r.knowledge ?? [])
     items.push(icon({ name: k.name, type: 'skill', flags: flag(`${k.kind}:${k.name}`),
-      system: { genesisID: k.kind === 'language' ? 'language' : 'knowledge', points: k.native ? 4 : num(k.rank) } }, k))
+      system: { genesisID: k.kind === 'language' ? 'language' : 'knowledge', points: k.native ? 4 : num(k.rank) } }, k, ctx))
 
   for (const q of r.qualities ?? []) {
     const doc = base(q, 'quality', ctx, [q.free && 'Metatype trait.'])
     Object.assign(doc.system, { category: q.positive ? 'ADVANTAGE' : 'DISADVANTAGE', level: yes(q.attrs?.perLevel), value: num(q.level), explain: q.note ?? '' })
-    items.push(icon(doc, q))
+    items.push(icon(doc, q, ctx))
   }
   for (const p of r.picks ?? []) items.push(pickItem(p, ctx))
 
@@ -139,17 +141,17 @@ function runnerItems(r, ctx) {
 
   for (const c of r.contacts ?? [])
     items.push(icon({ name: c.name, type: 'contact', flags: flag(c.uid),
-      system: { genesisID: '', rating: num(c.connection), loyalty: num(c.loyalty), type: c.archetype ?? '' } }, c))
+      system: { genesisID: '', rating: num(c.connection), loyalty: num(c.loyalty), type: c.archetype ?? '' } }, c, ctx))
   if (r.lifestyle) {
     const l = r.lifestyle, key = lifestyleKey(l.name)
     if (!key) ctx.say(`Lifestyle ${l.name}: not a shadowrun6-eden lifestyle → middle`)
     items.push(icon({ name: l.name, type: 'lifestyle', flags: flag(l.id),
-      system: { genesisID: '', type: key ?? 'middle', paid: num(l.months), cost: num(l.cost) } }, l))
+      system: { genesisID: '', type: key ?? 'middle', paid: num(l.months), cost: num(l.cost) } }, l, ctx))
   }
   for (const s of r.sins ?? [])
     items.push(icon({ name: s.name, type: 'sin', flags: flag(s.uid),
       system: { genesisID: '', quality: sinQuality(s.kind, s.rating),
-        description: sanitize((s.licences ?? []).map(l => `Licence: ${l.name} (rating ${l.rating})`).join('\n\n')) } }, s))
+        description: sanitize((s.licences ?? []).map(l => `Licence: ${l.name} (rating ${l.rating})`).join('\n\n')) } }, s, ctx))
   return items
 }
 const noSkills = () => Object.fromEntries(SKILLS.map(k => [k, { points: 0, specialization: '', expertise: '' }]))
@@ -161,9 +163,9 @@ const noSkills = () => Object.fromEntries(SKILLS.map(k => [k, { points: 0, speci
  */
 export function translateRunner(r, opts) {
   if (r.npc) return translateNpc(r, opts)
-  const { exportedAt, appVersion, sanitize = escapeText, specs = {} } = opts
+  const { exportedAt, appVersion, sanitize = escapeText, icons = null, specs = {} } = opts
   const name = r.streetName || r.realName || 'Runner', lines = []
-  const ctx = { exportedAt, appVersion, sanitize, say: t => lines.push(t) }
+  const ctx = { exportedAt, appVersion, sanitize, icons: iconSet(icons), say: t => lines.push(t) }
   const flag = id => ({ [MODULE_ID]: { id, exportedAt, appVersion } })
 
   // every Eden skill key, 0 when the runner has none of it (so Replace clears a skill dropped in Chummer)
@@ -236,7 +238,7 @@ const intOf = s => (/^\s*-?\d+\s*$/.test(s?.value ?? '') ? Number(s.value) : nul
  */
 export function beingActor(npc, { name, flags, sanitize = escapeText, icons = null, powers = {} }) {
   const f = flags[MODULE_ID], lines = [], items = []
-  const ctx = { exportedAt: f.exportedAt, appVersion: f.appVersion, sanitize, say: t => lines.push(t) }
+  const ctx = { exportedAt: f.exportedAt, appVersion: f.appVersion, sanitize, icons: iconSet(icons), say: t => lines.push(t) }
   const known = Object.hasOwn(KINDS, npc.kind), [type] = KINDS[known ? npc.kind : 'grunt']
   const stat = Object.fromEntries((npc.stats ?? []).map(s => [s.key, s])), int = k => intOf(stat[k])
   const rating = npc.rating ?? 1, system = {}
@@ -279,7 +281,7 @@ export function beingActor(npc, { name, flags, sanitize = escapeText, icons = nu
       Object.assign(doc.system, { type: /^\s*m/i.test(a.type ?? '') ? 'mana' : 'physical', action: activationKey(a.action),
         range: rangeKey(a.range), duration: durationKey(a.duration) })
     }
-    items.push(icon(doc, e))
+    items.push(icon(doc, e, ctx))
   }
 
   const value = s => (!s.ok ? `${s.printed} (not read)` : s.value !== s.printed ? `${s.printed} → ${s.value}` : s.printed)
@@ -292,13 +294,16 @@ export function beingActor(npc, { name, flags, sanitize = escapeText, icons = nu
   system.notes = '<h3>NPC</h3>' + sanitize(block.join('\n\n')) + (lines.length ? '<h3>From Chummer</h3>' + sanitize(lines.join('\n\n')) : '')
   const actor = { name, type, flags: { [MODULE_ID]: { ...f, npc: { kind: npc.kind, rating: npc.rating ?? null } } },
     prototypeToken: { actorLink: false, disposition: -1 }, system }
+  // the kind's default icon as image and token (an uploaded portrait or token replaces it); no flags.icon: Apply icons never touches actors
+  const img = ctx.icons && iconFor(npcIconKey(npc.kind), null, null, ctx.icons)
+  if (img) { actor.img = img; actor.prototypeToken.texture = { src: img } }
   return { actor, items, lines }
 }
 
 /** A runner file's NPC (runner.npc set): beingActor, plus the runner's background, notes and (usually empty) build items. */
 export function translateNpc(r, { exportedAt, appVersion, sanitize = escapeText, icons = null }) {
   const name = r.streetName || r.realName || 'NPC', own = []
-  const items = runnerItems(r, { exportedAt, appVersion, sanitize, say: t => own.push(t) })
+  const items = runnerItems(r, { exportedAt, appVersion, sanitize, icons: iconSet(icons), say: t => own.push(t) })
   const b = beingActor(r.npc, { name, flags: { [MODULE_ID]: { id: r.id, exportedAt, appVersion } }, sanitize, icons })
   const s = b.actor.system
   s.description = sanitize(r.background)
