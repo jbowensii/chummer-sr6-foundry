@@ -1,0 +1,148 @@
+// Write a translated book (lib/books.js translateBook) into world compendiums. Foundry globals only inside functions
+// (node --check clean). Never throws: a failing pack is reported in `failed` and the other packs carry on.
+import { MODULE_ID } from '../lib/constants.js'
+import { planBookPacks } from '../lib/books.js'
+import { keepArt, mergeActorItems, mergeJournalPages, planPack } from '../lib/plan.js'
+import { replaceable } from '../lib/icons.js'
+import { COMPENDIUM_FOLDER, ensureFolder, FOLDER, itemData, uploadPortrait } from './apply.js'
+
+const CHUNK = 100
+
+// The world pack `name`, created in `folder` when missing (the server fills path, system and package: 'world').
+// { pack, made }: made when this call created it.
+async function getPack(name, label, type, folder) {
+  const found = game.packs.get(`world.${name}`)
+  if (found?.documentName === type) return { pack: found, made: false }
+  if (found) {
+    const kind = game.i18n.localize(CONFIG[found.documentName]?.documentClass?.metadata?.labelPlural ?? found.documentName)
+    throw new Error(game.i18n.format('SR6I.PackTypeClash', { id: found.collection, type: kind }))
+  }
+  const pack = await foundry.documents.collections.CompendiumCollection.createCompendium({ name, label, type })
+  if (!pack?.collection) throw new Error(`Could not create the compendium ${label}`)
+  try { await pack.setFolder(folder) } catch (e) { await dropPack(pack); throw e }
+  return { pack, made: true }
+}
+const dropPack = async pack => { try { await pack.deleteCompendium() } catch (e) { console.error(`${MODULE_ID} | ${pack.title}: deleting the empty compendium failed`, e) } }
+
+// Write docs into the pack, creating it only now that there is something to write. A pack this call created is
+// deleted again when the write fails, so a failure never leaves an empty compendium behind.
+async function writeNew(name, label, type, folder, docs, after) {
+  const { pack, made } = await getPack(name, label, type, folder)
+  try { return await writePack(pack, docs, after) } catch (e) {
+    if (made) await dropPack(pack)
+    throw e
+  }
+}
+
+// A folder made only when needed (ensureFolder), remembering whether this run made it so an unused one can go again.
+const lazyFolder = (name, parent, made) => {
+  let f
+  return async () => {
+    if (f) return f
+    const p = parent && await parent()
+    const had = game.folders.find(x => x.type === 'Compendium' && x.name === name && (x.folder?.id ?? null) === (p?.id ?? null))
+    f = had ?? await ensureFolder(name, p, 'Compendium')
+    if (!had) made.push(f)
+    return f
+  }
+}
+// Folders this run made that hold nothing (no pack was written into them) are deleted, innermost first.
+async function dropEmptyFolders(made) {
+  for (const f of made.reverse()) {
+    try { if (!f.getSubfolders().length && !game.packs.some(p => p.folder?.id === f.id)) await f.delete() } catch {}
+  }
+}
+
+// A compendium's NPC portraits (img) and tokens (token image; without one the token shows the portrait), uploaded only
+// once their pack is written: Foundry has no call to delete an uploaded file, so a failed write must never have uploaded
+// one. A failed upload keeps the default artwork. The file name is fixed per NPC and export, so a re-import overwrites
+// it. An image or token image the user chose (kept by writePack) is never replaced.
+export const portraitsAfter = (portraits = {}, tokens = {}, say) => async (docs, op) => {
+  for (const d of docs) {
+    const url = portraits[d._id], tok = tokens[d._id], f = d.flags[MODULE_ID]
+    if (!url && !tok) continue
+    try {
+      const up = { _id: d._id }, id = `${f.source}-${f.id}`
+      if (url && replaceable(d.img)) up.img = await uploadPortrait(url, id, f.exportedAt)
+      if (replaceable(d.prototypeToken?.texture?.src)) {
+        const src = tok ? await uploadPortrait(tok, id, f.exportedAt, 'tokens') : up.img
+        if (src) up['prototypeToken.texture.src'] = src
+      }
+      if (Object.keys(up).length > 1) await Actor.updateDocuments([up], op)
+    } catch (e) {
+      console.error(`${MODULE_ID} | ${d.name}: portrait`, e)
+      say(`${d.name}: portrait or token not uploaded (${e?.message ?? e}) → default artwork`)
+    }
+  }
+}
+
+// Replace by id: delete the entries the file has, then create all of them with their ids, in chunks. If a create
+// fails, what this run made is deleted and the replaced entries are put back, so a failure never loses them.
+// A replaced journal keeps the pages the GM added to it, a replaced actor the GM's own items, and a replaced entry
+// (and a replaced actor's rebuilt items) the image the user chose (lib/plan.js keepArt). Entries not in the file stay.
+// after(docs, op): run once everything is written, while the pack is still unlocked.
+async function writePack(pack, incoming, after) {
+  const Doc = pack.documentClass, op = { pack: pack.collection }
+  const { replace, create, duplicates, ...plan } = planPack(new Set(pack.index.keys()), incoming)
+  let docs = plan.docs
+  // V14 refuses writes to a locked pack, even a world pack the GM locked: unlock for this write and lock it again after.
+  const locked = pack.locked
+  if (locked) await pack.configure({ locked: false })
+  try {
+    const old = replace.length ? (await pack.getDocuments({ _id__in: replace })).map(d => d.toObject()) : []
+    const [kept, merge] = { JournalEntry: ['pages', mergeJournalPages], Actor: ['items', mergeActorItems] }[pack.documentName] ?? []
+    if (old.length) {
+      const was = new Map(old.map(d => [d._id, d]))
+      docs = docs.map(d => {
+        const o = was.get(d._id)
+        if (!o) return d
+        const k = keepArt(o, d)
+        return merge ? { ...k, [kept]: merge(o[kept], k[kept] ?? []) } : k
+      })
+    }
+    if (replace.length) await Doc.deleteDocuments(replace, op)
+    const made = []
+    try {
+      for (let i = 0; i < docs.length; i += CHUNK) {
+        made.push(...await Doc.createDocuments(docs.slice(i, i + CHUNK), { ...op, keepId: true }))
+      }
+    } catch (e) {
+      try { if (made.length) await Doc.deleteDocuments(made.map(d => d.id), op) } catch {}
+      try { if (old.length) await Doc.createDocuments(old, { ...op, keepId: true }) } catch (restore) {
+        console.error(`${MODULE_ID} | ${pack.title}: restoring the replaced entries failed`, restore)
+        throw new Error(`${e?.message ?? e} (restoring the replaced entries failed)`, { cause: e })
+      }
+      throw e
+    }
+    await after?.(docs, op)
+    return { label: pack.title, created: create.length, replaced: replace.length, duplicates: duplicates.map(d => d.name ?? d._id) }
+  } finally {
+    if (locked) await pack.configure({ locked: true })
+  }
+}
+
+// a pack actor's items with their effects in Foundry's shape (book items carry none: no bonuses in a book entry)
+const withItemData = d => (d.items ? { ...d, items: d.items.map(itemData) } : d)
+const fail = (pack, name, error) => { console.error(`${MODULE_ID} | ${name}`, error); return { pack, name, error } }
+
+/**
+ * t: translateBook output. onProgress({ key, n, total }), key = the pack key before each pack is written. Packs go in
+ * `<book name> (<source id>)` inside topFolder (by default FOLDER, COMPENDIUM_FOLDER for a GM's compendium); pack names
+ * get `prefix` (Quench). Actor packs upload the compendium NPCs' portraits and tokens after their write.
+ * Returns { source, counts: { [pack name]: { label, created, replaced, duplicates: [entry name] } }, failed: [{ pack, name, error }], notes: [portrait lines] }.
+ */
+export async function importBook(t, { onProgress, prefix = '', topFolder = t.source.compendium ? COMPENDIUM_FOLDER : FOLDER } = {}) {
+  const src = t.source, counts = {}, failed = [], made = [], notes = []
+  // nothing to write: no pack and no folder
+  const packs = planBookPacks(t, prefix)
+  const folder = lazyFolder(`${src.name} (${src.id})`, lazyFolder(topFolder, null, made), made)
+  for (const [i, p] of packs.entries()) {
+    onProgress?.({ key: p.key, n: i + 1, total: packs.length })
+    try {
+      const after = p.type === 'Actor' ? portraitsAfter(t.portraits, t.tokens, l => notes.push(l)) : undefined
+      counts[p.name] = await writeNew(p.name, p.label, p.type, await folder(), p.docs.map(withItemData), after)
+    } catch (error) { failed.push(fail(p.name, p.label, error)) }
+  }
+  await dropEmptyFolders(made)
+  return { source: src, counts, failed, notes }
+}

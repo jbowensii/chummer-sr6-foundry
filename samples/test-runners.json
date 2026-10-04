@@ -27,7 +27,7 @@
     "initiation": 1,
     "submersion": 0
    },
-   "portrait": "data:image/png;base64,iVBORw0KGgo=",
+   "portrait": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGPQ0NAAAAD0AHmj6usRAAAAAElFTkSuQmCC",
    "token": null,
    "attributes": {
     "bod": {
@@ -47,8 +47,8 @@
      "augmented": 2
     },
     "wil": {
-     "natural": 4,
-     "augmented": 4
+     "natural": 3,
+     "augmented": 3
     },
     "log": {
      "natural": 5,
@@ -75,18 +75,18 @@
      "augmented": 0
     }
    },
-   "essence": 5.8,
+   "essence": 5.88,
    "edge": 3,
    "skills": [
     {
-     "id": "firearms",
+     "id": "mur.firearms",
      "name": "Firearms",
      "attr": "agi",
      "rank": 4,
      "spec": "Pistols (Light)"
     },
     {
-     "id": "sorcery",
+     "id": "mur.sorcery",
      "name": "Sorcery",
      "attr": "mag",
      "rank": 5,
@@ -94,13 +94,13 @@
      "expertise": "Spellcasting"
     },
     {
-     "id": "close-combat",
+     "id": "mur.close-combat",
      "name": "Close Combat",
      "attr": "agi",
      "rank": 2
     },
     {
-     "id": "basket-weaving",
+     "id": "mus.basket-weaving",
      "name": "Underwater Basket Weaving",
      "attr": "log",
      "rank": 1
@@ -128,7 +128,6 @@
    ],
    "qualities": [
     {
-     "uid": "q1",
      "id": "mus.lucky-break",
      "kind": "qualities",
      "name": "Lucky Break",
@@ -143,37 +142,42 @@
      "values": {
       "karma": 4
      },
+     "description": "Made-up luck.",
+     "uid": "q1",
      "positive": true,
      "level": 1,
      "free": false
     },
     {
-     "uid": "q2",
-     "id": "mus.night-eyes",
+     "id": "mur.night-eyes",
      "kind": "qualities",
      "name": "Night Eyes",
-     "source": "MUS",
+     "source": "MUR",
      "page": 10,
      "canon": true,
      "attrs": {
-      "kind": "positive"
+      "kind": "positive",
+      "karma": "0"
      },
      "parts": [],
-     "values": {},
+     "values": {
+      "karma": 0
+     },
+     "uid": "q2",
      "positive": true,
      "level": 1,
      "free": true
     },
     {
-     "uid": "q3",
-     "id": "mus.made-up-debt",
+     "id": "mur.made-up-debt",
      "kind": "qualities",
      "name": "Made-up Debt",
-     "source": "MUS",
+     "source": "MUR",
      "page": 10,
      "canon": true,
      "attrs": {
       "kind": "negative",
+      "karma": "2",
       "perLevel": "true",
       "maxLevel": "3"
      },
@@ -181,6 +185,7 @@
      "values": {
       "karma": 2
      },
+     "uid": "q3",
      "positive": false,
      "level": 2,
      "free": false,
@@ -189,7 +194,6 @@
    ],
    "picks": [
     {
-     "uid": "p1",
      "id": "mus.zap-bolt",
      "kind": "spells",
      "name": "Zap Bolt",
@@ -202,22 +206,22 @@
       "range": "LOS",
       "type": "M",
       "duration": "I",
-      "dv": "F-3",
+      "dv": "3",
       "damage": "P"
      },
      "parts": [],
      "values": {
       "drain": 3
      },
+     "uid": "p1",
      "pick": "spells",
      "bonuses": []
     },
     {
-     "uid": "p2",
-     "id": "mus.glimmer",
+     "id": "mur.glimmer",
      "kind": "spells",
      "name": "Glimmer",
-     "source": "MUS",
+     "source": "MUR",
      "page": 10,
      "canon": true,
      "attrs": {
@@ -228,11 +232,11 @@
      },
      "parts": [],
      "values": {},
+     "uid": "p2",
      "pick": "spells",
      "bonuses": []
     },
     {
-     "uid": "p3",
      "id": "mus.test-ward",
      "kind": "rituals",
      "name": "Test Ward",
@@ -247,11 +251,11 @@
      "values": {
       "threshold": 4
      },
+     "uid": "p3",
      "pick": "rituals",
      "bonuses": []
     },
     {
-     "uid": "p4",
      "id": "mus.quick-step",
      "kind": "adeptpowers",
      "name": "Quick Step",
@@ -265,8 +269,9 @@
      },
      "parts": [],
      "values": {
-      "powerCost": 1
+      "powerCost": 0.5
      },
+     "uid": "p4",
      "pick": "adeptpowers",
      "level": 2,
      "bonuses": [
@@ -277,7 +282,6 @@
      ]
     },
     {
-     "uid": "p5",
      "id": "mus.made-up-centering",
      "kind": "metamagics",
      "name": "Made-up Centering",
@@ -287,13 +291,13 @@
      "attrs": {},
      "parts": [],
      "values": {},
+     "uid": "p5",
      "pick": "metamagics",
      "bonuses": []
     }
    ],
    "purchases": [
     {
-     "uid": "w1",
      "id": "mus.pocket-zapper",
      "kind": "weapons",
      "name": "Pocket Zapper",
@@ -328,17 +332,18 @@
       ],
       "ammo": 4
      },
+     "description": "A made-up zapper.",
+     "uid": "w1",
      "qty": 1,
      "worn": false,
      "bonuses": [],
      "accessories": []
     },
     {
-     "uid": "w2",
-     "id": "mus.odd-blade",
+     "id": "mur.odd-blade",
      "kind": "weapons",
      "name": "Odd Blade",
-     "source": "MUS",
+     "source": "MUR",
      "page": 10,
      "canon": true,
      "attrs": {
@@ -360,14 +365,14 @@
        null
       ]
      },
+     "uid": "w2",
      "qty": 1,
      "worn": false,
+     "note": "Made-up engraving.",
      "bonuses": [],
-     "accessories": [],
-     "note": "Made-up engraving."
+     "accessories": []
     },
     {
-     "uid": "a1",
      "id": "mus.test-jacket",
      "kind": "armor",
      "name": "Test Jacket",
@@ -377,22 +382,20 @@
      "attrs": {
       "category": "Body armor",
       "defense": "3",
-      "avail": "2",
       "cost": "500"
      },
      "parts": [],
      "values": {
       "cost": 500,
-      "avail": 2,
       "defense": 3
      },
+     "uid": "a1",
      "qty": 1,
      "worn": true,
      "bonuses": [],
      "accessories": []
     },
     {
-     "uid": "c1",
      "id": "mus.reflex-booster",
      "kind": "augmentations",
      "name": "Made-up Reflex Booster",
@@ -415,7 +418,9 @@
       "legality": "I",
       "essence": 0.12
      },
+     "uid": "c1",
      "qty": 1,
+     "grade": "used",
      "worn": false,
      "bonuses": [
       {
@@ -429,11 +434,10 @@
      ],
      "accessories": [
       {
-       "uid": "c1a",
-       "id": "mus.booster-port",
+       "id": "mur.booster-port",
        "kind": "augmentations",
        "name": "Booster Port",
-       "source": "MUS",
+       "source": "MUR",
        "page": 10,
        "canon": true,
        "attrs": {
@@ -447,16 +451,15 @@
         "cost": 100,
         "capacity": 1
        },
+       "uid": "c1a",
        "qty": 1,
        "worn": false,
        "bonuses": [],
        "accessories": []
       }
-     ],
-     "grade": "used"
+     ]
     },
     {
-     "uid": "e1",
      "id": "mus.test-link",
      "kind": "electronics",
      "name": "Test Link",
@@ -476,17 +479,17 @@
       "cost": 700,
       "avail": 2
      },
+     "uid": "e1",
      "qty": 1,
      "worn": false,
      "bonuses": [],
      "accessories": []
     },
     {
-     "uid": "g1",
-     "id": "mus.power-focus",
+     "id": "mur.power-focus",
      "kind": "gear",
      "name": "Made-up Power Focus",
-     "source": "MUS",
+     "source": "MUR",
      "page": 10,
      "canon": true,
      "attrs": {
@@ -499,13 +502,13 @@
       "rating": 2,
       "cost": 8000
      },
+     "uid": "g1",
      "qty": 1,
      "worn": true,
      "bonuses": [],
      "accessories": []
     },
     {
-     "uid": "g2",
      "id": "mus.rope",
      "kind": "gear",
      "name": "Glitter Rope",
@@ -520,17 +523,17 @@
      "values": {
       "cost": 50
      },
+     "uid": "g2",
      "qty": 3,
      "worn": false,
      "bonuses": [],
      "accessories": []
     },
     {
-     "uid": "v1",
-     "id": "mus.test-bike",
+     "id": "mur.test-bike",
      "kind": "vehicles",
      "name": "Test Bike",
-     "source": "MUS",
+     "source": "MUR",
      "page": 10,
      "canon": true,
      "attrs": {
@@ -570,13 +573,13 @@
        "seats": 1
       }
      },
+     "uid": "v1",
      "qty": 1,
      "worn": false,
      "bonuses": [],
      "accessories": []
     },
     {
-     "uid": "x1",
      "kind": "gear",
      "name": "Lucky Coin",
      "canon": false,
@@ -585,6 +588,7 @@
      "values": {
       "cost": 5
      },
+     "uid": "x1",
      "qty": 1,
      "worn": false,
      "bonuses": [],
@@ -604,7 +608,7 @@
     "id": "mus.made-up-squat",
     "name": "Made-up Hideout",
     "months": 2,
-    "cost": 900
+    "cost": 450
    },
    "sins": [
     {
@@ -634,7 +638,7 @@
      "dice": 3
     },
     "astralInit": {
-     "base": 9,
+     "base": 8,
      "dice": 2
     },
     "monitors": {
@@ -643,20 +647,59 @@
      "overflow": 3
     },
     "defenseRating": 6,
-    "composure": 7,
-    "judgeIntentions": 8,
+    "composure": 6,
+    "judgeIntentions": 7,
     "memory": 9,
-    "liftCarry": 7,
-    "drain": 9,
+    "liftCarry": 6,
+    "drain": 8,
     "pools": [
      {
-      "skill": "firearms",
+      "skill": "mur.close-combat",
+      "label": "Close Combat",
+      "rank": 2,
+      "attr": "agi",
+      "dp": 7
+     },
+     {
+      "skill": "mur.firearms",
       "label": "Firearms",
       "rank": 4,
       "attr": "agi",
       "dp": 9,
       "spec": "Pistols (Light)",
-      "specDp": 11
+      "specDp": 13
+     },
+     {
+      "skill": "crb.gab",
+      "label": "Gab",
+      "rank": 0,
+      "attr": "cha",
+      "dp": 1
+     },
+     {
+      "skill": "mur.sorcery",
+      "label": "Sorcery",
+      "rank": 5,
+      "attr": "mag",
+      "dp": 10,
+      "spec": "Made-up Spellshaping",
+      "specDp": 14,
+      "expertise": "Spellcasting",
+      "expertiseDp": 15
+     },
+     {
+      "skill": "crb.tinkering",
+      "label": "Tinkering",
+      "rank": 0,
+      "attr": "log",
+      "dp": 3
+     },
+     {
+      "skill": "mus.basket-weaving",
+      "label": "Underwater Basket Weaving",
+      "rank": 1,
+      "attr": "log",
+      "dp": 6
      }
     ]
    },
@@ -666,16 +709,16 @@
     {
      "at": "2026-10-01T10:00:00.000Z",
      "type": "finalize",
-     "summary": "Finalized",
+     "summary": "Creation finished",
      "karma": 7,
      "nuyen": 1234
     },
     {
      "at": "2026-10-02T10:00:00.000Z",
-     "type": "earn",
-     "summary": "Made-up run",
-     "karma": -5,
-     "nuyen": -2000
+     "type": "note",
+     "summary": "Made-up debrief.",
+     "karma": 0,
+     "nuyen": 0
     }
    ]
   },
@@ -687,7 +730,7 @@
    "realName": "",
    "finalized": false,
    "metatype": {
-    "id": "mus.human",
+    "id": "mur.human",
     "name": "Human"
    },
    "magic": {
@@ -699,36 +742,36 @@
    "token": null,
    "attributes": {
     "bod": {
-     "natural": 4,
-     "augmented": 4
+     "natural": 1,
+     "augmented": 1
     },
     "agi": {
-     "natural": 3,
-     "augmented": 3
+     "natural": 1,
+     "augmented": 1
     },
     "rea": {
-     "natural": 3,
-     "augmented": 3
+     "natural": 1,
+     "augmented": 1
     },
     "str": {
-     "natural": 4,
-     "augmented": 4
+     "natural": 1,
+     "augmented": 1
     },
     "wil": {
-     "natural": 2,
-     "augmented": 2
+     "natural": 1,
+     "augmented": 1
     },
     "log": {
-     "natural": 2,
-     "augmented": 2
+     "natural": 1,
+     "augmented": 1
     },
     "int": {
-     "natural": 3,
-     "augmented": 3
+     "natural": 1,
+     "augmented": 1
     },
     "cha": {
-     "natural": 2,
-     "augmented": 2
+     "natural": 1,
+     "augmented": 1
     },
     "edg": {
      "natural": 1,
@@ -753,7 +796,7 @@
    "contacts": [],
    "lifestyle": null,
    "sins": [],
-   "karma": 0,
+   "karma": 40,
    "nuyen": 0,
    "background": "Invented for the tests.",
    "notes": "",
@@ -767,7 +810,7 @@
      "id": "mus.ganger",
      "name": "Made-up Ganger",
      "source": "MUS",
-     "page": 40
+     "page": 10
     },
     "stats": [
      {
@@ -834,17 +877,17 @@
       "ok": true
      },
      {
-      "key": "init",
-      "label": "Initiative",
-      "printed": "6 + 1D6",
-      "value": "6 + 1D6",
-      "ok": true
-     },
-     {
       "key": "dr",
       "label": "Defense Rating",
       "printed": "2D6",
       "value": "2D6",
+      "ok": true
+     },
+     {
+      "key": "init",
+      "label": "Initiative",
+      "printed": "6 + 1D6",
+      "value": "6 + 1D6",
       "ok": true
      }
     ],

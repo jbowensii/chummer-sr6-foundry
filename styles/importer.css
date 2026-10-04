@@ -1,0 +1,11 @@
+.sr6i { display: flex; flex-direction: column; gap: 0.5rem; }
+.sr6i-error { color: var(--color-level-error, #c00); }
+.sr6i-warning { color: var(--color-level-warning, #b60); }
+.sr6i-rows, .sr6i-report { list-style: none; margin: 0; padding: 0; }
+.sr6i-row { display: flex; align-items: flex-start; gap: 0.5rem; padding: 0.25rem 0; border-bottom: 1px solid var(--color-border-light-2, #ccc); }
+.sr6i-row img, .sr6i-noportrait { width: 36px; height: 36px; object-fit: cover; border: none; flex: none; font-size: 28px; text-align: center; }
+.sr6i-info { flex: 1; }
+.sr6i-date { color: var(--color-text-light-6, #777); }
+.sr6i-choices { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+.sr6i-textonly, .sr6i-counts, .sr6i-pack { font-size: var(--font-size-12, 12px); }
+.sr6i-import-btn { flex: 0 0 100%; }
