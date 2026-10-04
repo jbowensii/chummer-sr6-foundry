@@ -1,6 +1,7 @@
 // Entry point: the import window is built at init; GMs get an "Import from Chummer" button in the Actors and Compendium sidebars.
 import { createImportApp } from './foundry/app.js'
-import { loadIconIndex } from './foundry/icons.js'
+import { createIconsApp, loadIconIndex } from './foundry/icons.js'
+import { MODULE_ID } from './lib/constants.js'
 import { registerQuench } from './foundry/quench.js'
 
 let ImportApp = null
@@ -34,6 +35,9 @@ function addButton(root, tab) {
 Hooks.once('init', () => {
   iconsLoaded = loadIconIndex().then(i => { icons = i })
   ImportApp = createImportApp(() => icons)
+  // restricted: GM only
+  game.settings.registerMenu(MODULE_ID, 'applyIcons', { name: 'SR6I.Icons.Title', label: 'SR6I.Icons.Button',
+    hint: 'SR6I.Icons.Hint', icon: 'fas fa-image', type: createIconsApp(() => icons), restricted: true })
 })
 Hooks.on('renderActorDirectory', (app, html) => addButton(html, 'actors'))
 Hooks.on('renderCompendiumDirectory', (app, html) => addButton(html, 'compendium'))

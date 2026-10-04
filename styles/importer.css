@@ -7,5 +7,5 @@
 .sr6i-info { flex: 1; }
 .sr6i-date { color: var(--color-text-light-6, #777); }
 .sr6i-choices { display: flex; gap: 0.75rem; flex-wrap: wrap; }
-.sr6i-textonly { font-size: var(--font-size-12, 12px); }
+.sr6i-textonly, .sr6i-counts, .sr6i-pack { font-size: var(--font-size-12, 12px); }
 .sr6i-import-btn { flex: 0 0 100%; }

@@ -6,7 +6,6 @@
     "ReadFailed": "This file couldn’t be read: {reason}",
     "NotEden": "This world runs {system}, not Shadowrun 6th Edition (shadowrun6-eden).",
     "NewerEden": "Tested with shadowrun6-eden {tested}; this world runs {version}. The import may miss new fields.",
-    "BooksNotYet": "This is a Chummer SR6 book file. Book import isn’t available in this version of the module yet.",
     "Exported": "exported {date}",
     "InWorld": "In world: exported {world} · This file: exported {file} ({compare})",
     "Newer": "newer",
@@ -29,6 +28,31 @@
     "TextOnly": "Turned into notes:",
     "Open": "Open {name}",
     "Close": "Close",
-    "RunnersAndNpcs": "{runners} runners · {npcs} NPCs. NPCs go into the Actors folder “{folder}”."
+    "RunnersAndNpcs": "{runners} runners · {npcs} NPCs. NPCs go into the Actors folder “{folder}”.",
+    "IncludeBook": "Import this book",
+    "Canon": "Canon",
+    "NonCanon": "Non-canon",
+    "Compendium": "GM’s compendium (House) · goes into the Compendium folder “{folder}”",
+    "DescriptionsIn": "descriptions included",
+    "DescriptionsOut": "no descriptions",
+    "BookProgress": "Importing {name} ({n} of {total})…",
+    "BookPackProgress": "Importing {name}: {pack} ({n} of {total})…",
+    "PackResult": "{label}: created {created}, replaced {replaced}",
+    "PackFailed": "{label}: failed: {reason}",
+    "Duplicate": "{label}: “{name}” is in this file more than once; the last one was kept.",
+    "NothingInBook": "Nothing in this book that Eden uses",
+    "LeftAlone": "Entries not in this file were left as they were.",
+    "OpenCompendiums": "Open compendiums",
+    "PackTypeClash": "A compendium named {id} already holds {type}; delete it or move its contents, then import again.",
+    "NothingSelected": "Nothing selected to import.",
+    "Icons": {
+      "Title": "Apply icons",
+      "Button": "Apply icons",
+      "Hint": "Point imported items at the module's icons again, e.g. after a module update adds art.",
+      "Explain": "Sets the module's icons on imported items in the world, on runners and NPCs, and in the Chummer SR6 compendiums. An image you chose yourself is never replaced: only empty images, Foundry's and shadowrun6-eden's stock images, and the module's own icons are. Portraits and tokens are not touched.",
+      "Working": "Applying icons…",
+      "Done": "Updated {updated} · kept {kept} you chose · {unchanged} already right.",
+      "NoIndex": "The module's icon list couldn't be loaded (see the console), so no icons can be applied."
+    }
   }
 }

@@ -8,6 +8,7 @@
       {{#each report}}
       <li>
         <strong>{{name}}</strong>{{#if outcome}}: <span class="{{#if failed}}sr6i-error{{/if}}">{{outcome}}</span>{{/if}}
+        {{#each packs}}<div class="sr6i-pack {{#if failed}}sr6i-error{{/if}}">{{text}}</div>{{/each}}
         {{#if textOnly.length}}
           <div class="sr6i-textonly">{{localize "SR6I.TextOnly"}}
             <ul>{{#each textOnly}}<li>{{this}}</li>{{/each}}</ul>
@@ -16,7 +17,11 @@
       </li>
       {{/each}}
     </ul>
+    {{#if bookReport}}<p>{{localize "SR6I.LeftAlone"}}</p>{{/if}}
     <footer class="form-footer">
+      {{#if bookReport}}
+        <button type="button" data-action="openCompendiums"><i class="fa-solid fa-book-atlas"></i> {{localize "SR6I.OpenCompendiums"}}</button>
+      {{/if}}
       {{#each report}}{{#if actorId}}
         <button type="button" data-action="openActor" data-actor-id="{{actorId}}"><i class="fas fa-user"></i> {{openLabel}}</button>
       {{/if}}{{/each}}
@@ -29,6 +34,24 @@
       </label>
       {{#if refused}}<p class="sr6i-error" role="alert">{{refused}}</p>{{/if}}
     {{/unless}}
+
+    {{#if books}}
+      <ul class="sr6i-rows">
+        {{#each books}}
+        <li class="sr6i-row">
+          <input type="checkbox" name="book-{{@index}}" {{#unless error}}checked{{else}}disabled{{/unless}} aria-label="{{../bookLabel}}: {{name}}">
+          <div class="sr6i-info">
+            <strong>{{name}}</strong> <span class="sr6i-date">{{id}} · {{canon}} · {{descriptions}}</span>
+            {{#if error}}<div class="sr6i-error">{{error}}</div>{{else}}<div class="sr6i-counts">{{counts}}</div>{{/if}}
+          </div>
+        </li>
+        {{/each}}
+      </ul>
+      <p class="sr6i-progress" role="status">{{progress}}</p>
+      <footer class="form-footer">
+        <button type="button" data-action="import" {{#if busy}}disabled{{/if}}><i class="fas fa-file-import"></i> {{localize "SR6I.Import"}}</button>
+      </footer>
+    {{/if}}
 
     {{#if rows}}
       {{#if summary}}<p>{{summary}}</p>{{/if}}

@@ -45,7 +45,8 @@ export function effectData(e) {
     return { ...rest, system: { changes: changes.map(c => ({ key: c.key, type: 'add', value: c.value })) } }
   return { ...rest, changes: changes.map(c => ({ key: c.key, value: c.value, mode: CONST.ACTIVE_EFFECT_MODES.ADD })) }
 }
-const itemData = i => (i.effects ? { ...i, effects: i.effects.map(effectData) } : i)
+// an item from translate.js with its effects as ActiveEffect data (world actors and pack actors alike)
+export const itemData = i => (i.effects ? { ...i, effects: i.effects.map(effectData) } : i)
 
 /** Eden's specialization labels as Foundry loaded them: { [skill]: { [specKey]: label } } (never shipped: Eden is GPL-3). */
 export const edenSpecLabels = () => game.i18n.translations.shadowrun6?.special ?? game.i18n._fallback?.shadowrun6?.special ?? {}

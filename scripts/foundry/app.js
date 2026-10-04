@@ -2,13 +2,14 @@
 import { MODULE_ID, TESTED_EDEN } from '../lib/constants.js'
 import { readExport } from '../lib/read.js'
 import { escapeText, npcHeadline, translateRunner } from '../lib/translate.js'
-import { defaultChoice } from '../lib/plan.js'
-import { applyRunner, edenSpecLabels, findExisting, NPC_FOLDER } from './apply.js'
+import { defaultChoice, planPack } from '../lib/plan.js'
+import { PACKS, PORTRAIT, translateBook } from '../lib/books.js'
+import { applyRunner, COMPENDIUM_FOLDER, edenSpecLabels, findExisting, NPC_FOLDER } from './apply.js'
+import { importBook } from './books.js'
 
 const flagOf = d => d?.flags?.[MODULE_ID]
 const time = x => Date.parse(x ?? '') || 0
-// Only a real image goes into <img> and the world's files (apply.js names it .png or .jpg).
-const PORTRAIT = /^data:image\/(png|jpe?g);base64,/i
+// Only a real image (PORTRAIT) goes into <img> and the world's files (apply.js names it .png or .jpg).
 const OUTCOME = { create: 'SR6I.Created', replace: 'SR6I.Replaced', new: 'SR6I.NewVersion', skip: 'SR6I.Skipped' }
 const SYSTEM = 'shadowrun6-eden'
 
@@ -27,11 +28,12 @@ export function createImportApp(getIcons = () => null) {
       classes: ['sr6i-app'],
       window: { title: 'SR6I.Title', icon: 'fas fa-file-import' },
       position: { width: 560, height: 'auto' },
-      actions: { import: ChummerSr6ImportApp.#onImport, openActor: ChummerSr6ImportApp.#onOpen, done: ChummerSr6ImportApp.#onDone },
+      actions: { import: ChummerSr6ImportApp.#onImport, openActor: ChummerSr6ImportApp.#onOpen, done: ChummerSr6ImportApp.#onDone,
+        openCompendiums: ChummerSr6ImportApp.#onOpenCompendiums },
     }
     static PARTS = { main: { template: `modules/${MODULE_ID}/templates/import.hbs`, scrollable: ['.sr6i-rows', '.sr6i-report'] } }
 
-    file = null; rows = null; refused = ''; busy = false; report = null
+    file = null; rows = null; books = null; refused = ''; busy = false; report = null; bookReport = false
 
     async _prepareContext(options) {
       const sys = game.system
@@ -51,10 +53,19 @@ export function createImportApp(getIcons = () => null) {
             label: L({ replace: 'SR6I.Replace', new: 'SR6I.New', skip: 'SR6I.Skip' }[value]) })),
         }
       })
+      const books = this.books?.map(({ book, t, error }) => ({
+        name: book.source.name, id: book.source.id, error: error && F('SR6I.Failed', { reason: error }),
+        canon: book.source.compendium ? F('SR6I.Compendium', { folder: COMPENDIUM_FOLDER }) : L(book.source.canon ? 'SR6I.Canon' : 'SR6I.NonCanon'),
+        descriptions: L(this.file.descriptions === true ? 'SR6I.DescriptionsIn' : 'SR6I.DescriptionsOut'),
+        // after de-duplicating ids, as the write does (planPack); rules count their pages, not the chapter journals
+        counts: t && Object.keys(PACKS).filter(k => t.packs[k]?.length).map(k => { const { docs } = planPack(new Set(), t.packs[k])
+          const n = k === 'rules' ? docs.reduce((n, j) => n + j.pages.length, 0) : docs.length
+          return `${PACKS[k][0]} ${n}` }).join(' · ') || L('SR6I.NothingInBook'),
+      }))
       const nNpc = this.rows?.filter(r => r.runner.npc).length ?? 0
       const summary = nNpc ? F('SR6I.RunnersAndNpcs', { runners: this.rows.length - nNpc, npcs: nNpc, folder: NPC_FOLDER }) : ''
-      return { systemError, systemWarning, rows, summary, refused: this.refused, busy: this.busy, report: this.report,
-        includeLabel: L('SR6I.Include'), progress: '' }
+      return { systemError, systemWarning, rows, summary, books, bookReport: this.bookReport, refused: this.refused, busy: this.busy,
+        report: this.report, includeLabel: L('SR6I.Include'), bookLabel: L('SR6I.IncludeBook'), progress: '' }
     }
 
     async _onRender(context, options) {
@@ -76,12 +87,18 @@ export function createImportApp(getIcons = () => null) {
       if (!file) return
       let res
       try { res = readExport(await file.text()) } catch (e) { res = { ok: false, reason: F('SR6I.ReadFailed', { reason: e?.message ?? String(e) }) } }
-      // ponytail: book files are read but not imported until the book import lands (plan M8)
-      if (res.ok && res.file.kind === 'books') res = { ok: false, reason: L('SR6I.BooksNotYet') }
       this.file = res.ok ? res.file : null
       this.refused = res.ok ? '' : res.reason
+      const books = res.ok && res.file.kind === 'books'
+      // Translated now for the preview's counts; Import writes these. A book that can't be translated is shown failed.
+      this.books = books ? res.file.books.map(book => {
+        try {
+          return { book, t: translateBook(book, { exportedAt: book.exportedAt ?? res.file.exportedAt, appVersion: res.file.app?.version ?? '',
+            descriptions: res.file.descriptions === true, sanitize, icons: getIcons() }) }
+        } catch (e) { return { book, error: e?.message ?? String(e) } }
+      }) : null
       const image = s => (PORTRAIT.test(s ?? '') ? s : null)
-      this.rows = res.ok ? res.file.runners.map(runner => {
+      this.rows = res.ok && !books ? res.file.runners.map(runner => {
         const existing = findExisting(runner.id), exportedAt = runner.exportedAt ?? res.file.exportedAt
         return { runner, existing, exportedAt, portrait: image(runner.portrait), token: image(runner.token),
           choice: defaultChoice(flagOf(existing), { exportedAt }) }
@@ -90,6 +107,7 @@ export function createImportApp(getIcons = () => null) {
     }
 
     static async #onImport() {
+      if (this.books) return this.#importBooks()
       if (this.busy || !this.rows || game.system.id !== SYSTEM) return
       const el = this.element
       // Read the choices from the form before anything re-renders it.
@@ -121,7 +139,39 @@ export function createImportApp(getIcons = () => null) {
       this.render()
     }
 
+    async #importBooks() {
+      if (this.busy || game.system.id !== SYSTEM) return
+      const el = this.element
+      const jobs = this.books.filter((b, i) => el.querySelector(`[name="book-${i}"]`)?.checked)
+      const progress = el.querySelector('.sr6i-progress')
+      if (!jobs.length) { if (progress) progress.textContent = L('SR6I.NothingSelected'); return }
+      this.busy = true
+      for (const b of el.querySelectorAll('button[data-action=import], input')) b.disabled = true
+      // A book that couldn't be translated has no tick; the report lists it as failed.
+      const report = this.books.filter(b => b.error).map(({ book, error }) =>
+        ({ name: book.source.name, failed: true, outcome: F('SR6I.Failed', { reason: error }), packs: [], textOnly: [] }))
+      let n = 0
+      for (const { book, t } of jobs) {
+        const name = book.source.name
+        if (progress) progress.textContent = F('SR6I.BookProgress', { name, n: ++n, total: jobs.length })
+        const onProgress = ({ key, n: i, total }) => {
+          if (progress) progress.textContent = F('SR6I.BookPackProgress', { name, pack: PACKS[key][0], n: i, total })
+        }
+        let res
+        try { res = await importBook(t, { onProgress }) } catch (error) { res = { counts: {}, failed: [{ name, error }] } }  // importBook shouldn't throw; the window mustn't stick busy
+        // one line per pack written or failed; an id the file has twice is noted with the report lines
+        const counts = Object.values(res.counts)
+        const packs = [...counts.map(c => ({ text: F('SR6I.PackResult', c) })),
+          ...res.failed.map(f => ({ failed: true, text: F('SR6I.PackFailed', { label: f.name, reason: f.error?.message ?? String(f.error) }) }))]
+        const dupes = counts.flatMap(c => c.duplicates.map(d => F('SR6I.Duplicate', { label: c.label, name: d })))
+        report.push({ name, packs, outcome: packs.length ? '' : L('SR6I.NothingInBook'), textOnly: [...t.textOnly, ...(res.notes ?? []), ...dupes] })
+      }
+      Object.assign(this, { busy: false, report, bookReport: true })
+      this.render()
+    }
+
     static #onOpen(event, target) { game.actors.get(target.dataset.actorId)?.sheet?.render(true) }
     static #onDone() { this.close() }
+    static #onOpenCompendiums() { ui.sidebar?.changeTab('compendium', 'primary'); ui.sidebar?.expand() }
   }
 }
