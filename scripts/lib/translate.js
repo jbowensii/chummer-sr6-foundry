@@ -3,7 +3,7 @@
 import { MODULE_ID } from './constants.js'
 import {
   ATTRS, MOR, SKILLS, SPELL_CATEGORIES, activationKey, armorSubtype, augmentType, durationKey, electronicsSubtype, gearType,
-  lifestyleKey, normKey, sinQuality, skillKey, specKey, spellFields, vehicleType, weaponType,
+  lifestyleKey, normKey, rangeKey, sinQuality, skillKey, specKey, spellFields, spiritKey, spriteKey, vehicleType, weaponType,
 } from './eden.js'
 
 const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }
@@ -114,30 +114,10 @@ function pickItem(x, ctx) {
   return icon(withEffects(doc, x), x)
 }
 
-/**
- * sanitize: PLAIN TEXT -> safe HTML (callers wrap Foundry's cleaner around escapeText, never replace it).
- * specs: { [edenSkill]: { [specKey]: label } } from the Eden localization Foundry loaded. icons: icons/index.json (M5).
- */
-export function translateRunner(r, { exportedAt, appVersion, sanitize = escapeText, icons = null, specs = {} }) {
-  const name = r.streetName || r.realName || 'Runner', lines = [], items = []
-  const ctx = { exportedAt, appVersion, sanitize, say: t => lines.push(t) }
-  const flag = id => ({ [MODULE_ID]: { id, exportedAt, appVersion } })
-
-  // every Eden skill key, 0 when the runner has none of it (so Replace clears a skill dropped in Chummer)
-  const skills = Object.fromEntries(SKILLS.map(k => [k, { points: 0, specialization: '', expertise: '' }]))
-  for (const s of r.skills ?? []) {
-    const key = skillKey(s.name) ?? skillKey(s.id)
-    if (!key) { ctx.say(`${s.name} ${num(s.rank)}: not a shadowrun6-eden skill → notes`); continue }
-    const pick = (spec, what) => {
-      if (!spec) return ''
-      const k = specKey(spec, specs[key])
-      if (!k) ctx.say(`${s.name}: ${what} ${spec} → notes`)
-      return k ?? ''
-    }
-    skills[key] = { points: num(s.rank), specialization: pick(s.spec, 'specialization'), expertise: pick(s.expertise, 'expertise') }
-  }
-  if (r.magic?.aspectedSkill) ctx.say(`Aspected magician: ${r.magic.aspectedSkill} → notes`)
-
+// Everything a runner file holds as items, for runners and NPCs alike (an NPC's build is usually blank).
+function runnerItems(r, ctx) {
+  const { sanitize } = ctx, items = []
+  const flag = id => ({ [MODULE_ID]: { id, exportedAt: ctx.exportedAt, appVersion: ctx.appVersion } })
   for (const k of r.knowledge ?? [])
     items.push(icon({ name: k.name, type: 'skill', flags: flag(`${k.kind}:${k.name}`),
       system: { genesisID: k.kind === 'language' ? 'language' : 'knowledge', points: k.native ? 4 : num(k.rank) } }, k))
@@ -170,6 +150,37 @@ export function translateRunner(r, { exportedAt, appVersion, sanitize = escapeTe
     items.push(icon({ name: s.name, type: 'sin', flags: flag(s.uid),
       system: { genesisID: '', quality: sinQuality(s.kind, s.rating),
         description: sanitize((s.licences ?? []).map(l => `Licence: ${l.name} (rating ${l.rating})`).join('\n\n')) } }, s))
+  return items
+}
+const noSkills = () => Object.fromEntries(SKILLS.map(k => [k, { points: 0, specialization: '', expertise: '' }]))
+
+/**
+ * sanitize: PLAIN TEXT -> safe HTML (callers wrap Foundry's cleaner around escapeText, never replace it).
+ * specs: { [edenSkill]: { [specKey]: label } } from the Eden localization Foundry loaded. icons: icons/index.json (M5).
+ * A runner with an npc block is an NPC, critter, spirit or sprite (translateNpc).
+ */
+export function translateRunner(r, opts) {
+  if (r.npc) return translateNpc(r, opts)
+  const { exportedAt, appVersion, sanitize = escapeText, specs = {} } = opts
+  const name = r.streetName || r.realName || 'Runner', lines = []
+  const ctx = { exportedAt, appVersion, sanitize, say: t => lines.push(t) }
+  const flag = id => ({ [MODULE_ID]: { id, exportedAt, appVersion } })
+
+  // every Eden skill key, 0 when the runner has none of it (so Replace clears a skill dropped in Chummer)
+  const skills = noSkills()
+  for (const s of r.skills ?? []) {
+    const key = skillKey(s.name) ?? skillKey(s.id)
+    if (!key) { ctx.say(`${s.name} ${num(s.rank)}: not a shadowrun6-eden skill → notes`); continue }
+    const pick = (spec, what) => {
+      if (!spec) return ''
+      const k = specKey(spec, specs[key])
+      if (!k) ctx.say(`${s.name}: ${what} ${spec} → notes`)
+      return k ?? ''
+    }
+    skills[key] = { points: num(s.rank), specialization: pick(s.spec, 'specialization'), expertise: pick(s.expertise, 'expertise') }
+  }
+  if (r.magic?.aspectedSkill) ctx.say(`Aspected magician: ${r.magic.aspectedSkill} → notes`)
+  const items = runnerItems(r, ctx)
 
   const d = r.derived, init = i => (i ? `${i.base}${i.dice != null ? ` + ${i.dice}D6` : ''}` : '')
   const facts = d ? [`Initiative ${init(d.initiative)}${d.astralInit ? `, astral ${init(d.astralInit)}` : ''}`,
@@ -177,7 +188,7 @@ export function translateRunner(r, { exportedAt, appVersion, sanitize = escapeTe
     `Defense Rating ${d.defenseRating}`] : []
   const m = r.magic ?? {}
   const actor = {
-    name, type: 'Player', flags: flag(r.id),
+    name, type: 'Player', flags: flag(r.id), prototypeToken: { actorLink: true },
     system: {
       name: r.realName ?? '', metatype: r.metatype?.name ?? '', mortype: MOR[m.kind] ?? 'mundane',
       nuyen: Math.max(0, Math.trunc(num(r.nuyen))), karma: Math.max(0, Math.trunc(num(r.karma))),
@@ -192,4 +203,106 @@ export function translateRunner(r, { exportedAt, appVersion, sanitize = escapeTe
   actor.system.attributes.mag.initiation = num(m.initiation)
   actor.system.attributes.res.submersion = num(m.submersion)
   return { actor, items, textOnly: lines.map(t => `${name}: ${t}`) }
+}
+
+// NPCs (Chummer's src/sr6/engine/npc.ts): kind -> [Eden actor type, headline label, rating label].
+const KINDS = { grunt: ['NPC', 'Grunt', 'Professional Rating'], critter: ['Critter', 'Critter'], spirit: ['Spirit', 'Spirit', 'Force'],
+  sprite: ['sprite', 'Sprite', 'Level'] }
+const PART_LABELS = { skills: 'Skills', powers: 'Powers', optionalPowers: 'Optional powers', weaknesses: 'Weaknesses', attacks: 'Attacks',
+  augmentations: 'Augmentations', gear: 'Gear', weapons: 'Weapons' }
+/** "Grunt, Professional Rating 3 · Made-up Crew", "Spirit, Force 4", "Critter" (as Chummer's npcHeadline). */
+export function npcHeadline(n) {
+  const [, label = n.kind, rating] = KINDS[n.kind] ?? []
+  return [label, rating && n.rating != null && `${rating} ${n.rating}`].filter(Boolean).join(', ') + (n.kind === 'grunt' && n.group ? ` · ${n.group}` : '')
+}
+/** A line split on its top-level commas: "Glow (fire, light), Bite" -> ["Glow (fire, light)", "Bite"]. */
+export function splitTop(s) {
+  const out = ['']
+  let depth = 0
+  for (const c of String(s ?? '')) {
+    if ('([{'.includes(c)) depth++
+    else if (')]}'.includes(c)) depth = Math.max(0, depth - 1)
+    if (c === ',' && !depth) out.push(''); else out[out.length - 1] += c
+  }
+  return out.map(x => x.trim()).filter(Boolean)
+}
+const intOf = s => (/^\s*-?\d+\s*$/.test(s?.value ?? '') ? Number(s.value) : null)
+
+/**
+ * An NPC block (C1's runner.npc, or a book being's entry.npc) -> Eden actor data; book beings use it too (books.js).
+ * flags: the actor's flags ({ [MODULE_ID]: { id, exportedAt, appVersion, … } }); powers: { [normKey(name)]: entry } of the
+ * file's critterpowers, for their fields. Returns { actor, items, lines } (report lines, not prefixed). GM-only facts go in
+ * system.notes; the token is hostile and unlinked; system.description is the caller's.
+ */
+export function beingActor(npc, { name, flags, sanitize = escapeText, icons = null, powers = {} }) {
+  const f = flags[MODULE_ID], lines = [], items = []
+  const ctx = { exportedAt: f.exportedAt, appVersion: f.appVersion, sanitize, say: t => lines.push(t) }
+  const known = Object.hasOwn(KINDS, npc.kind), [type] = KINDS[known ? npc.kind : 'grunt']
+  const stat = Object.fromEntries((npc.stats ?? []).map(s => [s.key, s])), int = k => intOf(stat[k])
+  const rating = npc.rating ?? 1, system = {}
+
+  if (!known || npc.kind === 'grunt' || npc.kind === 'critter') {
+    // raw inputs: integer stats only ("2D6", or a formula Chummer couldn't read, stays in the notes)
+    system.attributes = Object.fromEntries(ATTRS.filter(k => int(k) != null).map(k => [k, { base: int(k) }]))
+    if (int('edg') != null) system.edge = { max: int('edg') }
+    system.skills = noSkills()
+    for (const p of npc.pools ?? []) {
+      const key = skillKey(p.name)
+      if (key) system.skills[key] = { points: num(p.rating), specialization: '', expertise: '' }
+      else ctx.say(`${p.printed}: not a shadowrun6-eden skill → notes`)
+    }
+  }
+  if (!known || npc.kind === 'grunt') {
+    if (!known) ctx.say(`NPC kind ${npc.kind} not known → NPC`)
+    Object.assign(system, { type: 'npc', rating, gruntmeta: npc.group ?? '',
+      mortype: int('mag') > 0 ? 'magician' : int('res') > 0 ? 'technomancer' : 'mundane' })
+  } else if (npc.kind === 'spirit') {
+    const k = spiritKey(npc.from?.name ?? name)
+    if (!k) ctx.say('spirit type not recognised → air; set it on the sheet')
+    Object.assign(system, { rating, spiritType: k ?? 'air' })
+  } else if (npc.kind === 'sprite') {
+    const k = spriteKey(npc.from?.name ?? name)
+    if (!k) ctx.say('sprite type not recognised; set it on the sheet')
+    Object.assign(system, { type: k, level: rating })
+  }
+
+  // powers as items (a sprite's are sprite powers); a critter power's fields from the file's entry when it has one
+  const powerType = npc.kind === 'sprite' ? 'spritepower' : 'critterpower'
+  for (const part of ['powers', 'optionalPowers']) for (const l of (npc.lines ?? []).filter(l => l.part === part)) for (const p of splitTop(l.text)) {
+    const e = powers[normKey(p)] ?? powers[normKey(p.replace(/\s*\(.*$/, ''))]
+    const optional = part === 'optionalPowers' && 'Optional power.'
+    const doc = e ? base({ ...e, name: p, uid: `power:${p}` }, powerType, ctx, [optional])
+      : { name: p, type: powerType, flags: { [MODULE_ID]: { id: `power:${p}`, exportedAt: f.exportedAt, appVersion: f.appVersion } },
+        system: { genesisID: '', description: optional ? sanitize(optional) : '' } }
+    if (e && powerType === 'critterpower') {
+      const a = e.attrs ?? {}
+      Object.assign(doc.system, { type: /^\s*m/i.test(a.type ?? '') ? 'mana' : 'physical', action: activationKey(a.action),
+        range: rangeKey(a.range), duration: durationKey(a.duration) })
+    }
+    items.push(icon(doc, e))
+  }
+
+  const value = s => (!s.ok ? `${s.printed} (not read)` : s.value !== s.printed ? `${s.printed} → ${s.value}` : s.printed)
+  const pool = p => (p.pool != null ? `${p.name}${p.rating != null ? ` ${p.rating}` : ''} (pool ${p.pool})` : p.printed)
+  const from = npc.from
+  const block = [npcHeadline(npc), ...(npc.stats ?? []).map(s => `${s.label} ${value(s)}`),
+    ...(npc.lines ?? []).map(l => `${PART_LABELS[l.part] ?? l.part}: ${l.text}`),
+    ...(npc.pools?.length ? [`Dice pools: ${npc.pools.map(pool).join(', ')}`] : []),
+    ...(from ? [`${from.name}: ${from.source} p.${from.page}`] : [])]
+  system.notes = '<h3>NPC</h3>' + sanitize(block.join('\n\n')) + (lines.length ? '<h3>From Chummer</h3>' + sanitize(lines.join('\n\n')) : '')
+  const actor = { name, type, flags: { [MODULE_ID]: { ...f, npc: { kind: npc.kind, rating: npc.rating ?? null } } },
+    prototypeToken: { actorLink: false, disposition: -1 }, system }
+  return { actor, items, lines }
+}
+
+/** A runner file's NPC (runner.npc set): beingActor, plus the runner's background, notes and (usually empty) build items. */
+export function translateNpc(r, { exportedAt, appVersion, sanitize = escapeText, icons = null }) {
+  const name = r.streetName || r.realName || 'NPC', own = []
+  const items = runnerItems(r, { exportedAt, appVersion, sanitize, say: t => own.push(t) })
+  const b = beingActor(r.npc, { name, flags: { [MODULE_ID]: { id: r.id, exportedAt, appVersion } }, sanitize, icons })
+  const s = b.actor.system
+  s.description = sanitize(r.background)
+  s.notes = sanitize(r.notes) + s.notes + sanitize(own.join('\n\n'))
+  if (r.npc.kind === 'grunt' && r.metatype?.name) s.metatype = r.metatype.name
+  return { actor: b.actor, items: [...b.items, ...items], textOnly: [...b.lines, ...own].map(t => `${name}: ${t}`) }
 }

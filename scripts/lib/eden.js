@@ -83,12 +83,14 @@ const RANGE = { 'LOS(A)': 'line_of_sight_area', LOS: 'line_of_sight', T: 'touch'
 const DURATION = { i: 'instantaneous', instant: 'instantaneous', instantaneous: 'instantaneous', s: 'sustained', sustained: 'sustained',
   p: 'permanent', permanent: 'permanent', l: 'limited', limited: 'limited', always: 'always' }
 export const durationKey = s => DURATION[normKey(s)] ?? 'special'
+/** A printed range (LOS, LOS(A), T, S, S(A)) -> Eden's spell_range key; unknown -> self (Eden's default). */
+export const rangeKey = s => RANGE[String(s ?? '').toUpperCase().replace(/\s+/g, '')] ?? 'self'
 /** A spell's Eden fields from its printed attrs and Chummer's values. An unknown category is health (the caller reports it). */
 export function spellFields(attrs = {}, values = {}) {
   const cat = String(attrs.category ?? '').toLowerCase(), duration = durationKey(attrs.duration), tags = String(attrs.tags ?? '').toLowerCase()
   return {
     category: SPELL_CATEGORIES.includes(cat) ? cat : 'health',
-    range: RANGE[String(attrs.range ?? '').toUpperCase().replace(/\s+/g, '')] ?? 'self',
+    range: rangeKey(attrs.range),
     type: /^\s*m/i.test(attrs.type ?? '') ? 'mana' : 'physical',
     duration,
     damage: /^\s*s/i.test(attrs.damage ?? '') ? 'stun' : 'physical',
