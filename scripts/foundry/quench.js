@@ -157,7 +157,7 @@ export function registerQuench(quench) {
         const newer = structuredClone(runner)
         newer.exportedAt = '2026-12-01T12:00:00.000Z'
         newer.karma = 42
-        newer.skills = newer.skills.filter(x => x.id !== 'firearms')
+        newer.skills = newer.skills.filter(x => x.name !== 'Firearms')
         assert.equal(defaultChoice(flagOf(findExisting(newer.id)), newer), 'replace')
         const res = await importRunner(file, newer, 'replace', folder)
         assert.equal(res.action, 'replace', res.error?.message)

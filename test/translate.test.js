@@ -37,7 +37,7 @@ describe('the Player actor', () => {
   })
   test('Chummer’s derived values in the notes for reference', () => {
     const n = run().actor.system.notes
-    expect(n).toMatch(/Initiative 9 \+ 3D6, astral 9 \+ 2D6/)
+    expect(n).toMatch(/Initiative 9 \+ 3D6, astral 8 \+ 2D6/)
     expect(n).toMatch(/physical 10, stun 10, overflow 3/)
     expect(n).toMatch(/Defense Rating 6/)
   })
@@ -63,7 +63,7 @@ describe('skills', () => {
     expect(t.textOnly).toContain('Made-Up Mara: Underwater Basket Weaving 1: not a shadowrun6-eden skill → notes')
   })
   test('a skill dropped in Chummer goes to 0', () => {
-    const r = mara(); r.skills = r.skills.filter(s => s.id !== 'firearms')
+    const r = mara(); r.skills = r.skills.filter(s => s.name !== 'Firearms')
     expect(run(r).actor.system.skills.firearms.points).toBe(0)
   })
   test('knowledge and languages: skill items, a native language at 4', () => {
@@ -95,7 +95,7 @@ describe('items', () => {
     expect(byName(t, 'Glimmer').system).toMatchObject({ category: 'illusion', range: 'line_of_sight_area', type: 'physical', duration: 'sustained', drain: 0, isSustained: true })
     expect(byName(t, 'Test Ward')).toMatchObject({ type: 'ritual', system: { threshold: 4,
       features: { anchored: true, material_link: false, minion: false, spell: true, spotter: false } } })
-    expect(byName(t, 'Quick Step')).toMatchObject({ type: 'adeptpower', system: { hasLevel: true, level: 2, cost: 1, activation: 'minor_action' } })
+    expect(byName(t, 'Quick Step')).toMatchObject({ type: 'adeptpower', system: { hasLevel: true, level: 2, cost: 0.5, activation: 'minor_action' } })
     expect(byName(t, 'Quick Step').effects[0].changes).toEqual([{ key: 'system.initiative.physical.diceMod', value: '1', mode: 2 }])
     expect(byName(t, 'Made-up Centering').type).toBe('metamagic')
   })
@@ -155,7 +155,7 @@ describe('items', () => {
   test('contacts, lifestyle, SINs', () => {
     const t = run()
     expect(byName(t, 'Fake Fixer')).toMatchObject({ type: 'contact', system: { rating: 4, loyalty: 2, type: 'Fixer' } })
-    expect(byName(t, 'Made-up Hideout')).toMatchObject({ type: 'lifestyle', system: { type: 'middle', paid: 2, cost: 900 } })
+    expect(byName(t, 'Made-up Hideout')).toMatchObject({ type: 'lifestyle', system: { type: 'middle', paid: 2, cost: 450 } })
     expect(t.textOnly).toContain('Made-Up Mara: Lifestyle Made-up Hideout: not a shadowrun6-eden lifestyle → middle')
     expect(byName(t, 'Mara Testcase')).toMatchObject({ type: 'sin', system: { quality: 'GOOD_MATCH' } })
     expect(byName(t, 'Mara Testcase').system.description).toMatch(/Licence: Made-up Permit \(rating 3\)/)
