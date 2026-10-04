@@ -1,0 +1,885 @@
+{
+ "format": "chummer-sr6-export",
+ "version": 1,
+ "kind": "runners",
+ "exportedAt": "2026-10-04T09:00:00.000Z",
+ "app": {
+  "name": "Chummer Anarchy 2.0",
+  "version": "0.9.0"
+ },
+ "descriptions": true,
+ "runners": [
+  {
+   "id": "run-mara-1",
+   "updatedAt": "2026-10-03T20:00:00.000Z",
+   "exportedAt": "2026-10-04T09:00:00.000Z",
+   "streetName": "Made-Up Mara",
+   "realName": "Mara Testcase",
+   "finalized": true,
+   "metatype": {
+    "id": "mus.elf",
+    "name": "Elf"
+   },
+   "magic": {
+    "kind": "mystic-adept",
+    "tradition": "Made-up Hermetic",
+    "drainAttr": "log",
+    "initiation": 1,
+    "submersion": 0
+   },
+   "portrait": "data:image/png;base64,iVBORw0KGgo=",
+   "token": null,
+   "attributes": {
+    "bod": {
+     "natural": 3,
+     "augmented": 3
+    },
+    "agi": {
+     "natural": 5,
+     "augmented": 5
+    },
+    "rea": {
+     "natural": 4,
+     "augmented": 5
+    },
+    "str": {
+     "natural": 2,
+     "augmented": 2
+    },
+    "wil": {
+     "natural": 4,
+     "augmented": 4
+    },
+    "log": {
+     "natural": 5,
+     "augmented": 5
+    },
+    "int": {
+     "natural": 4,
+     "augmented": 4
+    },
+    "cha": {
+     "natural": 3,
+     "augmented": 3
+    },
+    "edg": {
+     "natural": 3,
+     "augmented": 3
+    },
+    "mag": {
+     "natural": 5,
+     "augmented": 5
+    },
+    "res": {
+     "natural": 0,
+     "augmented": 0
+    }
+   },
+   "essence": 5.8,
+   "edge": 3,
+   "skills": [
+    {
+     "id": "firearms",
+     "name": "Firearms",
+     "attr": "agi",
+     "rank": 4,
+     "spec": "Pistols (Light)"
+    },
+    {
+     "id": "sorcery",
+     "name": "Sorcery",
+     "attr": "mag",
+     "rank": 5,
+     "spec": "Made-up Spellshaping",
+     "expertise": "Spellcasting"
+    },
+    {
+     "id": "close-combat",
+     "name": "Close Combat",
+     "attr": "agi",
+     "rank": 2
+    },
+    {
+     "id": "basket-weaving",
+     "name": "Underwater Basket Weaving",
+     "attr": "log",
+     "rank": 1
+    }
+   ],
+   "knowledge": [
+    {
+     "name": "Made-up Gang Lore",
+     "kind": "knowledge",
+     "native": false,
+     "rank": 2
+    },
+    {
+     "name": "Testlandic",
+     "kind": "language",
+     "native": true,
+     "rank": 0
+    },
+    {
+     "name": "Fakespeak",
+     "kind": "language",
+     "native": false,
+     "rank": 1
+    }
+   ],
+   "qualities": [
+    {
+     "uid": "q1",
+     "id": "mus.lucky-break",
+     "kind": "qualities",
+     "name": "Lucky Break",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "kind": "positive",
+      "karma": "4"
+     },
+     "parts": [],
+     "values": {
+      "karma": 4
+     },
+     "positive": true,
+     "level": 1,
+     "free": false
+    },
+    {
+     "uid": "q2",
+     "id": "mus.night-eyes",
+     "kind": "qualities",
+     "name": "Night Eyes",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "kind": "positive"
+     },
+     "parts": [],
+     "values": {},
+     "positive": true,
+     "level": 1,
+     "free": true
+    },
+    {
+     "uid": "q3",
+     "id": "mus.made-up-debt",
+     "kind": "qualities",
+     "name": "Made-up Debt",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "kind": "negative",
+      "perLevel": "true",
+      "maxLevel": "3"
+     },
+     "parts": [],
+     "values": {
+      "karma": 2
+     },
+     "positive": false,
+     "level": 2,
+     "free": false,
+     "note": "Owes a made-up fixer."
+    }
+   ],
+   "picks": [
+    {
+     "uid": "p1",
+     "id": "mus.zap-bolt",
+     "kind": "spells",
+     "name": "Zap Bolt",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "category": "combat",
+      "tags": "Direct",
+      "range": "LOS",
+      "type": "M",
+      "duration": "I",
+      "dv": "F-3",
+      "damage": "P"
+     },
+     "parts": [],
+     "values": {
+      "drain": 3
+     },
+     "pick": "spells",
+     "bonuses": []
+    },
+    {
+     "uid": "p2",
+     "id": "mus.glimmer",
+     "kind": "spells",
+     "name": "Glimmer",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "category": "illusion",
+      "range": "LOS(A)",
+      "type": "P",
+      "duration": "S"
+     },
+     "parts": [],
+     "values": {},
+     "pick": "spells",
+     "bonuses": []
+    },
+    {
+     "uid": "p3",
+     "id": "mus.test-ward",
+     "kind": "rituals",
+     "name": "Test Ward",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "keywords": "Anchored, Spell",
+      "threshold": "4"
+     },
+     "parts": [],
+     "values": {
+      "threshold": 4
+     },
+     "pick": "rituals",
+     "bonuses": []
+    },
+    {
+     "uid": "p4",
+     "id": "mus.quick-step",
+     "kind": "adeptpowers",
+     "name": "Quick Step",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "cost": "0.5",
+      "perLevel": "true",
+      "activation": "Minor action"
+     },
+     "parts": [],
+     "values": {
+      "powerCost": 1
+     },
+     "pick": "adeptpowers",
+     "level": 2,
+     "bonuses": [
+      {
+       "target": "initDice",
+       "value": 1
+      }
+     ]
+    },
+    {
+     "uid": "p5",
+     "id": "mus.made-up-centering",
+     "kind": "metamagics",
+     "name": "Made-up Centering",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {},
+     "parts": [],
+     "values": {},
+     "pick": "metamagics",
+     "bonuses": []
+    }
+   ],
+   "purchases": [
+    {
+     "uid": "w1",
+     "id": "mus.pocket-zapper",
+     "kind": "weapons",
+     "name": "Pocket Zapper",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "category": "Pocket Tasers",
+      "dv": "3S(e)",
+      "ar": "9/7/—/—/—",
+      "modes": "SA",
+      "ammo": "4(m)",
+      "avail": "2(L)",
+      "cost": "150"
+     },
+     "parts": [],
+     "values": {
+      "cost": 150,
+      "avail": 2,
+      "legality": "L",
+      "dv": 3,
+      "stun": true,
+      "ar": [
+       9,
+       7,
+       null,
+       null,
+       null
+      ],
+      "modes": [
+       "SA"
+      ],
+      "ammo": 4
+     },
+     "qty": 1,
+     "worn": false,
+     "bonuses": [],
+     "accessories": []
+    },
+    {
+     "uid": "w2",
+     "id": "mus.odd-blade",
+     "kind": "weapons",
+     "name": "Odd Blade",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "category": "Blades",
+      "dv": "STR+?",
+      "ar": "6/—/—/—/—",
+      "avail": "1",
+      "cost": "80"
+     },
+     "parts": [],
+     "values": {
+      "cost": 80,
+      "avail": 1,
+      "ar": [
+       6,
+       null,
+       null,
+       null,
+       null
+      ]
+     },
+     "qty": 1,
+     "worn": false,
+     "bonuses": [],
+     "accessories": [],
+     "note": "Made-up engraving."
+    },
+    {
+     "uid": "a1",
+     "id": "mus.test-jacket",
+     "kind": "armor",
+     "name": "Test Jacket",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "category": "Body armor",
+      "defense": "3",
+      "avail": "2",
+      "cost": "500"
+     },
+     "parts": [],
+     "values": {
+      "cost": 500,
+      "avail": 2,
+      "defense": 3
+     },
+     "qty": 1,
+     "worn": true,
+     "bonuses": [],
+     "accessories": []
+    },
+    {
+     "uid": "c1",
+     "id": "mus.reflex-booster",
+     "kind": "augmentations",
+     "name": "Made-up Reflex Booster",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "type": "cyberware",
+      "category": "Bodyware",
+      "rating": "1-3",
+      "essence": "Rating × 0.1",
+      "avail": "4(I)",
+      "cost": "Rating × 1000"
+     },
+     "parts": [],
+     "values": {
+      "rating": 1,
+      "cost": 1200,
+      "avail": 4,
+      "legality": "I",
+      "essence": 0.12
+     },
+     "qty": 1,
+     "worn": false,
+     "bonuses": [
+      {
+       "target": "rea",
+       "value": 1
+      },
+      {
+       "target": "initDice",
+       "value": 1
+      }
+     ],
+     "accessories": [
+      {
+       "uid": "c1a",
+       "id": "mus.booster-port",
+       "kind": "augmentations",
+       "name": "Booster Port",
+       "source": "MUS",
+       "page": 10,
+       "canon": true,
+       "attrs": {
+        "type": "cyberware",
+        "category": "Bodyware",
+        "capacity": "[1]",
+        "cost": "100"
+       },
+       "parts": [],
+       "values": {
+        "cost": 100,
+        "capacity": 1
+       },
+       "qty": 1,
+       "worn": false,
+       "bonuses": [],
+       "accessories": []
+      }
+     ],
+     "grade": "used"
+    },
+    {
+     "uid": "e1",
+     "id": "mus.test-link",
+     "kind": "electronics",
+     "name": "Test Link",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "category": "Commlinks",
+      "rating": "3",
+      "array": "1/1",
+      "avail": "2",
+      "cost": "700"
+     },
+     "parts": [],
+     "values": {
+      "rating": 3,
+      "cost": 700,
+      "avail": 2
+     },
+     "qty": 1,
+     "worn": false,
+     "bonuses": [],
+     "accessories": []
+    },
+    {
+     "uid": "g1",
+     "id": "mus.power-focus",
+     "kind": "gear",
+     "name": "Made-up Power Focus",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "category": "Foci",
+      "rating": "1-6",
+      "cost": "Rating × 4000"
+     },
+     "parts": [],
+     "values": {
+      "rating": 2,
+      "cost": 8000
+     },
+     "qty": 1,
+     "worn": true,
+     "bonuses": [],
+     "accessories": []
+    },
+    {
+     "uid": "g2",
+     "id": "mus.rope",
+     "kind": "gear",
+     "name": "Glitter Rope",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "category": "Survival gear",
+      "cost": "50"
+     },
+     "parts": [],
+     "values": {
+      "cost": 50
+     },
+     "qty": 3,
+     "worn": false,
+     "bonuses": [],
+     "accessories": []
+    },
+    {
+     "uid": "v1",
+     "id": "mus.test-bike",
+     "kind": "vehicles",
+     "name": "Test Bike",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "category": "Bikes",
+      "handling": "4/3",
+      "accel": "10/15",
+      "interval": "20",
+      "topSpeed": "120",
+      "body": "5",
+      "armor": "4",
+      "pilot": "1",
+      "sensor": "1",
+      "seats": "1",
+      "cost": "5000"
+     },
+     "parts": [],
+     "values": {
+      "cost": 5000,
+      "vehicle": {
+       "handling": [
+        4,
+        3
+       ],
+       "accel": [
+        10,
+        15
+       ],
+       "interval": [
+        20,
+        20
+       ],
+       "topSpeed": 120,
+       "body": 5,
+       "armor": 4,
+       "pilot": 1,
+       "sensor": 1,
+       "seats": 1
+      }
+     },
+     "qty": 1,
+     "worn": false,
+     "bonuses": [],
+     "accessories": []
+    },
+    {
+     "uid": "x1",
+     "kind": "gear",
+     "name": "Lucky Coin",
+     "canon": false,
+     "attrs": {},
+     "parts": [],
+     "values": {
+      "cost": 5
+     },
+     "qty": 1,
+     "worn": false,
+     "bonuses": [],
+     "accessories": []
+    }
+   ],
+   "contacts": [
+    {
+     "uid": "k1",
+     "name": "Fake Fixer",
+     "archetype": "Fixer",
+     "connection": 4,
+     "loyalty": 2
+    }
+   ],
+   "lifestyle": {
+    "id": "mus.made-up-squat",
+    "name": "Made-up Hideout",
+    "months": 2,
+    "cost": 900
+   },
+   "sins": [
+    {
+     "uid": "s1",
+     "name": "Mara Testcase",
+     "kind": "fake",
+     "rating": 3,
+     "licences": [
+      {
+       "name": "Made-up Permit",
+       "rating": 3
+      }
+     ]
+    },
+    {
+     "uid": "s2",
+     "name": "Birth Record",
+     "kind": "real",
+     "licences": []
+    }
+   ],
+   "karma": 7,
+   "nuyen": 1234,
+   "derived": {
+    "initiative": {
+     "base": 9,
+     "dice": 3
+    },
+    "astralInit": {
+     "base": 9,
+     "dice": 2
+    },
+    "monitors": {
+     "physical": 10,
+     "stun": 10,
+     "overflow": 3
+    },
+    "defenseRating": 6,
+    "composure": 7,
+    "judgeIntentions": 8,
+    "memory": 9,
+    "liftCarry": 7,
+    "drain": 9,
+    "pools": [
+     {
+      "skill": "firearms",
+      "label": "Firearms",
+      "rank": 4,
+      "attr": "agi",
+      "dp": 9,
+      "spec": "Pistols (Light)",
+      "specDp": 11
+     }
+    ]
+   },
+   "background": "An invented runner for the tests.\n\nShe exists only here.",
+   "notes": "Made-up notes & <stuff>.",
+   "ledger": [
+    {
+     "at": "2026-10-01T10:00:00.000Z",
+     "type": "finalize",
+     "summary": "Finalized",
+     "karma": 7,
+     "nuyen": 1234
+    },
+    {
+     "at": "2026-10-02T10:00:00.000Z",
+     "type": "earn",
+     "summary": "Made-up run",
+     "karma": -5,
+     "nuyen": -2000
+    }
+   ]
+  },
+  {
+   "id": "npc-grunt-1",
+   "updatedAt": "2026-10-04T09:00:00.000Z",
+   "exportedAt": "2026-10-04T09:00:00.000Z",
+   "streetName": "Made-up Ganger",
+   "realName": "",
+   "finalized": false,
+   "metatype": {
+    "id": "mus.human",
+    "name": "Human"
+   },
+   "magic": {
+    "kind": "mundane",
+    "initiation": 0,
+    "submersion": 0
+   },
+   "portrait": null,
+   "token": null,
+   "attributes": {
+    "bod": {
+     "natural": 4,
+     "augmented": 4
+    },
+    "agi": {
+     "natural": 3,
+     "augmented": 3
+    },
+    "rea": {
+     "natural": 3,
+     "augmented": 3
+    },
+    "str": {
+     "natural": 4,
+     "augmented": 4
+    },
+    "wil": {
+     "natural": 2,
+     "augmented": 2
+    },
+    "log": {
+     "natural": 2,
+     "augmented": 2
+    },
+    "int": {
+     "natural": 3,
+     "augmented": 3
+    },
+    "cha": {
+     "natural": 2,
+     "augmented": 2
+    },
+    "edg": {
+     "natural": 1,
+     "augmented": 1
+    },
+    "mag": {
+     "natural": 0,
+     "augmented": 0
+    },
+    "res": {
+     "natural": 0,
+     "augmented": 0
+    }
+   },
+   "essence": 6,
+   "edge": 1,
+   "skills": [],
+   "knowledge": [],
+   "qualities": [],
+   "picks": [],
+   "purchases": [],
+   "contacts": [],
+   "lifestyle": null,
+   "sins": [],
+   "karma": 0,
+   "nuyen": 0,
+   "background": "Invented for the tests.",
+   "notes": "",
+   "ledger": [],
+   "npc": {
+    "kind": "grunt",
+    "rating": 3,
+    "group": "Made-up Crew",
+    "from": {
+     "kind": "npcs",
+     "id": "mus.ganger",
+     "name": "Made-up Ganger",
+     "source": "MUS",
+     "page": 40
+    },
+    "stats": [
+     {
+      "key": "bod",
+      "label": "BOD",
+      "printed": "4",
+      "value": "4",
+      "ok": true
+     },
+     {
+      "key": "agi",
+      "label": "AGI",
+      "printed": "3",
+      "value": "3",
+      "ok": true
+     },
+     {
+      "key": "rea",
+      "label": "REA",
+      "printed": "3",
+      "value": "3",
+      "ok": true
+     },
+     {
+      "key": "str",
+      "label": "STR",
+      "printed": "4",
+      "value": "4",
+      "ok": true
+     },
+     {
+      "key": "wil",
+      "label": "WIL",
+      "printed": "2",
+      "value": "2",
+      "ok": true
+     },
+     {
+      "key": "log",
+      "label": "LOG",
+      "printed": "2",
+      "value": "2",
+      "ok": true
+     },
+     {
+      "key": "int",
+      "label": "INT",
+      "printed": "3",
+      "value": "3",
+      "ok": true
+     },
+     {
+      "key": "cha",
+      "label": "CHA",
+      "printed": "2",
+      "value": "2",
+      "ok": true
+     },
+     {
+      "key": "edg",
+      "label": "EDG",
+      "printed": "1",
+      "value": "1",
+      "ok": true
+     },
+     {
+      "key": "init",
+      "label": "Initiative",
+      "printed": "6 + 1D6",
+      "value": "6 + 1D6",
+      "ok": true
+     },
+     {
+      "key": "dr",
+      "label": "Defense Rating",
+      "printed": "2D6",
+      "value": "2D6",
+      "ok": true
+     }
+    ],
+    "lines": [
+     {
+      "part": "skills",
+      "text": "Firearms 4, Close Combat 3, Basket Weaving 2"
+     },
+     {
+      "part": "weapons",
+      "text": "Made-up Zapper [Pistol, DV 2S]"
+     }
+    ],
+    "pools": [
+     {
+      "name": "Firearms",
+      "rating": 4,
+      "attr": "agi",
+      "pool": 7,
+      "printed": "Firearms 4"
+     },
+     {
+      "name": "Close Combat",
+      "rating": 3,
+      "attr": "agi",
+      "pool": 6,
+      "printed": "Close Combat 3"
+     },
+     {
+      "name": "Basket Weaving",
+      "rating": 2,
+      "printed": "Basket Weaving 2"
+     }
+    ]
+   }
+  }
+ ]
+}

@@ -1,0 +1,753 @@
+{
+ "format": "chummer-sr6-export",
+ "version": 1,
+ "kind": "books",
+ "exportedAt": "2026-10-04T09:00:00.000Z",
+ "app": {
+  "name": "Chummer Anarchy 2.0",
+  "version": "0.9.0"
+ },
+ "descriptions": true,
+ "books": [
+  {
+   "source": {
+    "id": "MUS",
+    "name": "Made-Up Streets",
+    "publisher": "Nobody",
+    "canon": true
+   },
+   "entries": [
+    {
+     "id": "mus.prio-a",
+     "kind": "priorities",
+     "name": "A",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "letter": "A"
+     },
+     "parts": [
+      {
+       "tag": "resources",
+       "text": ""
+      }
+     ],
+     "values": {}
+    },
+    {
+     "id": "mus.elf",
+     "kind": "metatypes",
+     "name": "Elf",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {},
+     "parts": [],
+     "values": {}
+    },
+    {
+     "id": "mus.basket-weaving",
+     "kind": "skills",
+     "name": "Underwater Basket Weaving",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "attr": "log",
+      "untrained": "false"
+     },
+     "parts": [],
+     "values": {}
+    },
+    {
+     "id": "mus.lucky-break",
+     "kind": "qualities",
+     "name": "Lucky Break",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "kind": "positive",
+      "karma": "4"
+     },
+     "parts": [],
+     "values": {
+      "karma": 4
+     },
+     "description": "Made-up luck."
+    },
+    {
+     "id": "mus.pocket-zapper",
+     "kind": "weapons",
+     "name": "Pocket Zapper",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "category": "Pocket Tasers",
+      "dv": "3S(e)",
+      "ar": "9/7/—/—/—",
+      "modes": "SA",
+      "ammo": "4(m)",
+      "avail": "2(L)",
+      "cost": "150"
+     },
+     "parts": [],
+     "values": {
+      "cost": 150,
+      "avail": 2,
+      "legality": "L",
+      "dv": 3,
+      "stun": true,
+      "ar": [
+       9,
+       7,
+       null,
+       null,
+       null
+      ],
+      "modes": [
+       "SA"
+      ],
+      "ammo": 4
+     },
+     "description": "A made-up zapper."
+    },
+    {
+     "id": "mus.glitter-cannon",
+     "kind": "weapons",
+     "name": "Glitter Cannon",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "category": "Glitter cannons",
+      "dv": "—",
+      "cost": "ask your fixer"
+     },
+     "parts": [],
+     "values": {}
+    },
+    {
+     "id": "mus.test-jacket",
+     "kind": "armor",
+     "name": "Test Jacket",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "category": "Body armor",
+      "defense": "3",
+      "cost": "500"
+     },
+     "parts": [],
+     "values": {
+      "cost": 500,
+      "defense": 3
+     }
+    },
+    {
+     "id": "mus.reflex-booster",
+     "kind": "augmentations",
+     "name": "Made-up Reflex Booster",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "type": "cyberware",
+      "category": "Bodyware",
+      "rating": "1-3",
+      "essence": "Rating × 0.1",
+      "cost": "Rating × 1000"
+     },
+     "parts": [],
+     "values": {
+      "rating": 1,
+      "cost": 1000,
+      "essence": 0.1
+     }
+    },
+    {
+     "id": "mus.test-link",
+     "kind": "electronics",
+     "name": "Test Link",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "category": "Commlinks",
+      "rating": "3",
+      "cost": "700"
+     },
+     "parts": [],
+     "values": {
+      "rating": 3,
+      "cost": 700
+     }
+    },
+    {
+     "id": "mus.rope",
+     "kind": "gear",
+     "name": "Glitter Rope",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "category": "Survival gear",
+      "cost": "50"
+     },
+     "parts": [],
+     "values": {
+      "cost": 50
+     }
+    },
+    {
+     "id": "mus.test-drone",
+     "kind": "vehicles",
+     "name": "Test Drone",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "category": "Small drones (air)",
+      "handling": "3",
+      "topSpeed": "60",
+      "body": "2",
+      "cost": "3000"
+     },
+     "parts": [],
+     "values": {
+      "cost": 3000,
+      "vehicle": {
+       "handling": [
+        3,
+        3
+       ],
+       "topSpeed": 60,
+       "body": 2
+      }
+     }
+    },
+    {
+     "id": "mus.zap-bolt",
+     "kind": "spells",
+     "name": "Zap Bolt",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "category": "combat",
+      "tags": "Direct",
+      "range": "LOS",
+      "type": "M",
+      "duration": "I",
+      "dv": "F-3",
+      "damage": "P"
+     },
+     "parts": [],
+     "values": {
+      "drain": 3
+     }
+    },
+    {
+     "id": "mus.test-ward",
+     "kind": "rituals",
+     "name": "Test Ward",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "keywords": "Anchored",
+      "threshold": "4"
+     },
+     "parts": [],
+     "values": {
+      "threshold": 4
+     }
+    },
+    {
+     "id": "mus.quick-step",
+     "kind": "adeptpowers",
+     "name": "Quick Step",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "cost": "0.5",
+      "perLevel": "true",
+      "activation": "Minor action"
+     },
+     "parts": [],
+     "values": {
+      "powerCost": 0.5
+     }
+    },
+    {
+     "id": "mus.made-up-pulse",
+     "kind": "complexforms",
+     "name": "Made-up Pulse",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "duration": "S",
+      "fade": "3"
+     },
+     "parts": [],
+     "values": {
+      "fade": 3
+     }
+    },
+    {
+     "id": "mus.made-up-centering",
+     "kind": "metamagics",
+     "name": "Made-up Centering",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {},
+     "parts": [],
+     "values": {}
+    },
+    {
+     "id": "mus.made-up-echo",
+     "kind": "echoes",
+     "name": "Made-up Echo",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {},
+     "parts": [],
+     "values": {}
+    },
+    {
+     "id": "mus.made-up-glow",
+     "kind": "critterpowers",
+     "name": "Made-up Glow",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "type": "M",
+      "action": "Minor",
+      "range": "LOS",
+      "duration": "S"
+     },
+     "parts": [],
+     "values": {}
+    },
+    {
+     "id": "mus.fake-hound",
+     "kind": "critters",
+     "name": "Fake Hound",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "category": "Made-up beasts",
+      "bod": "5",
+      "agi": "4",
+      "rea": "4",
+      "str": "5",
+      "wil": "3",
+      "log": "1",
+      "int": "4",
+      "cha": "2",
+      "edg": "1"
+     },
+     "parts": [],
+     "values": {},
+     "npc": {
+      "kind": "critter",
+      "from": {
+       "kind": "critters",
+       "id": "mus.fake-hound",
+       "name": "Fake Hound",
+       "source": "MUS",
+       "page": 50
+      },
+      "stats": [
+       {
+        "key": "bod",
+        "label": "BOD",
+        "printed": "5",
+        "value": "5",
+        "ok": true
+       },
+       {
+        "key": "agi",
+        "label": "AGI",
+        "printed": "4",
+        "value": "4",
+        "ok": true
+       }
+      ],
+      "lines": [
+       {
+        "part": "skills",
+        "text": "Close Combat 4"
+       },
+       {
+        "part": "powers",
+        "text": "Made-up Glow, Fake Bite"
+       },
+       {
+        "part": "weaknesses",
+        "text": "Allergy (made-up dust)"
+       }
+      ],
+      "pools": [
+       {
+        "name": "Close Combat",
+        "rating": 4,
+        "attr": "agi",
+        "pool": 8,
+        "printed": "Close Combat 4"
+       }
+      ]
+     }
+    },
+    {
+     "id": "mus.spirit-of-man",
+     "kind": "spirits",
+     "name": "Spirit of Man",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "bod": "F",
+      "agi": "F+1",
+      "rea": "F",
+      "str": "F-1"
+     },
+     "parts": [],
+     "values": {},
+     "npc": {
+      "kind": "spirit",
+      "rating": 1,
+      "from": {
+       "kind": "spirits",
+       "id": "mus.spirit-of-man",
+       "name": "Spirit of Man",
+       "source": "MUS",
+       "page": 60
+      },
+      "stats": [
+       {
+        "key": "bod",
+        "label": "BOD",
+        "printed": "F",
+        "value": "1",
+        "ok": true
+       },
+       {
+        "key": "agi",
+        "label": "AGI",
+        "printed": "F+1",
+        "value": "2",
+        "ok": true
+       }
+      ],
+      "lines": [
+       {
+        "part": "powers",
+        "text": "Made-up Glow"
+       }
+      ],
+      "pools": []
+     }
+    },
+    {
+     "id": "mus.ganger",
+     "kind": "npcs",
+     "name": "Made-up Ganger",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "rating": "3",
+      "group": "Made-up Crew",
+      "bod": "4",
+      "agi": "3"
+     },
+     "parts": [],
+     "values": {},
+     "npc": {
+      "kind": "grunt",
+      "rating": 3,
+      "group": "Made-up Crew",
+      "from": {
+       "kind": "npcs",
+       "id": "mus.ganger",
+       "name": "Made-up Ganger",
+       "source": "MUS",
+       "page": 40
+      },
+      "stats": [
+       {
+        "key": "bod",
+        "label": "BOD",
+        "printed": "4",
+        "value": "4",
+        "ok": true
+       },
+       {
+        "key": "agi",
+        "label": "AGI",
+        "printed": "3",
+        "value": "3",
+        "ok": true
+       },
+       {
+        "key": "rea",
+        "label": "REA",
+        "printed": "3",
+        "value": "3",
+        "ok": true
+       },
+       {
+        "key": "str",
+        "label": "STR",
+        "printed": "4",
+        "value": "4",
+        "ok": true
+       },
+       {
+        "key": "wil",
+        "label": "WIL",
+        "printed": "2",
+        "value": "2",
+        "ok": true
+       },
+       {
+        "key": "log",
+        "label": "LOG",
+        "printed": "2",
+        "value": "2",
+        "ok": true
+       },
+       {
+        "key": "int",
+        "label": "INT",
+        "printed": "3",
+        "value": "3",
+        "ok": true
+       },
+       {
+        "key": "cha",
+        "label": "CHA",
+        "printed": "2",
+        "value": "2",
+        "ok": true
+       },
+       {
+        "key": "edg",
+        "label": "EDG",
+        "printed": "1",
+        "value": "1",
+        "ok": true
+       },
+       {
+        "key": "init",
+        "label": "Initiative",
+        "printed": "6 + 1D6",
+        "value": "6 + 1D6",
+        "ok": true
+       },
+       {
+        "key": "dr",
+        "label": "Defense Rating",
+        "printed": "2D6",
+        "value": "2D6",
+        "ok": true
+       }
+      ],
+      "lines": [
+       {
+        "part": "skills",
+        "text": "Firearms 4, Close Combat 3, Basket Weaving 2"
+       },
+       {
+        "part": "weapons",
+        "text": "Made-up Zapper [Pistol, DV 2S]"
+       }
+      ],
+      "pools": [
+       {
+        "name": "Firearms",
+        "rating": 4,
+        "attr": "agi",
+        "pool": 7,
+        "printed": "Firearms 4"
+       },
+       {
+        "name": "Close Combat",
+        "rating": 3,
+        "attr": "agi",
+        "pool": 6,
+        "printed": "Close Combat 3"
+       },
+       {
+        "name": "Basket Weaving",
+        "rating": 2,
+        "printed": "Basket Weaving 2"
+       }
+      ]
+     }
+    },
+    {
+     "id": "mus.fault-sprite",
+     "kind": "sprites",
+     "name": "Fault Sprite",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "attack": "L",
+      "sleaze": "L+1",
+      "data": "L",
+      "firewall": "L+2",
+      "res": "L"
+     },
+     "parts": [],
+     "values": {},
+     "npc": {
+      "kind": "sprite",
+      "rating": 1,
+      "from": {
+       "kind": "sprites",
+       "id": "mus.fault-sprite",
+       "name": "Fault Sprite",
+       "source": "MUS",
+       "page": 70
+      },
+      "stats": [
+       {
+        "key": "attack",
+        "label": "Attack",
+        "printed": "L",
+        "value": "1",
+        "ok": true
+       }
+      ],
+      "lines": [
+       {
+        "part": "powers",
+        "text": "Made-up Static"
+       }
+      ],
+      "pools": []
+     }
+    },
+    {
+     "id": "mus.made-up-squat",
+     "kind": "lifestyles",
+     "name": "Made-up Hideout",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "cost": "450"
+     },
+     "parts": [],
+     "values": {
+      "cost": 450
+     }
+    },
+    {
+     "id": "mus.fake-fixer",
+     "kind": "contacts",
+     "name": "Fake Fixer",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "connection": "4",
+      "loyalty": "2",
+      "archetype": "Fixer"
+     },
+     "parts": [],
+     "values": {}
+    },
+    {
+     "id": "mus.made-up-childhood",
+     "kind": "lifemodules",
+     "name": "Made-up Childhood",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "stage": "opening"
+     },
+     "parts": [],
+     "values": {}
+    },
+    {
+     "id": "mus.rule-intro",
+     "kind": "rules",
+     "name": "Made-up Basics",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "chapter": "Made-up Rules",
+      "level": "1"
+     },
+     "parts": [],
+     "values": {},
+     "description": "Invented rules text."
+    },
+    {
+     "id": "mus.rule-detail",
+     "kind": "rules",
+     "name": "Made-up Detail",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "chapter": "Made-up Rules",
+      "level": "2",
+      "parent": "mus.rule-intro"
+     },
+     "parts": [],
+     "values": {}
+    }
+   ]
+  },
+  {
+   "source": {
+    "id": "MUX",
+    "name": "Made-Up Extras",
+    "publisher": "Nobody",
+    "canon": false
+   },
+   "entries": [
+    {
+     "id": "mux.prio-b",
+     "kind": "priorities",
+     "name": "B",
+     "source": "MUX",
+     "page": 10,
+     "canon": false,
+     "attrs": {
+      "letter": "B"
+     },
+     "parts": [],
+     "values": {}
+    },
+    {
+     "id": "mux.troll",
+     "kind": "metatypes",
+     "name": "Troll",
+     "source": "MUX",
+     "page": 10,
+     "canon": false,
+     "attrs": {},
+     "parts": [],
+     "values": {}
+    }
+   ]
+  }
+ ]
+}
