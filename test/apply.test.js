@@ -2,7 +2,7 @@
 // Replace order and rollback. The real thing runs in Foundry's Quench batches (scripts/foundry/quench.js).
 import { beforeEach, expect, test, vi } from 'vitest'
 import { MODULE_ID } from '../scripts/lib/constants.js'
-import { applyRunner, effectData } from '../scripts/foundry/apply.js'
+import { applyRunner, dedupeUnarmed, effectData } from '../scripts/foundry/apply.js'
 
 let log, world, n, failCreateItems
 const flags = f => ({ [MODULE_ID]: { exportedAt: '2026-10-04T09:00:00.000Z', ...f } })
@@ -19,6 +19,7 @@ class FakeActor {
     const made = arr.map(i => ({ ...i, id: `i${++n}` })); this.items.push(...made); return made
   }
   async deleteEmbeddedDocuments(_, ids) {
+    log.push(['deleteItems', ids])
     if (this.failDelete && ids.some(id => this.items.find(i => i.id === id)?.old)) throw new Error('delete failed')
     this.items = this.items.filter(i => !ids.includes(i.id))
   }
@@ -105,4 +106,43 @@ test('replace with nothing in the world fails without creating anything', async 
   const res = await applyRunner(player(), 'replace')
   expect(res.action).toBe('failed')
   expect(world).toEqual([])
+})
+
+// Eden adds its Unarmed on every client that sees the actor created, without waiting: two can land.
+const unarmed = (t, f = {}) => ({ name: 'Unarmed', type: 'gear', flags: f, _stats: { createdTime: t }, system: { genesisID: 'unarmed' } })
+
+test('dedupeUnarmed: keeps the oldest of Eden’s Unarmed items, deletes the rest, nothing else; idempotent', async () => {
+  const doc = new FakeActor({ name: 'Mara', items: [unarmed(30), { name: 'GM fists', flags: {}, system: { genesisID: 'x' } },
+    unarmed(10), unarmed(20, flags({ id: 'u' })), unarmed(40)] })
+  const keep = doc.items[2].id
+  expect(await dedupeUnarmed(doc)).toBe(2)
+  expect(doc.items.filter(i => i.system.genesisID === 'unarmed' && !i.flags[MODULE_ID]).map(i => i.id)).toEqual([keep])
+  expect(doc.items.map(i => i.name)).toEqual(['GM fists', 'Unarmed', 'Unarmed'])  // ours (flagged) stays too
+  log = []
+  expect(await dedupeUnarmed(doc)).toBe(0)
+  expect(log).toEqual([])
+})
+
+test('dedupeUnarmed: a failing delete is logged, never thrown', async () => {
+  const doc = new FakeActor({ name: 'Mara', items: [unarmed(1), unarmed(2)] })
+  doc.deleteEmbeddedDocuments = async () => { throw new Error('nope') }
+  expect(await dedupeUnarmed(doc)).toBe(0)
+})
+
+test('replace: one actor update, one item create, one item delete; a duplicate Unarmed is removed after', async () => {
+  const doc = new FakeActor({ name: 'Mara', flags: flags({ id: 'r1' }),
+    items: [unarmed(2), unarmed(1), { name: 'old', old: true, flags: flags({ id: 'w' }) }] })
+  const [late, first] = doc.items.map(i => i.id)
+  const res = await applyRunner(player(), 'replace')
+  expect(res.action).toBe('replace')
+  expect(log.map(([k]) => k)).toEqual(['update', 'items', 'deleteItems', 'deleteItems'])
+  expect(log[3][1]).toEqual([late])
+  expect(doc.items.filter(i => i.system?.genesisID === 'unarmed').map(i => i.id)).toEqual([first])
+})
+
+test('create: a duplicate Unarmed that landed during the import is removed', async () => {
+  globalThis.Actor = { create: async d => new FakeActor({ ...d, items: [unarmed(1), unarmed(2)] }) }
+  const res = await applyRunner(player(), 'create')
+  expect(res.actor.items.filter(i => i.system?.genesisID === 'unarmed')).toHaveLength(1)
+  expect(res.actor.items.map(i => i.name)).toEqual(['Unarmed', 'Made-up Booster'])
 })
