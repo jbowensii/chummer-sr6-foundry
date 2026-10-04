@@ -47,6 +47,9 @@ async function cleanUp(tag, folder) {
   if (ids.length) await Actor.deleteDocuments(ids)
   if (folder && game.folders.get(folder.id)) await folder.delete({ deleteSubfolders: true, deleteContents: true })
 }
+// Eden's own Unarmed weapon: added to every new Player/NPC by Eden itself (genesisID 'unarmed'), never by this module.
+const edenUnarmed = i => !flagOf(i) && i.system?.genesisID === 'unarmed'
+const ours = actor => actor.items.filter(i => !edenUnarmed(i))
 const itemsOf = (actor, type) => actor.items.filter(i => i.type === type)
 const byName = (actor, name) => actor.items.find(i => i.name === name)
 const count = docs => docs.reduce((c, d) => ({ ...c, [d.type]: (c[d.type] ?? 0) + 1 }), {})
@@ -99,10 +102,10 @@ export function registerQuench(quench) {
         assert.isAbove(mara.system.skills.firearms.pool, 0)
       })
       it('has its mortype', () => assert.equal(mara.system.mortype, 'mysticadept'))
-      it('has every item, per type', () => assert.deepEqual(count(mara.items.contents), count(t.items)))
+      it('has every item, per type', () => assert.deepEqual(count(ours(mara)), count(t.items)))
       it('keeps the genesisID of knowledge and language skills only', () => {
         assert.sameMembers(itemsOf(mara, 'skill').map(i => i.system.genesisID), ['knowledge', 'language', 'language'])
-        for (const i of mara.items.filter(i => i.type !== 'skill')) assert.equal(i.system.genesisID ?? '', '', i.name)
+        for (const i of ours(mara).filter(i => i.type !== 'skill')) assert.equal(i.system.genesisID ?? '', '', i.name)
       })
     })
   })
@@ -135,8 +138,9 @@ export function registerQuench(quench) {
         assert.equal(wired.system.attributes.rea.base, plain.system.attributes.rea.base)
         assert.equal(wired.system.attributes.rea.pool, plain.system.attributes.rea.pool + 1)
       })
+      // diceMod is Eden's effect key; Eden adds it to dice into dicePool, which its initiative roll uses.
       it('physical initiative has one more die', () =>
-        assert.equal(wired.system.initiative.physical.dice, plain.system.initiative.physical.dice + 1))
+        assert.equal(wired.system.initiative.physical.dicePool, plain.system.initiative.physical.dicePool + 1))
     })
   })
 
@@ -145,7 +149,7 @@ export function registerQuench(quench) {
     describe('Replace keeps play state, art and the GM’s items', function () {
       this.timeout(30000)
       const IMG = 'user/art.webp', TOKEN = 'user/token.webp'
-      let tag, folder, file, runner, first, noteId, oldFlagged, a
+      let tag, folder, file, runner, first, noteId, oldFlagged, unarmedId, a
       before(async function () {
         const s = await loadSample(); tag = s.tag; file = s.file; runner = file.runners[0]
         folder = await makeFolder()
@@ -154,6 +158,7 @@ export function registerQuench(quench) {
           'system.reputation': 2, img: IMG, 'prototypeToken.texture.src': TOKEN })
         noteId = (await first.createEmbeddedDocuments('Item', [{ name: 'GM note item', type: 'gear', system: { type: 'TOOLS', subtype: 'TOOLS' } }]))[0].id
         oldFlagged = first.items.filter(i => flagOf(i)).map(i => i.id)
+        unarmedId = first.items.find(edenUnarmed)?.id
         const newer = structuredClone(runner)
         newer.exportedAt = '2026-12-01T12:00:00.000Z'
         newer.karma = 42
@@ -179,6 +184,11 @@ export function registerQuench(quench) {
         const flagged = a.items.filter(i => flagOf(i))
         assert.isNotEmpty(flagged)
         assert.isEmpty(flagged.filter(i => oldFlagged.includes(i.id)))
+      })
+      // Eden adds it after create without waiting, so it may not be there yet; never deleted, never twice.
+      it('leaves Eden’s own Unarmed item alone', () => {
+        assert.isAtMost(a.items.filter(edenUnarmed).length, 1)
+        if (unarmedId) assert.ok(a.items.get(unarmedId), 'Eden’s Unarmed kept')
       })
       it('a skill dropped in the file goes to 0; karma updated', () => {
         assert.equal(a.system.skills.firearms.points, 0)

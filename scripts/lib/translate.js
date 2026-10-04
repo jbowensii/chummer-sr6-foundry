@@ -20,7 +20,8 @@ const iconSet = i => (i ? new Set(i) : null)
 
 // Augmentation bonuses -> ActiveEffect changes Eden applies itself (mode 2 = ADD). Edge: Eden's own effect key for the
 // template actors (Player, NPC, Critter, Spirit) is system.edge.max (config.js ACTIVE_EFFECT_OPTIONS); Eden moves it to
-// system.edge.mod itself for its data-model actors (EFFECT_CONVERSION_TOV2).
+// system.edge.mod itself for its data-model actors (EFFECT_CONVERSION_TOV2). Initiative dice: diceMod, which Eden adds to
+// dice into initiative.physical.dicePool, the number its initiative roll uses (dice itself stays the base).
 const BONUS_KEY = t => (t === 'initDice' ? 'system.initiative.physical.diceMod' : t === 'edg' ? 'system.edge.max' : `system.attributes.${t}.mod`)
 export const bonusChanges = bonuses => (bonuses ?? []).filter(b => b.target === 'initDice' || b.target === 'edg' || ATTRS.includes(b.target))
   .map(b => ({ key: BONUS_KEY(b.target), value: String(num(b.value)), mode: 2 }))

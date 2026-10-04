@@ -2,7 +2,7 @@
 
 A Foundry VTT module that imports runners, NPCs and book data exported from [Chummer Anarchy 2.0](https://github.com/jbowensii/chummer-anarchy2)'s Shadowrun 6 side into the Shadowrun 6th Edition (`shadowrun6-eden`) system.
 
-Tested with shadowrun6-eden 4.0.9 on Foundry 13 and 14. A newer shadowrun6-eden gets a warning, not a block; other systems are refused.
+Tested with shadowrun6-eden 4.0.11 on Foundry 14.368. A newer shadowrun6-eden gets a warning, not a block; other systems are refused.
 
 ## Install
 
@@ -90,7 +90,7 @@ For your own Foundry only. Don’t share the export file. A book-data file with 
 
 ### Tests in Foundry
 
-1. Install and enable [Quench](https://github.com/Ethaks/FVTT-Quench) in a shadowrun6-eden 4.0.9 world (Foundry 13 and 14) alongside this module.
+1. Install and enable [Quench](https://github.com/Ethaks/FVTT-Quench) in a shadowrun6-eden 4.0.11 world (Foundry 13 and 14) alongside this module.
 2. Open the Quench test runner, tick the "Chummer SR6 Importer" batches and run them.
 
 The batches import the made-up samples in `samples/` (no book text) into a throwaway Actors folder "Chummer SR6 Importer tests" and compendiums named `sr6test-…`, and delete what they made when they finish.
