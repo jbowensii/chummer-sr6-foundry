@@ -4,13 +4,17 @@ import { MODULE_ID } from './constants.js'
 import { docId } from './ids.js'
 import { lifestyleKey, normKey } from './eden.js'
 import { itemIconKey, withIcon } from './icons.js'
-import { base, beingActor, critterPowerFields, escapeText, lineItem, pickItem, qualityItem, translateNpc } from './translate.js'
+import {
+  base, beingActor, critterPowerFields, escapeText, lineItem, martialArtItem, pickItem, programItem, qualityItem, techniqueItem, translateNpc,
+  weaknessLine,
+} from './translate.js'
 
 // pack key -> [label, document type], in write order
 export const PACKS = { qualities: ['Qualities', 'Item'], weapons: ['Weapons', 'Item'], armor: ['Armor', 'Item'],
-  augmentations: ['Augmentations', 'Item'], electronics: ['Electronics', 'Item'], gear: ['Gear', 'Item'],
+  augmentations: ['Augmentations', 'Item'], electronics: ['Electronics', 'Item'], programs: ['Programs', 'Item'], gear: ['Gear', 'Item'],
   vehicles: ['Vehicles & drones', 'Item'], spells: ['Spells', 'Item'], rituals: ['Rituals', 'Item'], adeptpowers: ['Adept powers', 'Item'],
   complexforms: ['Complex forms', 'Item'], metamagics: ['Metamagics', 'Item'], echoes: ['Echoes', 'Item'],
+  martialarts: ['Martial arts', 'Item'], martialtechniques: ['Martial art techniques', 'Item'], traditions: ['Traditions', 'JournalEntry'],
   critterpowers: ['Critter powers', 'Item'], lifestyles: ['Lifestyles', 'Item'], contacts: ['Contacts', 'Item'],
   npcs: ['NPCs', 'Actor'], critters: ['Critters', 'Actor'], spirits: ['Spirits', 'Actor'], sprites: ['Sprites', 'Actor'],
   rules: ['Rules', 'JournalEntry'] }
@@ -51,10 +55,18 @@ export function translateBook(book, { exportedAt, appVersion, descriptions = fal
     flags: { [MODULE_ID]: { ...doc.flags[MODULE_ID], ...bookFlags(e) } } })
   const icon = (doc, e) => withIcon(doc, itemIconKey(doc), e.source ?? src.id, iconSet)
   const text = e => (descriptions && e.description ? e.description : undefined)
+  // a journal (key: its _id seed; flags.id the entry id, else the key): a rules chapter, or a tradition (Eden has no
+  // tradition item, only the actor's system.tradition); one page per entry in file order, at its heading level
+  const journal = (key, name, page, list, id = key) => ({ _id: docId(key), name, flags: { [MODULE_ID]: bookFlags({ id, page }) },
+    pages: list.map((r, i) => ({ _id: docId(`${src.id}:${r.kind}:${r.id}`), name: r.name || r.id, type: 'text', sort: (i + 1) * SORT,
+      title: { show: true, level: Math.min(4, Math.max(1, int(r.attrs?.level) || 1)) }, flags: { [MODULE_ID]: bookFlags(r) },
+      text: { content: sanitize(text(r) ?? see(r)), format: 1 } })) })
 
   const entries = book.entries ?? []
   // the book's critter powers, by name, for the fields of a being's powers (beingActor)
   const powers = Object.fromEntries(entries.filter(e => e.kind === 'critterpowers').map(e => [normKey(e.name), e]))
+  // a style's signature technique (attrs.signature, by name) -> that style's id, for the technique's Eden style link
+  const styleOf = Object.fromEntries(entries.filter(e => e.kind === 'martialarts' && e.attrs?.signature).map(e => [normKey(e.attrs.signature), e.id]))
   const skipped = {}
 
   for (const raw of entries) {
@@ -62,9 +74,13 @@ export function translateBook(book, { exportedAt, appVersion, descriptions = fal
     try {
       if (LINES.includes(kind)) add(kind, own(kind, e, lineItem({ ...e, qty: 1, bonuses: undefined }, ctx)))
       else if (PICKS.includes(kind)) add(kind, own(kind, e, pickItem({ ...e, pick: kind, bonuses: undefined }, ctx)))
+      else if (kind === 'programs') add(kind, own(kind, e, programItem(e, ctx)))
+      else if (kind === 'martialarts') add(kind, own(kind, e, martialArtItem(e, ctx)))
+      else if (kind === 'martialtechniques') add(kind, own(kind, e, techniqueItem(e, ctx, styleOf[normKey(e.name)])))
+      else if (kind === 'traditions') add(kind, journal(`${src.id}:traditions:${e.id}`, e.name, e.page, [e], e.id))
       else if (kind === 'qualities') add(kind, own(kind, e, qualityItem({ ...e, positive: !/^\s*neg/i.test(e.attrs?.kind ?? '') }, ctx)))
       else if (kind === 'critterpowers') {
-        const doc = base(e, 'critterpower', ctx)
+        const doc = base(e, 'critterpower', ctx, [weaknessLine(e)])
         Object.assign(doc.system, critterPowerFields(e))
         add(kind, own(kind, e, icon(doc, e)))
       } else if (kind === 'lifestyles') {
@@ -110,12 +126,7 @@ export function translateBook(book, { exportedAt, appVersion, descriptions = fal
     const ch = r.attrs?.chapter || 'Rules'
     chapters.set(ch, [...chapters.get(ch) ?? [], r])
   }
-  for (const [chapter, rules] of chapters) {
-    const id = `${src.id}:rules-chapter:${chapter}`
-    add('rules', { _id: docId(id), name: chapter, flags: { [MODULE_ID]: { ...bookFlags({ id, page: rules[0].page }) } },
-      pages: rules.map((r, i) => ({ _id: docId(`${src.id}:rules:${r.id}`), name: r.name || r.id, type: 'text', sort: (i + 1) * SORT,
-        title: { show: true, level: Math.min(4, Math.max(1, int(r.attrs?.level) || 1)) }, flags: { [MODULE_ID]: bookFlags(r) },
-        text: { content: sanitize(text(r) ?? see(r)), format: 1 } })) })
-  }
+  for (const [chapter, rules] of chapters)
+    add('rules', journal(`${src.id}:rules-chapter:${chapter}`, chapter, rules[0].page, rules))
   return { source: src, packs, portraits, tokens, textOnly }
 }

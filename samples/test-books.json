@@ -69,7 +69,8 @@
      "canon": true,
      "attrs": {
       "kind": "positive",
-      "karma": "4"
+      "karma": "4",
+      "karmaMax": "8"
      },
      "parts": [],
      "values": {
@@ -193,6 +194,26 @@
      }
     },
     {
+     "id": "mus.made-up-sniffer",
+     "kind": "programs",
+     "name": "Made-up Sniffer",
+     "source": "MUS",
+     "page": 11,
+     "canon": true,
+     "attrs": {
+      "type": "hacking",
+      "avail": "4(I)",
+      "cost": "250"
+     },
+     "parts": [],
+     "values": {
+      "cost": 250,
+      "avail": 4,
+      "legality": "I"
+     },
+     "description": "An invented program."
+    },
+    {
      "id": "mus.rope",
      "kind": "gear",
      "name": "Glitter Rope",
@@ -206,6 +227,23 @@
      "parts": [],
      "values": {
       "cost": 50
+     }
+    },
+    {
+     "id": "mus.made-up-spoiler",
+     "kind": "gear",
+     "name": "Made-up Spoiler",
+     "source": "MUS",
+     "page": 11,
+     "canon": true,
+     "attrs": {
+      "category": "Vehicle mods",
+      "slots": "2",
+      "cost": "300"
+     },
+     "parts": [],
+     "values": {
+      "cost": 300
      }
     },
     {
@@ -328,6 +366,47 @@
      "values": {}
     },
     {
+     "id": "mus.made-up-fist",
+     "kind": "martialarts",
+     "name": "Made-up Fist",
+     "source": "MUS",
+     "page": 11,
+     "canon": true,
+     "attrs": {
+      "categories": "Striking, Grappling",
+      "signature": "Made-up Sweep"
+     },
+     "parts": [],
+     "values": {},
+     "description": "An invented style."
+    },
+    {
+     "id": "mus.made-up-sweep",
+     "kind": "martialtechniques",
+     "name": "Made-up Sweep",
+     "source": "MUS",
+     "page": 11,
+     "canon": true,
+     "attrs": {
+      "category": "Striking"
+     },
+     "parts": [],
+     "values": {},
+     "description": "An invented technique."
+    },
+    {
+     "id": "mus.made-up-path",
+     "kind": "traditions",
+     "name": "Made-up Path",
+     "source": "MUS",
+     "page": 11,
+     "canon": true,
+     "attrs": {},
+     "parts": [],
+     "values": {},
+     "description": "An invented tradition."
+    },
+    {
      "id": "mus.made-up-glow",
      "kind": "critterpowers",
      "name": "Made-up Glow",
@@ -339,6 +418,20 @@
       "action": "Minor",
       "range": "LOS",
       "duration": "S"
+     },
+     "parts": [],
+     "values": {}
+    },
+    {
+     "id": "mus.made-up-allergy",
+     "kind": "critterpowers",
+     "name": "Made-up Allergy",
+     "source": "MUS",
+     "page": 11,
+     "canon": true,
+     "attrs": {
+      "type": "P",
+      "weakness": "true"
      },
      "parts": [],
      "values": {}

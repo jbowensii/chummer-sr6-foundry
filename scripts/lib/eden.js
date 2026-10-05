@@ -118,3 +118,16 @@ const wordKey = (keys, alias = {}) => name => {
 }
 export const spiritKey = wordKey(SPIRITS, SPIRIT_ALIAS)
 export const spriteKey = wordKey(SPRITES)
+
+// Eden 4.x `software` item (a data-model type): its system.type keys. Chummer's program type is printed ("basic",
+// "hacking", …); an unknown one is STANDARD (the caller reports it).
+const SOFTWARE = [[/hack/, 'HACKING'], [/auto/, 'AUTOSOFT'], [/data/, 'DATASOFT'], [/map/, 'MAPSOFT'], [/shop/, 'SHOPSOFT'],
+  [/talent|skill|active|know|lingua/, 'TALENTSOFT'], [/teach|tutor/, 'TEACHSOFT'], [/\bic\b|intrusion/, 'IC'], [/basic|common|standard/, 'STANDARD']]
+export function softwareType(type) {
+  const { hit: [, key], known } = first(SOFTWARE, type, [null, 'STANDARD'])
+  return { type: key, known }
+}
+
+// Eden martialartstyle system.category flags, from Chummer's printed categories ("Grappling, Weapon")
+const MARTIAL = ['grappling', 'mobility', 'ranged', 'striking', 'weapon']
+export const martialCategories = printed => { const w = words(printed).map(x => x.replace(/s$/, '')); return Object.fromEntries(MARTIAL.map(c => [c, w.includes(c)])) }

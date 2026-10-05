@@ -83,10 +83,45 @@ describe('a book', () => {
     expect(byName(t, 'Fault Sprite').type).toBe('sprite')
     expect(byName(t, 'Made-up Ganger')).toMatchObject({ type: 'NPC', system: { rating: 3 } })
   })
+  test('a program -> Eden software: its type, rating, price; no product (Eden checks it against its own book list)', () => {
+    const p = byName(t, 'Made-up Sniffer')
+    expect(p).toMatchObject({ _id: docId('MUS:programs:mus.made-up-sniffer'), type: 'software',
+      system: { type: 'HACKING', price: 250, availDef: '4(I)', page: 11, rating: 0 } })
+    expect(p.system).not.toHaveProperty('product')
+    expect(p.flags[M]).toMatchObject({ id: 'mus.made-up-sniffer', source: 'MUS', icon: { key: 'software' } })
+    const odd = translateBook({ ...mus, entries: [{ ...mus.entries.find(e => e.kind === 'programs'), page: 0, attrs: { type: 'Glitter' } }] }, OPTS)
+    expect(odd.packs.programs[0].system).toMatchObject({ type: 'STANDARD', page: null })
+    expect(odd.textOnly).toContain('Made-up Sniffer: program type "Glitter" not known → STANDARD')
+  })
+  test('a martial art style and its signature technique: Eden category flags, the technique tied to the style', () => {
+    const style = byName(t, 'Made-up Fist'), tech = byName(t, 'Made-up Sweep')
+    expect(style).toMatchObject({ _id: docId('MUS:martialarts:mus.made-up-fist'), type: 'martialartstyle',
+      system: { genesisID: 'mus.made-up-fist', category: { striking: true, grappling: true, mobility: false, ranged: false, weapon: false } } })
+    expect(style.system.description).toContain('Signature technique: Made-up Sweep')
+    expect(tech).toMatchObject({ type: 'martialarttech', system: { style: style.system.genesisID, choice: '' } })
+    expect(tech.system.description).toContain('Category: Striking')
+    const loose = translateBook({ ...mus, entries: mus.entries.filter(e => e.kind === 'martialtechniques') }, OPTS)
+    expect(loose.packs.martialtechniques[0].system.style).toBe('')
+  })
+  test('a tradition -> a journal with one page (Eden has no tradition item)', () => {
+    const [j] = t.packs.traditions
+    expect(j).toMatchObject({ _id: docId('MUS:traditions:mus.made-up-path'), name: 'Made-up Path', flags: { [M]: { id: 'mus.made-up-path', page: 11 } } })
+    expect(j.pages).toHaveLength(1)
+    expect(j.pages[0]).toMatchObject({ name: 'Made-up Path', type: 'text', text: { content: '<p>An invented tradition.</p>', format: 1 } })
+    expect(planBookPacks(t).find(p => p.key === 'traditions')).toMatchObject({ type: 'JournalEntry', label: 'Traditions — MUS' })
+  })
+  test('text Eden has no field for: a quality’s karma range, a mod’s slots, a weakness', () => {
+    expect(byName(t, 'Lucky Break').system.description).toContain('<p>Karma: 4–8</p>')
+    expect(byName(t, 'Made-up Spoiler').system.description).toContain('<p>Mod slots: 2</p>')
+    expect(byName(t, 'Made-up Allergy').system.description).toContain('<p>Weakness.</p>')
+    expect(byName(t, 'Made-up Glow').system.description).not.toContain('Weakness.')
+  })
   test('icons: items and actors get an image when the index is passed', () => {
     const x = translateBook(mus, { ...OPTS, icons: index })
     expect(byName(x, 'Pocket Zapper').img).toMatch(/^modules\/chummer-sr6-importer\/icons\/defaults\//)
     expect(byName(x, 'Spirit of Man').img).toMatch(/npc\/spirit\.webp$/)
+    expect(byName(x, 'Made-up Sniffer').img).toMatch(/defaults\/software\.webp$/)
+    expect(byName(x, 'Made-up Fist').img).toMatch(/defaults\/martialartstyle\.webp$/)
   })
 })
 

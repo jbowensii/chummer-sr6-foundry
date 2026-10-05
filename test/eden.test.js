@@ -1,8 +1,8 @@
 // shadowrun6-eden vocabulary (scripts/lib/eden.js): invented category strings, Eden's keys only.
 import { describe, expect, test } from 'vitest'
 import {
-  ATTRS, MOR, SKILLS, activationKey, armorSubtype, augmentType, durationKey, electronicsSubtype, gearType, lifestyleKey, normKey,
-  sinQuality, skillKey, specKey, spellFields, spiritKey, spriteKey, vehicleType, weaponType,
+  ATTRS, MOR, SKILLS, activationKey, armorSubtype, augmentType, durationKey, electronicsSubtype, gearType, lifestyleKey, martialCategories,
+  normKey, sinQuality, skillKey, softwareType, specKey, spellFields, spiritKey, spriteKey, vehicleType, weaponType,
 } from '../scripts/lib/eden.js'
 
 describe('keys', () => {
@@ -141,5 +141,22 @@ describe('lifestyles, SINs, spirits, sprites', () => {
     expect(spriteKey('Fault Sprite')).toBe('fault')
     expect(spriteKey('Data Sprite')).toBe('data')
     expect(spriteKey('Glitter Sprite')).toBe(null)
+  })
+})
+
+describe('programs and martial arts', () => {
+  test('softwareType: Eden software types from the printed program type; unknown -> STANDARD, not known', () => {
+    expect(softwareType('Hacking')).toEqual({ type: 'HACKING', known: true })
+    expect(softwareType('basic')).toEqual({ type: 'STANDARD', known: true })
+    expect(softwareType('Autosoft')).toEqual({ type: 'AUTOSOFT', known: true })
+    expect(softwareType('Made-up Datasoft')).toEqual({ type: 'DATASOFT', known: true })
+    expect(softwareType('IC')).toEqual({ type: 'IC', known: true })
+    expect(softwareType('Glitterware')).toEqual({ type: 'STANDARD', known: false })
+    expect(softwareType(undefined)).toEqual({ type: 'STANDARD', known: false })
+  })
+  test('martialCategories: printed categories -> Eden flags, plurals too', () => {
+    expect(martialCategories('Striking, Grappling')).toEqual({ grappling: true, mobility: false, ranged: false, striking: true, weapon: false })
+    expect(martialCategories('Weapons / Ranged')).toMatchObject({ weapon: true, ranged: true, striking: false })
+    expect(Object.values(martialCategories(undefined)).some(Boolean)).toBe(false)
   })
 })

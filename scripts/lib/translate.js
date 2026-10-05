@@ -4,7 +4,8 @@ import { MODULE_ID } from './constants.js'
 import { iconFor, itemIconKey, npcIconKey, withIcon } from './icons.js'
 import {
   ATTRS, MOR, SKILLS, SPELL_CATEGORIES, activationKey, armorSubtype, augmentType, durationKey, electronicsSubtype, gearType,
-  lifestyleKey, normKey, rangeKey, sinQuality, skillKey, specKey, spellFields, spiritKey, spriteKey, vehicleType, weaponType,
+  lifestyleKey, martialCategories, normKey, rangeKey, sinQuality, skillKey, softwareType, specKey, spellFields, spiritKey, spriteKey,
+  vehicleType, weaponType,
 } from './eden.js'
 
 const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }
@@ -51,7 +52,7 @@ const unknown = (ctx, x, what) => ctx.say(`${x.name}: ${what}`)
  */
 export function lineItem(p, ctx) {
   const a = p.attrs ?? {}, v = p.values ?? {}, rating = v.rating
-  const extra = [p.grade && `Grade: ${p.grade}`, p.note]
+  const extra = [p.grade && `Grade: ${p.grade}`, a.slots && `Mod slots: ${a.slots}`, p.note]
   let gear
   switch (p.kind) {
     case 'weapons': {
@@ -119,16 +120,49 @@ export function pickItem(x, ctx) {
   return icon(withEffects(doc, x), x, ctx)
 }
 
+// Eden's quality has no karma field: the printed karma (a range when the book prints several, attrs.karmaMax) is text
+const karmaLine = (a = {}) => a.karma && `Karma: ${a.karma}${a.karmaMax && a.karmaMax !== a.karma ? `–${a.karmaMax}` : ''}`
 /** A quality ({ positive, free?, level?, note? } on a runner; a book's entry sets positive from attrs.kind) -> Eden item data. */
 export function qualityItem(q, ctx) {
-  const doc = base(q, 'quality', ctx, [q.free && 'Metatype trait.'])
+  const doc = base(q, 'quality', ctx, [q.free && 'Metatype trait.', karmaLine(q.attrs)])
   Object.assign(doc.system, { category: q.positive ? 'ADVANTAGE' : 'DISADVANTAGE', level: yes(q.attrs?.perLevel), value: num(q.level), explain: q.note ?? '' })
   return icon(doc, q, ctx)
 }
+/** A critter power the book lists as a weakness (attrs.weakness): Eden has no field for it, so its description says so. */
+export const weaknessLine = e => yes(e?.attrs?.weakness) && 'Weakness.'
 /** A critter power entry's Eden fields (Eden's critterpower sheet: type, action, range, duration). */
 export function critterPowerFields(e) {
   const a = e.attrs ?? {}
   return { type: /^\s*m/i.test(a.type ?? '') ? 'mana' : 'physical', action: activationKey(a.action), range: rangeKey(a.range), duration: durationKey(a.duration) }
+}
+
+/**
+ * A Matrix program (a book entry) -> Eden's `software` item. That data model checks system.product against Eden's own
+ * book list and wants page >= 1, so product is left out (the description names the source) and page 0 is null.
+ */
+export function programItem(x, ctx) {
+  const a = x.attrs ?? {}, v = x.values ?? {}, s = softwareType(a.type)
+  if (!s.known) unknown(ctx, x, `program type "${a.type ?? ''}" not known → ${s.type}`)
+  const doc = base(x, 'software', ctx)
+  delete doc.system.product
+  Object.assign(doc.system, { page: x.page >= 1 ? x.page : null, type: s.type, rating: Math.max(0, num(v.rating)),
+    price: Math.max(0, num(v.cost)), availDef: a.avail ?? '' })
+  return icon(doc, x, ctx)
+}
+/**
+ * A martial art style -> Eden martialartstyle, its printed categories as Eden's flags. Its genesisID is the Chummer id:
+ * Eden lists a style's techniques on the sheet by system.style === the style's genesisID (techniqueItem).
+ */
+export function martialArtItem(x, ctx) {
+  const a = x.attrs ?? {}, doc = base(x, 'martialartstyle', ctx, [a.signature && `Signature technique: ${a.signature}`])
+  Object.assign(doc.system, { genesisID: x.id ?? '', category: martialCategories(a.categories) })
+  return icon(doc, x, ctx)
+}
+/** A martial art technique -> Eden martialarttech; style: the genesisID of its style ('' when the book ties it to none). */
+export function techniqueItem(x, ctx, style = '') {
+  const doc = base(x, 'martialarttech', ctx, [x.attrs?.category && `Category: ${x.attrs.category}`])
+  Object.assign(doc.system, { style, choice: '' })
+  return icon(doc, x, ctx)
 }
 
 // Everything a runner file holds as items, for runners and NPCs alike (an NPC's build is usually blank).
@@ -284,7 +318,7 @@ export function beingActor(npc, { name, flags, sanitize = escapeText, icons = nu
   for (const part of ['powers', 'optionalPowers']) for (const l of (npc.lines ?? []).filter(l => l.part === part)) for (const p of splitTop(l.text)) {
     const e = powers[normKey(p)] ?? powers[normKey(p.replace(/\s*\(.*$/, ''))]
     const optional = part === 'optionalPowers' && 'Optional power.'
-    const doc = e ? base({ ...e, name: p, uid: `power:${p}` }, powerType, ctx, [optional])
+    const doc = e ? base({ ...e, name: p, uid: `power:${p}` }, powerType, ctx, [optional, weaknessLine(e)])
       : { name: p, type: powerType, flags: { [MODULE_ID]: { id: `power:${p}`, exportedAt: f.exportedAt, appVersion: f.appVersion } },
         system: { genesisID: '', description: optional ? sanitize(optional) : '' } }
     if (e && powerType === 'critterpower') Object.assign(doc.system, critterPowerFields(e))

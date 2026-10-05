@@ -382,6 +382,35 @@ export function registerQuench(quench) {
         assert.deepEqual(j.pages.contents.sort((a, b) => a.sort - b.sort).map(p => [p.title.level, p.name]),
           [[1, 'Made-up Basics'], [2, 'Made-up Detail']])
       })
+      it('a program is Eden software that keeps its type and price through Eden’s data model', async () => {
+        const p = await pack('programs').getDocument(docId('MUS:programs:mus.made-up-sniffer'))
+        assert.equal(p.type, 'software')
+        assert.include(p.system, { type: 'HACKING', price: 250, availDef: '4(I)', page: 11 })
+      })
+      it('a martial art style and its signature technique: Eden types, category flags, the technique tied to the style', async () => {
+        const style = await pack('martialarts').getDocument(docId('MUS:martialarts:mus.made-up-fist'))
+        const tech = await pack('martialtechniques').getDocument(docId('MUS:martialtechniques:mus.made-up-sweep'))
+        assert.equal(style.type, 'martialartstyle')
+        assert.include(style.system.category, { striking: true, grappling: true, weapon: false })
+        assert.equal(tech.type, 'martialarttech')
+        assert.equal(tech.system.style, style.system.genesisID)
+      })
+      it('a style and technique dropped on an actor show together (Eden links them by genesisID)', async () => {
+        const style = await pack('martialarts').getDocument(docId('MUS:martialarts:mus.made-up-fist'))
+        const tech = await pack('martialtechniques').getDocument(docId('MUS:martialtechniques:mus.made-up-sweep'))
+        const a = await Actor.create({ name: 'Quench martial artist', type: 'Player' })
+        try {
+          await a.createEmbeddedDocuments('Item', [style.toObject(), tech.toObject()])
+          const s = a.items.find(i => i.type === 'martialartstyle'), t = a.items.find(i => i.type === 'martialarttech')
+          assert.equal(t.system.style, s.system.genesisID)
+        } finally { await a.delete() }
+      })
+      it('a tradition is a journal with its page', async () => {
+        const j = await pack('traditions').getDocument(docId('MUS:traditions:mus.made-up-path'))
+        assert.equal(j.name, 'Made-up Path')
+        assert.lengthOf(j.pages.contents, 1)
+        assert.include(j.pages.contents[0].text.content, 'invented tradition')
+      })
       it('re-import replaces by id, keeps a user image, a GM entry and a GM page, and locks a locked pack again', async () => {
         const weapons = pack('weapons'), id = docId('MUS:weapons:mus.pocket-zapper')
         await Item.updateDocuments([{ _id: id, img: 'user/art.webp' }], { pack: weapons.collection })

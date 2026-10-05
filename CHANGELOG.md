@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.0
+
+- Reads everything Chummer 0.9.5 exports for SR6 (`schema/sr6-export.schema.json` is Chummer's current copy): book data now has Matrix programs, martial art styles, martial art techniques and traditions.
+- Each of them gets its own compendium per book, as the other topics do, and only when the book has some: Programs (shadowrun6-eden software items, typed Hacking, Basic and so on, with price and availability), Martial arts (Eden martial art styles with their categories ticked), Martial art techniques (a style's signature technique is tied to its style, so both show together on a runner's sheet) and Traditions (journals: shadowrun6-eden has no tradition item).
+- Text shadowrun6-eden has no field for goes in the description: a quality's karma, as a range when the book prints several; a vehicle mod's slots; a critter power the book lists as a weakness.
+- Default icons for programs and martial arts, from the existing set.
+- In-Foundry tests: the book batch checks the new compendiums, and that a style and its technique dropped on a runner stay linked.
+
 ## 0.1.2
 
 - No more duplicate Unarmed items in shadowrun6-eden 4.0.11. Eden adds its Unarmed item to every new runner without waiting, once for each connected browser, so a runner could end up with two (seen after Replace). After an import, a Replace, an Add as new version or a book import, the importer now keeps one Eden Unarmed item (the oldest) and removes the extras. It never touches your own items or the imported ones.

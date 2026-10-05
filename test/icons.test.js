@@ -54,7 +54,8 @@ describe('icon keys', () => {
     expect(itemIconKey({ type: 'quality', system: { category: 'DISADVANTAGE' } })).toBe('quality/negative')
     expect(itemIconKey({ type: 'skill', system: { genesisID: 'knowledge' } })).toBe('skill/knowledge')
     expect(itemIconKey({ type: 'skill', system: { genesisID: 'language' } })).toBe('skill/language')
-    for (const k of ['ritual', 'adeptpower', 'complexform', 'metamagic', 'echo', 'critterpower', 'spritepower', 'contact', 'lifestyle', 'sin'])
+    for (const k of ['ritual', 'adeptpower', 'complexform', 'metamagic', 'echo', 'critterpower', 'spritepower', 'contact', 'lifestyle', 'sin',
+      'software', 'martialartstyle', 'martialarttech'])
       expect(itemIconKey({ type: k, system: {} })).toBe(k)
   })
   test('NPCs', () => expect(['grunt', 'critter', 'spirit', 'sprite'].map(npcIconKey)).toEqual(['npc', 'npc/critter', 'npc/spirit', 'npc/sprite']))
@@ -73,7 +74,8 @@ describe('the copied default set', () => {
       'THROWING', 'LAUNCHERS', 'DART', 'OTHER_CLOSE', 'OTHER_SPECIAL']
     for (const s of subtypes) expect(map, s).toHaveProperty([`weapon/${s.toLowerCase()}`])
     for (const k of ['weapon', 'armor', 'augmentation', 'electronics', 'focus', 'gear', 'vehicle', 'drone', 'spell', 'ritual', 'adeptpower',
-      'complexform', 'metamagic', 'echo', 'critterpower', 'spritepower', 'quality', 'contact', 'lifestyle', 'sin', 'skill', 'npc', 'rules'])
+      'complexform', 'metamagic', 'echo', 'critterpower', 'spritepower', 'quality', 'contact', 'lifestyle', 'sin', 'skill', 'npc', 'rules',
+      'software', 'martialartstyle', 'martialarttech'])
       expect(map, k).toHaveProperty([k])
   })
 })
