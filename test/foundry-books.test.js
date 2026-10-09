@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import { beforeEach, expect, test, vi } from 'vitest'
 import { MODULE_ID } from '../scripts/lib/constants.js'
 import { planTypePacks, translateBook } from '../scripts/lib/books.js'
-import { importBooks } from '../scripts/foundry/books.js'
+import { importBooks, packSystem } from '../scripts/foundry/books.js'
 import { applyIcons } from '../scripts/foundry/icons.js'
 
 const file = JSON.parse(readFileSync('samples/test-books.json', 'utf8'))
@@ -315,4 +315,12 @@ test('re-import keeps a user’s effect on an entry and swaps only ours', async 
   const after = q.docs.get(entry._id)
   expect(after.effects.map(e => e.name)).toEqual(['Lucky Break', 'Lucky Break (conditional)', 'GM house rule'])
   expect(after.effects.filter(e => e.flags?.[MODULE_ID]?.chummer)).toHaveLength(2)
+})
+
+test('packSystem: a pack entry carries no play state (Eden 4.0.11 _onUpdate needs an actor for usedForPool, wirelessActive, matrixCM)', async () => {
+        const s = { type: 'ELECTRONICS', usedForPool: true, defense: 2, matrix: { wirelessActive: true, matrixCM: { value: 9 }, attack: 3 } }
+    expect(packSystem(s)).toEqual({ type: 'ELECTRONICS', defense: 2, matrix: { attack: 3 } })
+    expect(s.usedForPool).toBe(true)  // the input is untouched
+    expect(packSystem(undefined)).toBeUndefined()
+    expect(packSystem({ type: 'ARMOR' })).toEqual({ type: 'ARMOR' })
 })

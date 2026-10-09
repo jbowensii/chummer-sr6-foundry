@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.1
+
+- Re-importing books no longer fails with "Cannot read properties of undefined (reading 'uuid')" or "(reading 'items')": a compendium entry no longer carries the on-actor play state shadowrun6-eden 4.0.11 reacts to when it changes (usedForPool, wireless on, Matrix condition monitor), which made Eden look for an actor a compendium item doesn't have.
+- Quench: per-book counts include `moved`; the re-import check unlocks Weapons even when it fails, so the next check isn't refused a locked pack.
+
 ## 0.4.0
 
 Import your books again after updating: the compendiums are new. Then Replace your runners so their items link to the new entries, and delete the old per-book compendiums and their folders yourself (the import never touches them).

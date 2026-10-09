@@ -93,9 +93,22 @@ async function categoryFolders(pack, docs) {
 // folder (always: a re-filed entry moves, even out of a folder the GM put it in). Every other entry is created, in its
 // category's folder, and Foundry picks its id. Entries not in the file are never touched.
 const OURS = ['name', 'type', 'img', 'system', 'effects', 'prototypeToken', 'items', 'pages', 'text', 'title']
+// A pack entry carries no play state: shadowrun6-eden 4.0.11's SR6Item._onUpdate reaches for the item's actor when an
+// update names usedForPool, matrix.wirelessActive or matrix.matrixCM (_checkPersonaChanges, _updatePanSheets), and a
+// compendium item has none, so the whole pack write fails. Those fields only mean something on an actor.
+export function packSystem(sys) {
+  if (!sys || typeof sys !== 'object') return sys
+  const { usedForPool, ...rest } = sys
+  if (rest.matrix && typeof rest.matrix === 'object') {
+    const { wirelessActive, matrixCM, ...m } = rest.matrix
+    rest.matrix = m
+  }
+  return rest
+}
 function updateData(old, doc) {
   const k = keepArt(old, doc), u = { _id: old._id, flags: { ...old.flags, [MODULE_ID]: doc.flags?.[MODULE_ID] } }
   for (const f of OURS) if (f in k) u[f] = k[f]
+  if (u.system && !doc.prototypeToken) u.system = packSystem(u.system)
   if (Array.isArray(doc.pages)) u.pages = mergeByKey(old.pages, k.pages)
   if (Array.isArray(doc.items)) u.items = mergeActorItems(old.items, k.items)
   // our effects are swapped, a user's kept (lib/plan.js keepUserEffects)
@@ -127,7 +140,7 @@ async function writePack(pack, updates, creates, { after, progress } = {}) {
     const made = []
     try {
       for (const c of chunks(creates, CHUNK)) {
-        made.push(...await Doc.createDocuments(c.map(d => ({ ...d, folder: folders.id(cat(d)) })), op))
+        made.push(...await Doc.createDocuments(c.map(d => ({ ...d, ...d.system && !d.prototypeToken ? { system: packSystem(d.system) } : {}, folder: folders.id(cat(d)) })), op))
         await step(c.length)
       }
     } catch (e) {
