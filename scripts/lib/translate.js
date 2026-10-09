@@ -341,10 +341,13 @@ export function translateRunner(r, opts) {
     `Defense Rating ${d.defenseRating}`] : []
   const m = r.magic ?? {}
   const actor = {
-    name, type: 'Player', flags: flag(r.id), prototypeToken: { actorLink: true },
+    // the full career ledger in our flags (Eden ignores them), for a ledger tab later
+    name, type: 'Player', flags: { [MODULE_ID]: { ...flag(r.id)[MODULE_ID], ledger: structuredClone(r.ledger ?? []) } }, prototypeToken: { actorLink: true },
     system: {
       name: r.realName ?? '', metatype: r.metatype?.name ?? '', mortype: MOR[m.kind] ?? 'mundane',
+      // karma: what the runner has now; karma_total: what it has earned in play (the ledger's earn entries)
       nuyen: Math.max(0, Math.trunc(num(r.nuyen))), karma: Math.max(0, Math.trunc(num(r.karma))),
+      karma_total: Math.max(0, Math.trunc((r.ledger ?? []).filter(l => l.type === 'earn').reduce((t, l) => t + num(l.karma), 0))),
       attributes: Object.fromEntries(ATTRS.map(k => [k, { base: num(r.attributes?.[k]?.natural) }])),
       edge: { max: num(r.attributes?.edg?.natural) },
       tradition: { name: m.tradition ?? '', attribute: m.drainAttr ?? 'log' },

@@ -220,3 +220,15 @@ test('bonusChanges: a skill bonus by the skill’s name (an Eden skill), else no
     { target: 'skill', id: 'crb.close-combat', value: 1 }]))
     .toEqual([{ key: 'system.skills.firearms.modifier', value: '2', mode: 2 }, { key: 'system.skills.close_combat.modifier', value: '1', mode: 2 }])
 })
+
+test('the ledger: karma now, karma_total earned in play, the full ledger in our flags', () => {
+  const r = mara()
+  r.ledger = [{ at: '2026-10-01T10:00:00.000Z', type: 'finalize', summary: 'Creation finished', karma: 7, nuyen: 1234 },
+    { at: '2026-10-02T10:00:00.000Z', type: 'earn', summary: 'Earned: Made-up run', karma: 5, nuyen: 3000 },
+    { at: '2026-10-03T10:00:00.000Z', type: 'advance', summary: 'Made-up advance', karma: 4, nuyen: 0 },
+    { at: '2026-10-04T10:00:00.000Z', type: 'earn', summary: 'Earned: Another run', karma: 3, nuyen: 0 }]
+  const { actor } = run(r)
+  expect(actor.system).toMatchObject({ karma: 7, karma_total: 8 })
+  expect(actor.flags['chummer-sr6-importer'].ledger).toEqual(r.ledger)
+  expect(run().actor.system.karma_total).toBe(0)  // the sample's ledger has no earnings
+})
