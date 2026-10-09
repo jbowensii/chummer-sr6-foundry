@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.2
+
+- Re-importing books works with shadowrun6-eden 4.0.11: its item update hooks (`_checkPersonaChanges`, `_updatePanSheets`) read the item's actor, which a compendium entry doesn't have, and Foundry fills the fields that set them off from Eden's defaults on every full update, so 0.4.1's fix wasn't enough. The module now has those two skip an item with no actor; on an actor's item they run as Eden wrote them.
+
 ## 0.4.1
 
 - Re-importing books no longer fails with "Cannot read properties of undefined (reading 'uuid')" or "(reading 'items')": a compendium entry no longer carries the on-actor play state shadowrun6-eden 4.0.11 reacts to when it changes (usedForPool, wireless on, Matrix condition monitor), which made Eden look for an actor a compendium item doesn't have.
