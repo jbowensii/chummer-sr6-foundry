@@ -461,5 +461,8 @@ export function translateNpc(r, { exportedAt, appVersion, sanitize = escapeText,
   s.description = sanitize(r.background)
   s.notes = sanitize(r.notes) + s.notes + sanitize(own.join('\n\n'))
   if (r.npc.kind === 'grunt' && r.metatype?.name) s.metatype = r.metatype.name
-  return { actor: b.actor, items: [...b.items, ...items], textOnly: [...b.lines, ...own].map(t => `${name}: ${t}`) }
+  // npc: its stat block's lines and where it came from, for its gear and weapon items from the world's compendiums
+  // (foundry/apply.js npcLineItems)
+  return { actor: b.actor, items: [...b.items, ...items], textOnly: [...b.lines, ...own].map(t => `${name}: ${t}`),
+    npc: { lines: r.npc.lines ?? [], from: r.npc.from ?? null } }
 }

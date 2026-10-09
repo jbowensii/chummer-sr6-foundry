@@ -88,7 +88,7 @@ A compendium a GM made in Chummer imports like a book, into its own folder "<com
 ## Not imported yet, or imported differently
 
 - Vehicles and drones are items on the runner and in "Vehicles & drones", not Vehicle actors.
-- An NPC's gear and weapon lines go in its notes as text.
+- An NPC's or critter's gear, weapon and augmentation lines become the real items from its book (in a book import, the book's own entries; for a runners file's NPC, that book's compendiums in this world): matched by name inside that book, the stat block's own values (DV, AR, modes, ammunition, rating) kept over the entry's, its "w/" accessories with it. A line that matches nothing stays text in the notes; several matches leave it as text and the report lists them.
 - A skill, specialization, weapon category, spirit or sprite type shadowrun6-eden doesn't know imports as a generic one, with a report line and a note.
 - A device array printed another way than a row of numbers is kept as text.
 - Effects Chummer read from a book's text are on the compendium entries only, not yet on a runner's own items (Chummer doesn't apply them yet). An item's source shows as Eden's book only for the books Eden lists; `genesisID` stays empty.

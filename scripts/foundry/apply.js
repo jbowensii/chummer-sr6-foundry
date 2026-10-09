@@ -2,6 +2,7 @@
 import { MODULE_ID } from '../lib/constants.js'
 import { missingTargets, normKey } from '../lib/eden.js'
 import { INDEX_FIELDS, resolveEntry, tieLine } from '../lib/chummer-id.js'
+import { LINE_KINDS, matchThing, npcThings, overrideStats, thingTie } from '../lib/npc-lines.js'
 import { fitUpdates, isOurEffect, keepItemArt, newVersionName, planItems, replaceUpdate, tokenUpdate } from '../lib/plan.js'
 
 export const FOLDER = 'Chummer SR6'
@@ -138,6 +139,42 @@ export async function linkCompendium(items, prefix = '') {
   return { items: out, notes }
 }
 
+/**
+ * An NPC's gear, weapon and augmentation lines (from a runners file) as the real items from its book's compendiums in
+ * this world (lib/npc-lines.js): matched by name in that book only, the stat block's own values kept over the entry's,
+ * its "w/" accessories fitted to it; linked to the entry (_stats.compendiumSource). Unmatched: the line stays text (the
+ * notes); tied: text and a report line. t.npc: { lines, from } (translateNpc). Returns { items, notes }.
+ */
+export async function npcLineItems(t, prefix = '') {
+  const things = npcThings(t.npc ?? {}), src = t.npc?.from?.source, page = t.npc?.from?.page ?? null
+  if (!things.length || !src) return { items: [], notes: [] }
+  const entries = await bookEntries(src, prefix), items = [], notes = []
+  const doc = async (entry, flags) => {
+    const data = (await fromUuid(entry.uuid))?.toObject()
+    if (!data) return null
+    for (const k of ['_id', 'folder', 'sort', 'ownership']) delete data[k]
+    data._stats = { compendiumSource: entry.uuid }
+    data.flags = { ...data.flags, [MODULE_ID]: { ...data.flags?.[MODULE_ID], ...flags } }
+    return data
+  }
+  for (const th of things) {
+    const r = matchThing(th.name, entries, LINE_KINDS[th.part], page)
+    if (r?.candidates) notes.push(thingTie(th, r.candidates))
+    if (!r?.entry) continue
+    const id = `line:${th.part}:${th.printed}`, d = await doc(r.entry, { id, npcLine: th.printed })
+    if (!d) continue
+    d.system = overrideStats(d.system, th.stats)
+    items.push(d)
+    for (const acc of th.accessories) {
+      const a = matchThing(acc, entries, null, page)
+      if (a?.candidates) notes.push(thingTie({ printed: acc }, a.candidates))
+      const m = a?.entry && await doc(a.entry, { id: `${id}:w/${acc}`, host: id, npcLine: th.printed })
+      if (m) items.push(m)
+    }
+  }
+  return { items, notes }
+}
+
 // Create an actor's items (Foundry picks their ids), then fit the mods and software to their hosts by the ids they got
 // (lib/plan.js fitUpdates). Returns the created items.
 async function createItems(doc, items) {
@@ -189,7 +226,8 @@ export async function applyRunner(t, choice, { portrait, token, exportedAt, fold
   if (choice === 'skip') return { actor: findExisting(runnerId), action: 'skip' }
   let created = null
   try {
-    const { items, notes } = await linkCompendium(t.items.map(itemData))
+    const linked = await linkCompendium(t.items.map(itemData)), lines = await npcLineItems(t)
+    const items = [...linked.items, ...lines.items], notes = [...linked.notes, ...lines.notes]
     const actor = structuredClone(t.actor)
     const at = exportedAt ?? flagOf(t.actor).exportedAt
     if (portrait) actor.img = await uploadPortrait(portrait, runnerId, at)

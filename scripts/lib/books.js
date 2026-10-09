@@ -2,6 +2,7 @@
 // Pure: no Foundry calls.
 import { MODULE_ID } from './constants.js'
 import { chummerFlags, chummerKey } from './chummer-id.js'
+import { LINE_KINDS, matchThing, npcThings, overrideStats, thingTie } from './npc-lines.js'
 import { lifestyleKey, modType, normKey } from './eden.js'
 import { itemIconKey, withIcon } from './icons.js'
 import {
@@ -97,12 +98,45 @@ export function translateBook(book, { exportedAt, appVersion, descriptions = fal
   const skipped = {}
   const kindById = new Map(entries.map(e => [e.id, e.kind])), kindOf = id => kindById.get(id) ?? null
 
+  // an item entry (weapons … vehicles, programs) as its Eden document: a mod when it is an accessory Eden has a mod for
+  // (hostKind: the kind of the item it fits, when known), else gear, focus or software
+  const itemDoc = (e, hostKind = LINES.includes(e.kind) ? accessoryHostKind(e, kindOf) : null) => {
+    const mod = hostKind && modType(hostKind, e.attrs?.category)
+    return own(e.kind, e, mod ? modItem({ ...e, bonuses: undefined }, ctx, mod)
+      : e.kind === 'programs' ? programItem(e, ctx) : lineItem({ ...e, qty: 1, bonuses: undefined }, ctx))
+  }
+  const ITEM_KINDS = [...LINES, 'programs']
+  // A being's gear, weapon and augmentation lines as this book's items (lib/npc-lines.js): matched by name in the book,
+  // the stat block's own values kept over the entry's, its "w/" accessories with it (a mod says what it's fitted to: a
+  // pack actor's items get their ids only when written). Unmatched: the line stays text; tied: text and a report line.
+  const thingItems = (being, npc) => {
+    const out = []
+    for (const th of npcThings(npc)) {
+      const r = matchThing(th.name, entries.filter(x => ITEM_KINDS.includes(x.kind)), LINE_KINDS[th.part], being.page)
+      if (r?.candidates) textOnly.push(`${being.name}: ${thingTie(th, r.candidates)}`)
+      if (!r?.entry) continue
+      const doc = itemDoc({ ...r.entry, description: text(r.entry) })
+      const id = `line:${th.part}:${th.printed}`
+      doc.flags[MODULE_ID] = { ...doc.flags[MODULE_ID], id, npcLine: th.printed }
+      doc.system = overrideStats(doc.system, th.stats)
+      out.push(doc)
+      for (const acc of th.accessories) {
+        const a = matchThing(acc, entries.filter(x => ITEM_KINDS.includes(x.kind)), null, being.page)
+        if (a?.candidates) textOnly.push(`${being.name}: ${thingTie({ printed: acc }, a.candidates)}`)
+        if (!a?.entry) continue
+        const m = itemDoc({ ...a.entry, description: text(a.entry) }, r.entry.kind)
+        m.flags[MODULE_ID] = { ...m.flags[MODULE_ID], id: `${id}:w/${acc}`, host: id, npcLine: th.printed }
+        m.system.description += sanitize(`Fitted to ${doc.name}.`)
+        out.push(m)
+      }
+    }
+    return out
+  }
+
   for (const raw of entries) {
     const kind = raw.kind, e = { ...raw, description: text(raw) }
     try {
-      const hostKind = LINES.includes(kind) ? accessoryHostKind(e, kindOf) : null, mod = hostKind && modType(hostKind, e.attrs?.category)
-      if (mod) add(kind, own(kind, e, modItem({ ...e, bonuses: undefined }, ctx, mod)))
-      else if (LINES.includes(kind)) add(kind, own(kind, e, lineItem({ ...e, qty: 1, bonuses: undefined }, ctx)))
+      if (LINES.includes(kind)) add(kind, itemDoc(e))
       else if (PICKS.includes(kind)) add(kind, own(kind, e, pickItem({ ...e, pick: kind, bonuses: undefined }, ctx)))
       else if (kind === 'programs') add(kind, own(kind, e, programItem(e, ctx)))
       else if (kind === 'martialarts') {
@@ -130,7 +164,7 @@ export function translateBook(book, { exportedAt, appVersion, descriptions = fal
         if (!e.npc) ctx.say(`${e.name}: no NPC block in the file → an empty ${BEING[kind]}`)
         const b = beingActor(npc, { name: e.name, flags: { [MODULE_ID]: bookFlags(e) }, sanitize, icons: iconSet, powers })
         b.actor.system.description = sanitize(e.description ?? see(e))
-        add(kind, { ...b.actor, items: b.items })
+        add(kind, { ...b.actor, items: [...b.items, ...thingItems(e, npc)] })
         textOnly.push(...b.lines.map(l => `${e.name}: ${l}`))
       } else if (kind !== 'rules') (skipped[kind] ??= []).push(raw)
     } catch (err) { textOnly.push(`${e.name ?? e.id}: not imported (${err?.message ?? err})`) }
