@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.2
+
+- The import window's book and runner lists scroll inside the window, so the Import button stays on screen with many books; the window can be resized.
+
 ## 0.3.1
 
 - Quench: the migration check uses an entry the sample book has (Glitter Cannon), and says so if the sample lacks it.
