@@ -224,6 +224,20 @@ describe('items', () => {
     expect(t.items.filter(i => i.type === 'lifestyle').map(i => [i.name, i.system.sin, i.flags['chummer-sr6-importer'].id])).toEqual([['Made-up Hideout', 'Mara Testcase', 'mus.made-up-squat']])
     expect(t.actor.system.gender).toBe('')
   })
+  test('a technique’s prerequisites in its description, a missing one marked', () => {
+    const r = mara()
+    r.martialArts[0].techniques[0].requires = [{ kind: 'adeptpower', name: 'Made-up Hands', met: false }, { kind: 'augmentation', name: 'Made-up Lacing', met: true }, { kind: 'other', name: 'A made-up oath' }]
+    expect(run(r).items.find(i => i.type === 'martialarttech').system.description)
+      .toMatch(/Requires: Made-up Hands \(adept power\) — missing; Made-up Lacing \(augmentation\); A made-up oath/)
+  })
+  test('a placeholder SIN: named as one, its lifestyle under it', () => {
+    const r = mara()
+    r.sins = [{ uid: 'p1', name: '', kind: 'real', placeholder: true, licences: [], lifestyles: [{ uid: 'l9', id: 'mus.made-up-squat', name: 'Made-up Hideout', months: 1 }] }]
+    const t = run(r), sin = t.items.find(i => i.type === 'sin')
+    expect(sin.name).toBe('Unnamed SIN (placeholder)')
+    expect(sin.system.description).toMatch(/placeholder: name it or replace it/)
+    expect(t.items.find(i => i.type === 'lifestyle').system.sin).toBe('Unnamed SIN (placeholder)')
+  })
   test('martial arts: the style with a random genesisID, its techniques tied to it, both linkable by chummerID', () => {
     const t = run(), style = t.items.find(i => i.type === 'martialartstyle'), tech = t.items.filter(i => i.type === 'martialarttech')
     expect(style).toMatchObject({ name: 'Made-up Fist', flags: { 'chummer-sr6-importer': { id: 'm1', chummerID: 'MUS:martialarts:mus.made-up-fist' } } })

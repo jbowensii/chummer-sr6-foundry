@@ -250,8 +250,11 @@ export function martialArtItem(x, ctx) {
   return icon(doc, x, ctx)
 }
 /** A martial art technique -> Eden martialarttech; style: the genesisID of its style ('' when the book ties it to none). */
+// a technique's printed prerequisites (Chummer's requires: { kind, name, met? }); met: false on a runner that lacks it
+const REQUIRES = { adeptpower: 'adept power', technique: 'technique', quality: 'quality', augmentation: 'augmentation' }
+const requiresLine = rs => rs?.length && `Requires: ${rs.map(r => `${r.name}${REQUIRES[r.kind] ? ` (${REQUIRES[r.kind]})` : ''}${r.met === false ? ' — missing' : ''}`).join('; ')}`
 export function techniqueItem(x, ctx, style = '') {
-  const doc = base(x, 'martialarttech', ctx, [x.attrs?.category && `Category: ${x.attrs.category}`])
+  const doc = base(x, 'martialarttech', ctx, [x.attrs?.category && `Category: ${x.attrs.category}`, requiresLine(x.requires)])
   Object.assign(doc.system, { style, choice: '' })
   return icon(doc, x, ctx)
 }
@@ -330,13 +333,15 @@ function runnerItems(r, ctx) {
     return icon({ name: l.name, type: 'lifestyle', flags: f,
       system: { genesisID: '', type: key ?? 'middle', paid: num(l.months), cost: num(l.cost), sin: sin?.name ?? '' } }, l, ctx)
   }
-  const sins = r.sins ?? []
+  // a placeholder SIN (Chummer gave an older runner's lifestyle an unnamed one to sit on) shows as such
+  const sins = (r.sins ?? []).map(s => (s.placeholder ? { ...s, name: s.name || 'Unnamed SIN (placeholder)' } : s))
   if (sins.some(s => Array.isArray(s.lifestyles))) for (const s of sins) for (const l of s.lifestyles ?? []) items.push(lifestyle(l, s))
   else if (r.lifestyle) items.push(lifestyle(r.lifestyle, sins[0]))
   for (const s of sins)
     items.push(icon({ name: s.name, type: 'sin', flags: flag(s.uid),
       system: { genesisID: '', quality: sinQuality(s.kind, s.rating),
-        description: sanitize([s.gender && `Gender: ${s.gender}`, ...(s.licences ?? []).map(l => `Licence: ${l.name} (rating ${l.rating})`)]
+        description: sanitize([s.placeholder && 'A placeholder: name it or replace it in Chummer.', s.gender && `Gender: ${s.gender}`,
+          ...(s.licences ?? []).map(l => `Licence: ${l.name} (rating ${l.rating})`)]
           .filter(Boolean).join('\n\n')) } }, s, ctx))
   return items
 }
