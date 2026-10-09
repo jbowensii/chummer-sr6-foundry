@@ -146,3 +146,22 @@ test('create: a duplicate Unarmed that landed during the import is removed', asy
   expect(res.actor.items.filter(i => i.system?.genesisID === 'unarmed')).toHaveLength(1)
   expect(res.actor.items.map(i => i.name)).toEqual(['Unarmed', 'Made-up Booster'])
 })
+
+test('create: a fitted mod points at its host on the new actor; a catalog item links its world compendium entry when there', async () => {
+  let r = 0
+  globalThis.foundry = { utils: { randomID: () => `rid${++r}` } }
+  const ref = 'Compendium.world.sr6-mus-weapons.Item.'
+  const { docId } = await import('../scripts/lib/ids.js')
+  const zapId = docId('MUS:weapons:mus.pocket-zapper')
+  game.packs = { get: id => (id === 'world.sr6-mus-weapons' ? { index: new Map([[zapId, {}]]) } : undefined) }
+  const gun = { name: 'Zapper', type: 'gear', flags: flags({ id: 'w1', catalogId: 'mus.pocket-zapper', kind: 'weapons', source: 'MUS' }), system: {} }
+  const sight = { name: 'Sight', type: 'mod', flags: flags({ id: 'w1a', host: 'w1', catalogId: 'mus.made-up-sight', kind: 'gear', source: 'MUS' }), system: {} }
+  const t = player(); t.items = [gun, sight]
+  const res = await applyRunner(t, 'create')
+  expect(res.action).toBe('create')
+  const items = log.find(([k]) => k === 'items')[1]
+  expect(items[0]).toMatchObject({ _id: 'rid1', _stats: { compendiumSource: ref + zapId } })
+  expect(items[1].system.embeddedInUuid).toBe(`Actor.${res.actor.id}.Item.rid1`)
+  expect(items[1]).not.toHaveProperty('_stats')  // its pack isn't in the world
+  delete globalThis.foundry
+})

@@ -42,22 +42,42 @@ export const armorSubtype = category => first(ARMOR, category, [null, 'ARMOR_BOD
 
 const CYBER = [[/head/, 'CYBER_HEADWARE'], [/eye/, 'CYBER_EYEWARE'], [/ear/, 'CYBER_EARWARE'], [/jack/, 'CYBERJACK'],
   [/limb|\barms?\b|\blegs?\b|\bhands?\b|\bfeet\b|\bfoot\b/, 'CYBER_LIMBS'], [/weapon/, 'CYBER_IMPLANT_WEAPON']]
-const BIO = [[/cultured/, 'BIOWARE_CULTURED'], [/weapon/, 'BIOWARE_IMPLANT_WEAPON'], [/dermal|skin/, 'BIOWARE_DERMAL']]
-/** type: the catalog's augmentation type (cyberware | bioware). */
-export function augmentType(type, category) {
+const BIO = [[/cultured/, 'BIOWARE_CULTURED'], [/weapon/, 'BIOWARE_IMPLANT_WEAPON'], [/dermal|skin/, 'BIOWARE_DERMAL'],
+  [/biosense/, 'BIOSENSE']]
+// implanted access devices first: Eden's persona reads them by subtype
+const CYBER_DEVICE = [[/cyberdeck|\bdeck/, 'CYBERDECK'], [/commlink/, 'COMMLINK']]
+const NANO = [[/cosmetic/, 'NANITES_COSMETIC'], [/therap|medic/, 'NANITES_THERAPEUTIC'], [/bioamp/, 'NANITES_BIOAMP'],
+  [/transient/, 'NANITES_TRANSIENT'], [/kit/, 'NANOTECH_KIT'], [/utilit/, 'NANITES_UTILITIES']]
+const GENE = [[/transgenic bio/, 'TRANSGENIC_BIOWARE'], [/transgen/, 'TRANSGENICS'], [/therap/, 'THERAPEUTIC'],
+  [/complementary/, 'COMPLEMENTARY_GENETIC_MODS']]
+/**
+ * type: the catalog's augmentation type as exported (cyberware | bioware); ware: the printed type when the export folded it
+ * (nanoware, geneware, symbionts, transgenics), which Eden has types or subtypes of its own for.
+ */
+export function augmentType(type, category, ware) {
+  const w = String(ware ?? '').toLowerCase()
+  if (w === 'nanoware') return { type: 'NANOWARE', subtype: first(NANO, category, [null, 'NANO_CYBERWARE']).hit[1] }
+  if (w === 'geneware') return { type: 'GENETICS', subtype: first(GENE, category, [null, 'AUGMENTICS']).hit[1] }
+  if (w === 'transgenics') return { type: 'GENETICS', subtype: 'TRANSGENICS' }
+  if (w === 'symbionts') return { type: 'BIOWARE', subtype: 'SYMBIONTS' }
   return /bio/i.test(type ?? '') ? { type: 'BIOWARE', subtype: first(BIO, category, [null, 'BIOWARE_STANDARD']).hit[1] }
-    : { type: 'CYBERWARE', subtype: first(CYBER, category, [null, 'CYBER_BODYWARE']).hit[1] }
+    : { type: 'CYBERWARE', subtype: first([...CYBER_DEVICE, ...CYBER], category, [null, 'CYBER_BODYWARE']).hit[1] }
 }
 
 // Eden gear type ELECTRONICS
-const ELECTRONICS = [[/commlink/, 'COMMLINK'], [/deck/, 'CYBERDECK'], [/rigger/, 'RIGGER_CONSOLE'], [/rfid|\btags?\b/, 'RFID'],
+const ELECTRONICS = [[/cyberterm/, 'CYBERTERM'], [/dataterm/, 'DATATERM'], [/commlink/, 'COMMLINK'], [/deck/, 'CYBERDECK'], [/rigger/, 'RIGGER_CONSOLE'], [/rfid|\btags?\b/, 'RFID'],
   [/optic|vision|camera/, 'OPTICAL'], [/audio/, 'AUDIO'], [/sensor/, 'SENSOR_HOUSING'], [/security|lock/, 'SECURITY'],
   [/breaking/, 'BREAKING'], [/\btac/, 'TAC_NET'], [/credstick|credit|\bid\b/, 'ID_CREDIT'], [/comm/, 'COMMUNICATION']]
 export const electronicsSubtype = category => first(ELECTRONICS, category, [null, 'ELECTRONIC_ACCESSORIES']).hit[1]
 
-const GEAR = [[/software|program|autosoft/, 'SOFTWARE', 'OTHER_PROGRAMS'], [/magic|formula|lodge|reagent/, 'MAGICAL', 'MAGIC_SUPPLIES'],
-  [/chemical|toxin/, 'CHEMICALS', 'INDUSTRIAL_CHEMICALS'], [/medkit|patch|biotech|medical/, 'BIOLOGY', 'BIOTECH'],
-  [/survival|climb|grapple/, 'SURVIVAL', 'SURVIVAL_GEAR']]
+const GEAR = [[/software|program|autosoft/, 'SOFTWARE', 'OTHER_PROGRAMS'], [/formula/, 'MAGICAL', 'MAGICAL_FORMULA'],
+  [/lodge/, 'MAGICAL', 'MAGIC_LODGE'], [/magic|reagent/, 'MAGICAL', 'MAGIC_SUPPLIES'],
+  [/\bbtls?\b|better.than.life/, 'CHEMICALS', 'BTL'], [/drug|compound/, 'CHEMICALS', 'DRUGS'], [/toxin|poison/, 'CHEMICALS', 'TOXINS'],
+  [/chemical/, 'CHEMICALS', 'INDUSTRIAL_CHEMICALS'], [/slap.?patch|\bpatch/, 'BIOLOGY', 'SLAP_PATCHES'],
+  [/medkit|biotech|medical/, 'BIOLOGY', 'BIOTECH'], [/grenade/, 'AMMUNITION', 'GRENADES'], [/missile/, 'AMMUNITION', 'MISSILES'],
+  [/rocket/, 'AMMUNITION', 'ROCKETS'], [/explosive/, 'AMMUNITION', 'EXPLOSIVES'], [/\bammo|ammunition|\brounds\b|\barrows\b|\bbolts\b/, 'AMMUNITION', 'AMMUNITION'],
+  [/grapple gun/, 'SURVIVAL', 'GRAPPLE_GUN'], [/winter|cold.weather/, 'SURVIVAL', 'WINTER_GEAR'],
+  [/survival|climb|grapple/, 'SURVIVAL', 'SURVIVAL_GEAR'], [/security|lock/, 'ELECTRONICS', 'SECURITY'], [/spare part/, 'TOOLS', 'SPARE_PARTS']]
 /** A focus is its own Eden item type; everything else is a gear item. */
 export function gearType(category) {
   if (/foci|focus/i.test(category ?? '')) return { item: 'focus', known: true }
@@ -79,6 +99,68 @@ export function vehicleType(category) {
   return { type: 'VEHICLES', subtype, known }
 }
 
+/** Eden's vehicle `vtype` (GROUND, WATER, AIR) from a vehicle's or drone's printed category. */
+export const vehicleVtype = category => (/\bair|aerial|aircraft|\bfly|rotor|plane|vtol|t-bird|thunderbird|\bjets?\b|wing|airship|zeppelin|blimp/i.test(category ?? '')
+  ? 'AIR' : /water|aquatic|boat|ship|\bsub|naval/i.test(category ?? '') ? 'WATER' : 'GROUND')
+
+// A Matrix access device's attributes Eden's persona reads, by subtype: a commlink, rigger console, dataterm or
+// cyberjack gives D and F, a cyberdeck A and S, a cyberterm all four (actor.js _preparePersona).
+const DEVICE_ATTRS = { COMMLINK: ['d', 'f'], RIGGER_CONSOLE: ['d', 'f'], DATATERM: ['d', 'f'], CYBERJACK: ['d', 'f'], CYBERDECK: ['a', 's'], CYBERTERM: ['a', 's', 'd', 'f'] }
+export const ACCESS_DEVICES = Object.keys(DEVICE_ATTRS)
+/**
+ * A Matrix access device's Eden fields: matrix.deviceRating, its printed attribute array on that subtype's attributes,
+ * and its program slots. Not a device: {}; an array of another length is left out (the caller keeps the text).
+ */
+export function deviceFields(subtype, { rating, array, programs } = {}) {
+  const keys = DEVICE_ATTRS[subtype]
+  if (!keys) return {}
+  const out = {}, nums = String(array ?? '').match(/\d+/g)?.map(Number) ?? []
+  if (Number.isFinite(rating) && rating > 0) out.matrix = { deviceRating: rating }
+  if (nums.length === keys.length) keys.forEach((k, i) => { out[k] = nums[i] })
+  const slots = Number(String(programs ?? '').match(/^\s*(\d+)\s*$/)?.[1])
+  if (Number.isFinite(slots)) out.progSlots = slots
+  return out
+}
+
+/** Eden's `mod` type for an accessory fitted to a host of hostKind (a Chummer kind), by its category's words; null: Eden
+ *  has no mod for it (a cyberlimb's accessory), so it stays a gear item. */
+export function modType(hostKind, category) {
+  const c = String(category ?? '').toLowerCase()
+  if (hostKind === 'weapons') return /\bmod(ification)?s?\b/.test(c) && !/accessor/.test(c) ? 'weapon_mod' : 'accessory_weapon'
+  if (hostKind === 'armor') return 'armor_mod'
+  if (hostKind === 'electronics') return /vision|visual|optic/.test(c) ? 'visual_enhancement' : /audio|hearing|sound/.test(c) ? 'audio_enhancement' : 'accessory_electronics'
+  return null
+}
+
+// Eden's PDF book codes (CONFIG.SR6.PDF_OPTIONS.BOOKS keys) for the Chummer source ids Eden has a book for: an item's
+// system.product (the sheet's book name and page, and Eden's "open in PDF" link). Others: no product.
+const EDEN_BOOKS = { CRB: 'core', 'CRB-SEA': 'core_seattle', 'CRB-BER': 'core_berlin', SWC: 'companion', FS: 'firing_squad',
+  HS: 'hack_slash', SW: 'street_wyrd', LL: 'lofwyr', BS: 'body_shop', DC: 'double_clutch', KK: 'krime', NF: 'no_future',
+  TS: 'tarnished_star', AW: 'astral_ways', BN: 'bestial_nature', SO: 'smooth_operations', CLN: 'collapsing_now',
+  DOD: 'dealers_of_death', EMC: 'emerald', PWP: 'power_plays', SHC: 'shadow_cast', 'SIF-NO': 'sif_new_orleans',
+  SLS: 'slip_streams', TKC: 'kechibi' }
+export const edenBook = source => EDEN_BOOKS[String(source ?? '').toUpperCase()] ?? null
+
+// A catalog effect's target (Chummer's export `effects`) -> Eden's Active Effect key (CONFIG.SR6.ACTIVE_EFFECT_OPTIONS)
+const DERIVED_KEY = { defense: 'system.defenserating.physical.mod', initiative: 'system.initiative.physical.mod',
+  composure: 'system.derived.composure.mod', 'judge-intentions': 'system.derived.judge_intentions.mod',
+  memory: 'system.derived.memory.mod', social: 'system.defenserating.social.mod' }
+/** A catalog effect ({ target, op, value }) on an actor -> its change key, or null when Eden has no field for it (an
+ *  edge-cost effect, an item: target, a name it doesn't know). */
+export function effectKey({ target, op } = {}) {
+  if (op !== 'add') return null
+  const [kind, name = ''] = String(target ?? '').split(':')
+  if (kind === 'attr') return name === 'edg' ? 'system.edge.max' : ATTRS.includes(name) ? `system.attributes.${name}.mod` : null
+  if (kind === 'skill') { const k = normKey(name); return SKILLS.includes(k) ? `system.skills.${k}.modifier` : null }
+  if (kind === 'derived') return DERIVED_KEY[name] ?? null
+  return null
+}
+/** An accessory's item:ar effect (`0,1,1,0,0`, one value a range band) -> changes on its host's system.attackRating.N. */
+export function hostChanges({ target, op, value } = {}) {
+  if (op !== 'add' || target !== 'item:ar') return []
+  return String(value ?? '').split(',').map(Number).flatMap((n, i) => (i < 5 && Number.isFinite(n) && n ? [{ key: `system.attackRating.${i}`, value: String(n) }] : []))
+}
+
 const RANGE = { 'LOS(A)': 'line_of_sight_area', LOS: 'line_of_sight', T: 'touch', 'S(A)': 'self_area', S: 'self' }
 const DURATION = { i: 'instantaneous', instant: 'instantaneous', instantaneous: 'instantaneous', s: 'sustained', sustained: 'sustained',
   p: 'permanent', permanent: 'permanent', l: 'limited', limited: 'limited', always: 'always' }
@@ -97,6 +179,7 @@ export function spellFields(attrs = {}, values = {}) {
     drain: values.drain ?? 0,
     combatSpellType: /indirect/.test(tags) ? 'spells_indirect' : /direct/.test(tags) ? 'spells_direct' : 'spells_indirect',
     isSustained: duration === 'sustained',
+    multiSense: /multi.?sense/.test(tags),
   }
 }
 export const activationKey = s => (/major/i.test(s ?? '') ? 'major_action' : /minor/i.test(s ?? '') ? 'minor_action' : 'passive')

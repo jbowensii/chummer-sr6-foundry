@@ -1,6 +1,7 @@
 // Pure import decisions: what to do with a runner already in the world, and what Replace may overwrite.
 import { MODULE_ID } from './constants.js'
 import { replaceable } from './icons.js'
+import { docId } from './ids.js'
 
 const time = x => Date.parse(x?.exportedAt ?? '') || 0
 
@@ -18,7 +19,8 @@ const DATED = new RegExp(` \\(\\d{1,2} (${MONTHS.join('|')}) \\d{4}\\)$`)
 
 // Eden play state (system paths): set on create (apply.js fills edge.value) or in play, never in a Replace update. The
 // translation writes none but edge.value's sibling edge.max; the rest are dropped here too, so Replace can't reset them.
-const START_ONLY = ['edge.value', 'physical', 'stun', 'overflow', 'heat', 'reputation', 'matrixIni', 'persona']
+// (physical.mod and stun.mod are the translation's: the extra boxes; damage stays)
+const START_ONLY = ['edge.value', 'physical.dmg', 'physical.value', 'stun.dmg', 'stun.value', 'overflow', 'heat', 'reputation', 'matrixIni', 'persona']
 const unset = (o, path) => { const ks = path.split('.'), last = ks.pop(); const p = ks.reduce((x, k) => x?.[k], o); if (p) delete p[last] }
 
 /**
@@ -79,3 +81,35 @@ export const mergeJournalPages = (existingPages, incomingPages) =>
 // (no module flags) are kept, after the imported ones.
 export const mergeActorItems = (existingItems, incomingItems) =>
   [...incomingItems, ...(existingItems ?? []).filter(i => !i.flags?.[MODULE_ID])]
+
+/**
+ * Fitted items on one actor: each item whose flags.host names another item's uid (flags.id) gets that host's document id
+ * in system.embeddedInUuid (Eden's mod and software link: Actor.<id>.Item.<id>), and each host a fresh _id (newId) so the
+ * link holds when they are created together with keepId. A host that isn't among the items: no link (the item stays
+ * loose, as if unfitted). Returns new item data; the inputs are untouched.
+ */
+export function fitItems(items, actorId, newId) {
+  const out = items.map(i => structuredClone(i)), byUid = new Map()
+  const hosts = new Set(out.map(i => i.flags?.[MODULE_ID]?.host).filter(Boolean))
+  for (const i of out) {
+    const uid = i.flags?.[MODULE_ID]?.id
+    if (uid != null && hosts.has(uid) && !byUid.has(uid)) { i._id ??= newId(); byUid.set(uid, i._id) }
+  }
+  for (const i of out) {
+    const host = byUid.get(i.flags?.[MODULE_ID]?.host)
+    if (host) i.system.embeddedInUuid = `Actor.${actorId}.Item.${host}`
+  }
+  return out
+}
+
+/**
+ * Where a runner's item came from in this module's world compendiums (lib/books.js: pack sr6-<source>-<kind>, document
+ * docId(<source>:<kind>:<catalog id>)): { pack: the world pack's collection id, id, uuid }, or null for a custom item.
+ * The caller links it (_stats.compendiumSource) only when that pack holds the document.
+ */
+export function compendiumRef(item, prefix = '') {
+  const f = item.flags?.[MODULE_ID] ?? {}
+  if (!f.catalogId || !f.source || !f.kind) return null
+  const name = `${prefix}sr6-${f.source}-${f.kind}`.toLowerCase().replace(/[^a-z0-9_-]/g, '-'), id = docId(`${f.source}:${f.kind}:${f.catalogId}`)
+  return { pack: `world.${name}`, id, uuid: `Compendium.world.${name}.Item.${id}` }
+}

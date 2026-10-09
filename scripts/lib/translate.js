@@ -3,9 +3,9 @@
 import { MODULE_ID } from './constants.js'
 import { iconFor, itemIconKey, npcIconKey, withIcon } from './icons.js'
 import {
-  ATTRS, MOR, SKILLS, SPELL_CATEGORIES, activationKey, armorSubtype, augmentType, durationKey, electronicsSubtype, gearType,
-  lifestyleKey, martialCategories, normKey, rangeKey, sinQuality, skillKey, softwareType, specKey, spellFields, spiritKey, spriteKey,
-  vehicleType, weaponType,
+  ACCESS_DEVICES, ATTRS, MOR, SKILLS, SPELL_CATEGORIES, activationKey, armorSubtype, augmentType, deviceFields, durationKey, edenBook,
+  effectKey, electronicsSubtype, gearType, hostChanges, lifestyleKey, martialCategories, modType, normKey, rangeKey, sinQuality, skillKey,
+  softwareType, specKey, spellFields, spiritKey, spriteKey, vehicleType, vehicleVtype, weaponType,
 } from './eden.js'
 
 const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }
@@ -22,26 +22,64 @@ const iconSet = i => (i ? new Set(i) : null)
 // Augmentation bonuses -> ActiveEffect changes Eden applies itself (mode 2 = ADD). Edge: Eden's own effect key for the
 // template actors (Player, NPC, Critter, Spirit) is system.edge.max (config.js ACTIVE_EFFECT_OPTIONS); Eden moves it to
 // system.edge.mod itself for its data-model actors (EFFECT_CONVERSION_TOV2). Initiative dice: diceMod, which Eden adds to
-// dice into initiative.physical.dicePool, the number its initiative roll uses (dice itself stays the base).
-const BONUS_KEY = t => (t === 'initDice' ? 'system.initiative.physical.diceMod' : t === 'edg' ? 'system.edge.max' : `system.attributes.${t}.mod`)
-export const bonusChanges = bonuses => (bonuses ?? []).filter(b => b.target === 'initDice' || b.target === 'edg' || ATTRS.includes(b.target))
+// dice into initiative.physical.dicePool, the number its initiative roll uses (dice itself stays the base). Defense:
+// the physical Defense Rating's mod (Eden's own Dermal Deposits effect).
+const BONUS_KEY = t => (t === 'initDice' ? 'system.initiative.physical.diceMod' : t === 'edg' ? 'system.edge.max'
+  : t === 'defense' ? 'system.defenserating.physical.mod' : `system.attributes.${t}.mod`)
+export const bonusChanges = bonuses => (bonuses ?? []).filter(b => ['initDice', 'edg', 'defense'].includes(b.target) || ATTRS.includes(b.target))
   .map(b => ({ key: BONUS_KEY(b.target), value: String(num(b.value)), mode: 2 }))
+const BONUS_LABEL = { initDice: 'Initiative dice', defense: 'Defense Rating' }
+const bonusText = bonuses => (bonuses ?? []).map(b => `${BONUS_LABEL[b.target] ?? String(b.target).toUpperCase()} ${num(b.value) >= 0 ? '+' : ''}${num(b.value)}`).join(', ')
+
+/**
+ * The catalog's effects (the export's `effects`: what the book's text says the entry does) -> Active Effects Eden applies:
+ * one effect with the changes Eden has a key for, transferred to the actor that holds the item, and the conditional ones
+ * (low) in a second, disabled effect for the GM to switch on. Book entries only: a runner's items carry none until
+ * Chummer applies them too (it shows none yet), so both show the same numbers.
+ */
+export function catalogEffects(x) {
+  const fx = x.effects ?? [], out = []
+  for (const [low, name] of [[false, x.name], [true, `${x.name} (conditional)`]]) {
+    const changes = fx.filter(e => !!e.low === low).flatMap(e => { const key = effectKey(e); return key ? [{ key, value: String(e.value), mode: 2 }] : [] })
+    if (changes.length) out.push({ name, transfer: true, disabled: low, changes })
+  }
+  return out
+}
+const ATTR_NAME = { bod: 'Body', agi: 'Agility', rea: 'Reaction', str: 'Strength', wil: 'Willpower', log: 'Logic', int: 'Intuition',
+  cha: 'Charisma', edg: 'Edge', mag: 'Magic', res: 'Resonance' }
+const words = t => String(t ?? '').replace(/^[a-z]+:/, '').replace(/-/g, ' ')
+const named = t => ATTR_NAME[String(t ?? '').replace(/^attr:/, '')] ?? words(t).replace(/\b\w/g, c => c.toUpperCase())
+/** The text lines for what Eden can't hold of the catalog's effects (an Edge-cost effect) and the tests the entry calls for. */
+export const effectLines = x => [
+  ...(x.effects ?? []).filter(e => e.op === 'edge-cost').map(e => `Edge boosts and actions on ${named(e.target)} tests cost ${Math.abs(num(Number(e.value)))} less.`),
+  ...(x.tests ?? []).map(t => `Test: ${named(t.skill)} + ${named(t.attr)}${Number.isFinite(t.threshold) ? ` (${t.threshold})` : ''}.`)]
 
 const ref = x => (x.source ? `Chummer: ${x.source}${x.page ? ` p.${x.page}` : ''}` : 'Chummer: custom item')
 // The fields every item carries: Eden's genesis template, our flags, the description with the entry's text and its source
 // (ctx.ref: a book's "See SRC p.N" in place of the runner's "Chummer: SRC p.N").
+// product: Eden's book code (eden.js edenBook), so the sheet names the book and links its PDF; '' when Eden has no code for
+// the source (the description and flags name it). kind: the Chummer kind, for the compendium link (foundry/apply.js).
 export function base(x, type, ctx, extra = []) {
   return {
     name: x.name, type,
-    flags: { [MODULE_ID]: { id: x.uid ?? x.id, catalogId: x.id ?? null, source: x.source ?? null, page: x.page ?? null, canon: !!x.canon,
+    flags: { [MODULE_ID]: { id: x.uid ?? x.id, catalogId: x.id ?? null, kind: x.kind ?? null, source: x.source ?? null, page: x.page ?? null, canon: !!x.canon,
       exportedAt: ctx.exportedAt, appVersion: ctx.appVersion } },
-    system: { genesisID: '', product: x.source ?? '', page: x.page ?? 0,
+    system: { genesisID: '', product: edenBook(x.source) ?? '', page: x.page ?? 0,
       description: ctx.sanitize(x.description) + extra.filter(Boolean).map(t => ctx.sanitize(t)).join('') + ctx.sanitize((ctx.ref ?? ref)(x)) },
   }
 }
-const withEffects = (doc, x) => {
-  const changes = bonusChanges(x.bonuses)
-  if (changes.length) doc.effects = [{ name: x.name, transfer: true, disabled: false, changes }]
+// a runner's bonuses (ctx.host: an accessory's are its host's, never the runner's: no effect) and, in a book
+// (ctx.bookEffects), the catalog's effects
+const withEffects = (doc, x, ctx = {}) => {
+  const changes = ctx.host ? [] : bonusChanges(x.bonuses)
+  const effects = [...changes.length ? [{ name: x.name, transfer: true, disabled: false, changes }] : [], ...ctx.bookEffects ? catalogEffects(x) : []]
+  if (effects.length) doc.effects = effects
+  return doc
+}
+// the data-model item types (software, mod) accept only Eden's book codes and a page of at least 1
+const dataModelSource = doc => {
+  if (!doc.system.product) delete doc.system.product
+  doc.system.page = doc.system.page >= 1 ? doc.system.page : null
   return doc
 }
 const unknown = (ctx, x, what) => ctx.say(`${x.name}: ${what}`)
@@ -52,24 +90,35 @@ const unknown = (ctx, x, what) => ctx.say(`${x.name}: ${what}`)
  */
 export function lineItem(p, ctx) {
   const a = p.attrs ?? {}, v = p.values ?? {}, rating = v.rating
-  const extra = [p.grade && `Grade: ${p.grade}`, a.slots && `Mod slots: ${a.slots}`, p.note]
+  const extra = [p.grade && `Grade: ${p.grade}`, a.slots && `Mod slots: ${a.slots}`, p.note, ...ctx.bookEffects ? effectLines(p) : []]
   let gear
   switch (p.kind) {
     case 'weapons': {
       const w = weaponType(a.category)
       if (!w.known) unknown(ctx, p, `weapon category "${a.category ?? ''}" not known → ${w.type}/${w.subtype}`)
-      const modes = v.modes ?? []
-      gear = { type: w.type, subtype: w.subtype, skill: w.skill, dmg: num(v.dv), stun: !!v.stun, dmgDef: a.dv ?? '',
+      const modes = v.modes ?? [], skill = skillKey(a.skill) ?? w.skill
+      // the row's own spec (Chummer reads it from the weapon's TYPE), as Eden's spec key through Eden's labels
+      const spec = a.spec ? specKey(a.spec, ctx.specs?.[skill]) : null
+      if (a.spec && !spec) ctx.say(`${p.name}: specialization ${a.spec} not a shadowrun6-eden ${skill} specialization → none`)
+      gear = { type: w.type, subtype: w.subtype, skill, skillSpec: spec ?? '', dmg: num(v.dv), stun: !!v.stun, dmgDef: a.dv ?? '',
         attackRating: [0, 1, 2, 3, 4].map(i => num(v.ar?.[i])), modes: Object.fromEntries(['SS', 'SA', 'BF', 'FA'].map(m => [m, modes.includes(m)])),
         ammocap: num(v.ammo) }
       break
     }
-    case 'armor': gear = { type: 'ARMOR', subtype: armorSubtype(a.category), defense: num(v.defense) }; break
-    case 'augmentations': gear = { ...augmentType(a.type, a.category), essence: num(v.essence), capacity: num(v.capacity) }; break
-    case 'electronics':
-      gear = { type: 'ELECTRONICS', subtype: electronicsSubtype(a.category) }
-      extra.push(a.array && `Array: ${a.array}`, a.programs && `Programs: ${a.programs}`)
+    // worn armor counts toward Eden's Defense Rating (usedForPool)
+    case 'armor': gear = { type: 'ARMOR', subtype: armorSubtype(a.category), defense: num(v.defense), usedForPool: !!p.worn }; break
+    case 'augmentations': {
+      const t = augmentType(a.type, a.category, a.ware)
+      gear = { ...t, essence: num(v.essence), capacity: num(v.capacity), ...deviceFields(t.subtype, { rating, array: a.array, programs: a.programs }) }
       break
+    }
+    case 'electronics': {
+      const subtype = electronicsSubtype(a.category), dev = deviceFields(subtype, { rating, array: a.array, programs: a.programs })
+      gear = { type: 'ELECTRONICS', subtype, ...dev }
+      // what Eden got no field for stays text
+      extra.push(a.array && !('a' in dev || 'd' in dev) && `Array: ${a.array}`, a.programs && !('progSlots' in dev) && `Programs: ${a.programs}`)
+      break
+    }
     case 'gear': {
       const g = gearType(a.category)
       if (g.item === 'focus') return focus(p, ctx, extra)
@@ -82,30 +131,57 @@ export function lineItem(p, ctx) {
       if (!t.known) unknown(ctx, p, `vehicle category "${a.category ?? ''}" not known → ${t.type}/${t.subtype}`)
       gear = { type: t.type, subtype: t.subtype, handlOn: num(x.handling?.[0]), handlOff: num(x.handling?.[1]), accOn: num(x.accel?.[0]),
         accOff: num(x.accel?.[1]), spdiOn: num(x.interval?.[0]), spdiOff: num(x.interval?.[1]), tspd: num(x.topSpeed), bod: num(x.body),
-        arm: num(x.armor), pil: num(x.pilot), sen: num(x.sensor), sea: num(x.seats) }
+        arm: num(x.armor), pil: num(x.pilot), sen: num(x.sensor), sea: num(x.seats), vtype: vehicleVtype(a.category) }
       break
     }
+    case 'programs': return programItem(p, ctx)
     default:
       unknown(ctx, p, `kind ${p.kind} not known → gear TOOLS`)
       gear = { type: 'TOOLS', subtype: 'TOOLS' }
   }
   const doc = base(p, 'gear', ctx, extra), qty = p.qty ?? 1
   Object.assign(doc.system, gear, { price: num(v.cost), priceDef: a.cost ?? '', avail: num(v.avail), availDef: a.avail ?? '',
-    count: qty, countable: qty > 1, needsRating: rating != null, rating: num(rating) })
-  return icon(withEffects(doc, p), p, ctx)
+    count: qty, countable: qty > 1, needsRating: rating != null, rating: num(rating), notes: p.note ?? '' })
+  return icon(withEffects(doc, p, ctx), p, ctx)
 }
 function focus(p, ctx, extra) {
   const doc = base(p, 'focus', ctx, extra)
   doc.system.rating = num(p.values?.rating)
-  return icon(withEffects(doc, p), p, ctx)
+  return icon(withEffects(doc, p, ctx), p, ctx)
+}
+
+/**
+ * An accessory as Eden's `mod` item (type: eden.js modType): fitted to its host by system.embeddedInUuid, which
+ * foundry/apply.js sets from flags.host (the host's uid) once the host has its id. In a book (ctx.bookEffects) its
+ * item: effects change the host (transfer off: Eden applies a fitted mod's effects to its host); a runner's accessory
+ * carries none (Chummer applies none yet), and its bonuses are its host's, so they are text.
+ */
+export function modItem(x, ctx, type) {
+  const a = x.attrs ?? {}, v = x.values ?? {}
+  const doc = dataModelSource(base(x, 'mod', ctx, [a.slots && `Mod slots: ${a.slots}`, x.note,
+    x.bonuses?.length && `On its host: ${bonusText(x.bonuses)}`, ...ctx.bookEffects ? effectLines(x) : []]))
+  Object.assign(doc.system, { type, rating: Math.max(0, num(v.rating)), price: Math.max(0, num(v.cost)), availDef: a.avail ?? '' })
+  if (ctx.bookEffects) {
+    const fx = x.effects ?? [], out = []
+    for (const [low, name] of [[false, x.name], [true, `${x.name} (conditional)`]]) {
+      const changes = fx.filter(e => !!e.low === low).flatMap(hostChanges).map(c => ({ ...c, mode: 2 }))
+      if (changes.length) out.push({ name, transfer: false, disabled: low, changes })
+    }
+    if (out.length) doc.effects = out
+  }
+  return icon(doc, x, ctx)
 }
 
 const RITUAL_FEATURES = ['anchored', 'material_link', 'minion', 'spell', 'spotter']
-/** A spell, ritual, adept power, complex form, metamagic or echo (x.pick: its kind) -> Eden item data. */
+/**
+ * A spell, ritual, adept power, complex form, metamagic or echo (x.pick: its kind) -> Eden item data. ctx.complexForms:
+ * Eden's own complex form table as Foundry loaded it ({ [normKey(name)]: { skill, oppAttr1, oppAttr2, threshold } },
+ * foundry/apply.js edenComplexForms), for a form's test (never copied into the module).
+ */
 export function pickItem(x, ctx) {
   const a = x.attrs ?? {}, v = x.values ?? {}
   const type = { spells: 'spell', rituals: 'ritual', adeptpowers: 'adeptpower', complexforms: 'complexform', metamagics: 'metamagic', echoes: 'echo' }[x.pick]
-  const doc = base(x, type, ctx)
+  const doc = base(x, type, ctx, ctx.bookEffects ? effectLines(x) : [])
   if (type === 'spell') {
     Object.assign(doc.system, spellFields(a, v))
     if (!SPELL_CATEGORIES.includes(String(a.category ?? '').toLowerCase())) unknown(ctx, x, `spell category "${a.category ?? ''}" not known → health`)
@@ -116,17 +192,19 @@ export function pickItem(x, ctx) {
     Object.assign(doc.system, { hasLevel: yes(a.perLevel), level: num(x.level), cost: num(v.powerCost), activation: activationKey(a.activation) })
   } else if (type === 'complexform') {
     Object.assign(doc.system, { duration: durationKey(a.duration), fading: num(v.fade) })
+    const cf = ctx.complexForms?.[normKey(x.name)]
+    if (cf) Object.assign(doc.system, { skill: cf.skill ?? '', oppAttr1: cf.oppAttr1 ?? '', oppAttr2: cf.oppAttr2 ?? '', threshold: num(cf.threshold) })
   }
-  return icon(withEffects(doc, x), x, ctx)
+  return icon(withEffects(doc, x, ctx), x, ctx)
 }
 
 // Eden's quality has no karma field: the printed karma (a range when the book prints several, attrs.karmaMax) is text
 const karmaLine = (a = {}) => a.karma && `Karma: ${a.karma}${a.karmaMax && a.karmaMax !== a.karma ? `–${a.karmaMax}` : ''}`
 /** A quality ({ positive, free?, level?, note? } on a runner; a book's entry sets positive from attrs.kind) -> Eden item data. */
 export function qualityItem(q, ctx) {
-  const doc = base(q, 'quality', ctx, [q.free && 'Metatype trait.', karmaLine(q.attrs)])
+  const doc = base(q, 'quality', ctx, [q.free && 'Metatype trait.', karmaLine(q.attrs), ...ctx.bookEffects ? effectLines(q) : []])
   Object.assign(doc.system, { category: q.positive ? 'ADVANTAGE' : 'DISADVANTAGE', level: yes(q.attrs?.perLevel), value: num(q.level), explain: q.note ?? '' })
-  return icon(doc, q, ctx)
+  return icon(withEffects(doc, q, ctx), q, ctx)
 }
 /** A critter power the book lists as a weakness (attrs.weakness): Eden has no field for it, so its description says so. */
 export const weaknessLine = e => yes(e?.attrs?.weakness) && 'Weakness.'
@@ -137,16 +215,15 @@ export function critterPowerFields(e) {
 }
 
 /**
- * A Matrix program (a book entry) -> Eden's `software` item. That data model checks system.product against Eden's own
- * book list and wants page >= 1, so product is left out (the description names the source) and page 0 is null.
+ * A Matrix program (a book entry or a runner's purchase) -> Eden's `software` item. That data model checks system.product
+ * against Eden's own book list and wants page >= 1: product is Eden's code or left out (the description names the source),
+ * page 0 is null. A runner's program bought into a device is installed in it (flags.host, foundry/apply.js).
  */
 export function programItem(x, ctx) {
   const a = x.attrs ?? {}, v = x.values ?? {}, s = softwareType(a.type)
   if (!s.known) unknown(ctx, x, `program type "${a.type ?? ''}" not known → ${s.type}`)
-  const doc = base(x, 'software', ctx)
-  delete doc.system.product
-  Object.assign(doc.system, { page: x.page >= 1 ? x.page : null, type: s.type, rating: Math.max(0, num(v.rating)),
-    price: Math.max(0, num(v.cost)), availDef: a.avail ?? '' })
+  const doc = dataModelSource(base(x, 'software', ctx))
+  Object.assign(doc.system, { type: s.type, rating: Math.max(0, num(v.rating)), price: Math.max(0, num(v.cost)), availDef: a.avail ?? '' })
   return icon(doc, x, ctx)
 }
 /**
@@ -176,17 +253,35 @@ function runnerItems(r, ctx) {
   for (const q of r.qualities ?? []) items.push(qualityItem(q, ctx))
   for (const p of r.picks ?? []) items.push(pickItem(p, ctx))
 
+  // An accessory fitted to its host: a program in its device (software), a weapon's, armor's or electronic device's
+  // accessory as Eden's mod (eden.js modType), anything else (a cyberlimb's) a gear item that says where it's fitted.
+  // flags.host: the host's uid, which foundry/apply.js turns into embeddedInUuid. Its bonuses are its host's: no effect.
   const addLine = (p, parent) => {
-    const doc = lineItem(p, ctx)
-    if (parent) doc.system.description += sanitize(`Fitted to ${parent.name}.`)
+    let doc
+    if (!parent) doc = lineItem(p, ctx)
+    else {
+      const type = p.kind === 'programs' ? null : modType(parent.kind, p.attrs?.category)
+      doc = p.kind === 'programs' ? lineItem(p, ctx) : type ? modItem(p, ctx, type) : lineItem(p, { ...ctx, host: parent })
+      if (p.kind === 'programs' || type) doc.flags[MODULE_ID].host = parent.uid
+      else doc.system.description += sanitize([`Fitted to ${parent.name}.`, p.bonuses?.length && `On its host: ${bonusText(p.bonuses)}`].filter(Boolean).join(' '))
+    }
     items.push(doc)
     for (const a of p.accessories ?? []) addLine(a, p)
+    // Eden's own accessories line on the host (its sheet's text field)
+    if (p.accessories?.length && doc.type === 'gear') doc.system.accessories = p.accessories.map(a => a.name).join(', ')
   }
   for (const p of r.purchases ?? []) addLine(p)
+  // the first access device of each kind is the one Eden's persona uses (usedForPool); the player switches on the sheet
+  const inUse = new Set()
+  for (const d of items.filter(i => i.type === 'gear' && ACCESS_DEVICES.includes(i.system.subtype) && !i.flags[MODULE_ID].host))
+    if (!inUse.has(d.system.subtype)) { inUse.add(d.system.subtype); d.system.usedForPool = true }
 
+  const TYPES = { academic: 'Academic', corporate: 'Corporate', criminal: 'Criminal', engineering: 'Engineering', government: 'Government',
+    magic: 'Magic', matrix: 'Matrix', media: 'Media', medical: 'Medical', street: 'Street' }
   for (const c of r.contacts ?? [])
     items.push(icon({ name: c.name, type: 'contact', flags: flag(c.uid),
-      system: { genesisID: '', rating: num(c.connection), loyalty: num(c.loyalty), type: c.archetype ?? '' } }, c, ctx))
+      system: { genesisID: '', rating: num(c.connection), loyalty: num(c.loyalty), type: c.archetype ?? '',
+        description: c.types?.length ? sanitize(`Contact types: ${c.types.map(t => TYPES[t] ?? t).join(', ')}`) : '' } }, c, ctx))
   if (r.lifestyle) {
     const l = r.lifestyle, key = lifestyleKey(l.name)
     if (!key) ctx.say(`Lifestyle ${l.name}: not a shadowrun6-eden lifestyle → middle`)
@@ -208,9 +303,9 @@ const noSkills = () => Object.fromEntries(SKILLS.map(k => [k, { points: 0, speci
  */
 export function translateRunner(r, opts) {
   if (r.npc) return translateNpc(r, opts)
-  const { exportedAt, appVersion, sanitize = escapeText, icons = null, specs = {} } = opts
+  const { exportedAt, appVersion, sanitize = escapeText, icons = null, specs = {}, complexForms = {} } = opts
   const name = r.streetName || r.realName || 'Runner', lines = []
-  const ctx = { exportedAt, appVersion, sanitize, icons: iconSet(icons), say: t => lines.push(t) }
+  const ctx = { exportedAt, appVersion, sanitize, icons: iconSet(icons), specs, complexForms, say: t => lines.push(t) }
   const flag = id => ({ [MODULE_ID]: { id, exportedAt, appVersion } })
 
   // every Eden skill key, 0 when the runner has none of it (so Replace clears a skill dropped in Chummer)
@@ -249,6 +344,8 @@ export function translateRunner(r, opts) {
   }
   actor.system.attributes.mag.initiation = num(m.initiation)
   actor.system.attributes.res.submersion = num(m.submersion)
+  // the boxes beyond Eden's own formula (Built Tough's): Eden's stored monitor modifiers
+  if (d?.monitorBonus) { actor.system.physical = { mod: num(d.monitorBonus.physical) }; actor.system.stun = { mod: num(d.monitorBonus.stun) } }
   return { actor, items, textOnly: lines.map(t => `${name}: ${t}`) }
 }
 

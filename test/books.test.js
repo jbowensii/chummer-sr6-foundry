@@ -1,7 +1,7 @@
 // SR6 books -> pack documents per topic (scripts/lib/books.js) on the made-up samples.
 import { readFileSync } from 'node:fs'
 import { describe, expect, test } from 'vitest'
-import { PACKS, planBookPacks, translateBook } from '../scripts/lib/books.js'
+import { PACKS, accessoryHostKind, planBookPacks, translateBook } from '../scripts/lib/books.js'
 import { docId } from '../scripts/lib/ids.js'
 
 const M = 'chummer-sr6-importer'
@@ -86,7 +86,7 @@ describe('a book', () => {
   test('a program -> Eden software: its type, rating, price; no product (Eden checks it against its own book list)', () => {
     const p = byName(t, 'Made-up Sniffer')
     expect(p).toMatchObject({ _id: docId('MUS:programs:mus.made-up-sniffer'), type: 'software',
-      system: { type: 'HACKING', price: 250, availDef: '4(I)', page: 11, rating: 0 } })
+      system: { type: 'HACKING', price: 250, availDef: '4(I)', page: 10, rating: 0 } })
     expect(p.system).not.toHaveProperty('product')
     expect(p.flags[M]).toMatchObject({ id: 'mus.made-up-sniffer', source: 'MUS', icon: { key: 'software' } })
     const odd = translateBook({ ...mus, entries: [{ ...mus.entries.find(e => e.kind === 'programs'), page: 0, attrs: { type: 'Glitter' } }] }, OPTS)
@@ -105,7 +105,7 @@ describe('a book', () => {
   })
   test('a tradition -> a journal with one page (Eden has no tradition item)', () => {
     const [j] = t.packs.traditions
-    expect(j).toMatchObject({ _id: docId('MUS:traditions:mus.made-up-path'), name: 'Made-up Path', flags: { [M]: { id: 'mus.made-up-path', page: 11 } } })
+    expect(j).toMatchObject({ _id: docId('MUS:traditions:mus.made-up-path'), name: 'Made-up Path', flags: { [M]: { id: 'mus.made-up-path', page: 10 } } })
     expect(j.pages).toHaveLength(1)
     expect(j.pages[0]).toMatchObject({ name: 'Made-up Path', type: 'text', text: { content: '<p>An invented tradition.</p>', format: 1 } })
     expect(planBookPacks(t).find(p => p.key === 'traditions')).toMatchObject({ type: 'JournalEntry', label: 'Traditions — MUS' })
@@ -139,5 +139,40 @@ describe('a GM compendium', () => {
     expect(tough.flags[M]).toMatchObject({ id: 'street-npc-1', source: 'STREET', compendium: true, npc: { kind: 'grunt' } })
     expect(c.tokens).toEqual({ [tough._id]: street.npcs[0].token })
     expect(c.portraits).toEqual({})
+  })
+})
+
+describe('what Eden takes from the book text', () => {
+  const t = translateBook(mus, OPTS), byName = (t, n) => Object.values(t.packs).flat().find(d => d.name === n)
+  test('a quality’s effects as Active Effects (a conditional one disabled), its test and the rest as text', () => {
+    const q = byName(t, 'Lucky Break')
+    expect(q.effects).toEqual([
+      { name: 'Lucky Break', transfer: true, disabled: false, changes: [{ key: 'system.attributes.agi.mod', value: '1', mode: 2 },
+        { key: 'system.defenserating.physical.mod', value: '1', mode: 2 }] },
+      { name: 'Lucky Break (conditional)', transfer: true, disabled: true, changes: [{ key: 'system.skills.firearms.modifier', value: '2', mode: 2 }] }])
+    expect(q.system.description).toContain('<p>Test: Perception + Intuition (3).</p>')
+  })
+  test('a weapon accessory -> Eden mod in its kind’s pack, its item:ar effect on the host (not transferred)', () => {
+    const sight = byName(t, 'Made-up Sight')
+    expect(t.packs.gear).toContain(sight)
+    expect(sight).toMatchObject({ _id: docId('MUS:gear:mus.made-up-sight'), type: 'mod', system: { type: 'accessory_weapon', price: 200, availDef: '2' } })
+    expect(sight.effects).toEqual([{ name: 'Made-up Sight', transfer: false, disabled: false,
+      changes: [{ key: 'system.attackRating.1', value: '1', mode: 2 }, { key: 'system.attackRating.2', value: '1', mode: 2 }] }])
+  })
+  test('a cyberdeck carries Eden’s matrix fields; a vehicle its vtype; a weapon its spec through Eden’s labels', () => {
+    expect(byName(t, 'Test Deck').system).toMatchObject({ subtype: 'CYBERDECK', a: 5, s: 4, progSlots: 2, matrix: { deviceRating: 2 } })
+    expect(byName(t, 'Test Drone').system.vtype).toBe('AIR')
+    const e = { ...mus.entries.find(x => x.id === 'mus.pocket-zapper') }
+    e.attrs = { ...e.attrs, skill: 'Firearms', spec: 'Tasers' }
+    const one = translateBook({ ...mus, entries: [e] }, { ...OPTS, specs: { firearms: { tasers: 'Tasers' } } })
+    expect(one.packs.weapons[0].system).toMatchObject({ skill: 'firearms', skillSpec: 'tasers' })
+  })
+  test('accessoryHostKind: the host entry’s kind, else the category’s words', () => {
+    const kindOf = id => ({ 'mus.pocket-zapper': 'weapons' })[id] ?? null
+    expect(accessoryHostKind({ attrs: { accessoryOf: 'mus.pocket-zapper' } }, kindOf)).toBe('weapons')
+    expect(accessoryHostKind({ attrs: { category: 'Armor modifications' } }, kindOf)).toBe('armor')
+    expect(accessoryHostKind({ attrs: { category: 'Made-up firearm accessories' } }, kindOf)).toBe('weapons')
+    expect(accessoryHostKind({ attrs: { category: 'Vision enhancements' } }, kindOf)).toBe('electronics')
+    expect(accessoryHostKind({ attrs: { category: 'Vehicle mods' } }, kindOf)).toBe(null)
   })
 })

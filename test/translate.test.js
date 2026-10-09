@@ -25,9 +25,11 @@ describe('the Player actor', () => {
     expect(actor.system.description).toBe('<p>An invented runner for the tests.</p><p>She exists only here.</p>')
     expect(actor.system.notes).toMatch(/^<p>Made-up notes &amp; &lt;stuff&gt;\.<\/p><h3>From Chummer<\/h3>/)
   })
-  test('never a derived value', () => {
+  test('never a derived value; the monitors only their extra boxes (Built Tough), as Eden’s stored modifiers', () => {
     const s = run().actor.system
-    for (const k of ['initiative', 'physical', 'stun', 'overflow', 'defenserating', 'derived', 'essence', 'heat', 'reputation']) expect(s).not.toHaveProperty(k)
+    for (const k of ['initiative', 'overflow', 'defenserating', 'derived', 'essence', 'heat', 'reputation']) expect(s).not.toHaveProperty(k)
+    expect(s.physical).toEqual({ mod: 1 })
+    expect(s.stun).toEqual({ mod: 0 })
     for (const k of ATTRS) expect(Object.keys(s.attributes[k]).filter(x => !['base', 'initiation', 'submersion'].includes(x))).toEqual([])
   })
   test('negative money is 0; a runner with no street name uses the real name', () => {
@@ -37,9 +39,9 @@ describe('the Player actor', () => {
   })
   test('Chummer’s derived values in the notes for reference', () => {
     const n = run().actor.system.notes
-    expect(n).toMatch(/Initiative 9 \+ 3D6, astral 8 \+ 2D6/)
-    expect(n).toMatch(/physical 10, stun 10, overflow 3/)
-    expect(n).toMatch(/Defense Rating 6/)
+    expect(n).toMatch(/Initiative 9 \+ 3D6, astral 9 \+ 2D6/)
+    expect(n).toMatch(/physical 11, stun 10, overflow 3/)
+    expect(n).toMatch(/Defense Rating 7/)
   })
 })
 
@@ -75,15 +77,20 @@ describe('skills', () => {
 })
 
 describe('items', () => {
-  test('genesisID empty on all but the skill items; flags and source on catalog items', () => {
+  test('genesisID empty on all but the skill items; flags and source on catalog items; product only for a book Eden has', () => {
     const t = run()
     for (const i of t.items) if (i.type !== 'skill') expect(i.system.genesisID, i.name).toBe('')
-    expect(byName(t, 'Lucky Break')).toMatchObject({ flags: { 'chummer-sr6-importer': { id: 'q1', catalogId: 'mus.lucky-break', source: 'MUS', page: 10, canon: true } },
-      system: { product: 'MUS', page: 10 } })
+    expect(byName(t, 'Lucky Break')).toMatchObject({ flags: { 'chummer-sr6-importer': { id: 'q1', catalogId: 'mus.lucky-break', kind: 'qualities', source: 'MUS', page: 10, canon: true } },
+      system: { product: '', page: 10 } })
+    const r = mara()
+    r.qualities[0].source = 'CRB'
+    expect(byName(run(r), 'Lucky Break').system.product).toBe('core')
     expect(byName(t, 'Lucky Break').system.description).toMatch(/Chummer: MUS p\.10/)
   })
-  test('qualities', () => {
+  test('qualities: no Active Effects from the book text on a runner (Chummer applies none yet)', () => {
     const t = run()
+    expect(byName(t, 'Lucky Break').effects).toBeUndefined()
+    expect(byName(t, 'Lucky Break').system.description).not.toMatch(/Test:/)
     expect(byName(t, 'Lucky Break').system).toMatchObject({ category: 'ADVANTAGE', level: false, value: 1, explain: '' })
     expect(byName(t, 'Made-up Debt').system).toMatchObject({ category: 'DISADVANTAGE', level: true, value: 2, explain: 'Owes a made-up fixer.' })
     expect(byName(t, 'Night Eyes').system.description).toMatch(/Metatype trait\./)
@@ -105,6 +112,10 @@ describe('items', () => {
       { uid: 'ec', kind: 'echoes', name: 'Made-up Echo', canon: true, attrs: {}, parts: [], values: {}, pick: 'echoes', bonuses: [] }]
     const t = run(r)
     expect(byName(t, 'Made-up Pulse')).toMatchObject({ type: 'complexform', system: { duration: 'sustained', fading: 3 } })
+    expect(byName(t, 'Made-up Pulse').system).not.toHaveProperty('skill')
+    // Eden's own table (read in Foundry) gives a form its test when the name matches
+    const cf = { made_up_pulse: { skill: 'electronics', oppAttr1: 'wil', oppAttr2: 'f', threshold: 0 } }
+    expect(byName(run(r, { complexForms: cf }), 'Made-up Pulse').system).toMatchObject({ skill: 'electronics', oppAttr1: 'wil', oppAttr2: 'f', threshold: 0 })
     expect(byName(t, 'Made-up Echo').type).toBe('echo')
   })
   test('a weapon: Eden type, damage, stun, printed DV, attack ratings, modes', () => {
@@ -126,16 +137,46 @@ describe('items', () => {
     expect(ware.system).toMatchObject({ type: 'CYBERWARE', subtype: 'CYBER_BODYWARE', essence: 0.12, rating: 1, needsRating: true, price: 1200 })
     expect(ware.system.description).toMatch(/Grade: used/)
     expect(ware.effects).toEqual([{ name: 'Made-up Reflex Booster', transfer: true, disabled: false,
-      changes: [{ key: 'system.attributes.rea.mod', value: '1', mode: 2 }, { key: 'system.initiative.physical.diceMod', value: '1', mode: 2 }] }])
+      changes: [{ key: 'system.attributes.rea.mod', value: '1', mode: 2 }, { key: 'system.initiative.physical.diceMod', value: '1', mode: 2 },
+        { key: 'system.defenserating.physical.mod', value: '1', mode: 2 }] }])
     const port = byName(t, 'Booster Port')
     expect(port.system).toMatchObject({ type: 'CYBERWARE', capacity: 1 })
     expect(port.system.description).toMatch(/Fitted to Made-up Reflex Booster\./)
     expect(port.effects).toBeUndefined()
+    expect(port.flags['chummer-sr6-importer']).not.toHaveProperty('host')  // Eden has no mod for ware: a loose gear item
+    expect(ware.system.accessories).toBe('Booster Port')
+  })
+  test('worn armor counts toward Eden’s Defense Rating; armor not worn doesn’t', () => {
+    expect(byName(run(), 'Test Jacket').system.usedForPool).toBe(true)
+    const r = mara()
+    r.purchases.find(p => p.uid === 'a1').worn = false
+    expect(byName(run(r), 'Test Jacket').system.usedForPool).toBe(false)
+  })
+  test('an accessory with bonuses on a host Eden has no mod for: no effect (its host’s), a text line', () => {
+    const r = mara()
+    r.purchases.find(p => p.uid === 'c1').accessories[0].bonuses = [{ target: 'str', value: 1 }]
+    const port = byName(run(r), 'Booster Port')
+    expect(port.effects).toBeUndefined()
+    expect(port.system.description).toMatch(/On its host: STR \+1/)
+  })
+  test('a weapon accessory: Eden’s mod, fitted to its host by uid, no effect on a runner; the host’s accessories line', () => {
+    const t = run(), sight = byName(t, 'Made-up Sight'), zapper = byName(t, 'Pocket Zapper')
+    expect(sight).toMatchObject({ type: 'mod', system: { type: 'accessory_weapon', price: 200, availDef: '2', rating: 0, page: 10 },
+      flags: { 'chummer-sr6-importer': { id: 'w1a', host: 'w1', catalogId: 'mus.made-up-sight' } } })
+    expect(sight.system).not.toHaveProperty('product')  // a data-model item: only Eden's book codes
+    expect(sight.effects).toBeUndefined()
+    expect(zapper.system.accessories).toBe('Made-up Sight')
+  })
+  test('a cyberdeck: Eden’s matrix fields; its program as software installed in it', () => {
+    const t = run(), deck = byName(t, 'Test Deck'), prog = byName(t, 'Made-up Sniffer')
+    expect(deck.system).toMatchObject({ type: 'ELECTRONICS', subtype: 'CYBERDECK', a: 5, s: 4, progSlots: 2, matrix: { deviceRating: 2 }, usedForPool: true })
+    expect(prog).toMatchObject({ type: 'software', system: { type: 'HACKING', price: 250, availDef: '4(I)' }, flags: { 'chummer-sr6-importer': { host: 'e2' } } })
+    expect(t.textOnly.join('\n')).not.toMatch(/programs not known/)
   })
   test('electronics, a focus, countable gear, a custom line', () => {
     const t = run()
-    expect(byName(t, 'Test Link').system).toMatchObject({ type: 'ELECTRONICS', subtype: 'COMMLINK', rating: 3 })
-    expect(byName(t, 'Test Link').system.description).toMatch(/Array: 1\/1/)
+    expect(byName(t, 'Test Link').system).toMatchObject({ type: 'ELECTRONICS', subtype: 'COMMLINK', rating: 3, d: 1, f: 1, matrix: { deviceRating: 3 }, usedForPool: true })
+    expect(byName(t, 'Test Link').system.description).not.toMatch(/Array:/)  // Eden holds it now
     expect(byName(t, 'Made-up Power Focus')).toMatchObject({ type: 'focus', system: { rating: 2, genesisID: '' } })
     expect(byName(t, 'Glitter Rope').system).toMatchObject({ type: 'SURVIVAL', subtype: 'SURVIVAL_GEAR', count: 3, countable: true })
     const coin = byName(t, 'Lucky Coin')
@@ -154,7 +195,7 @@ describe('items', () => {
   })
   test('contacts, lifestyle, SINs', () => {
     const t = run()
-    expect(byName(t, 'Fake Fixer')).toMatchObject({ type: 'contact', system: { rating: 4, loyalty: 2, type: 'Fixer' } })
+    expect(byName(t, 'Fake Fixer')).toMatchObject({ type: 'contact', system: { rating: 4, loyalty: 2, type: 'Fixer', description: '<p>Contact types: Street</p>' } })
     expect(byName(t, 'Made-up Hideout')).toMatchObject({ type: 'lifestyle', system: { type: 'middle', paid: 2, cost: 450 } })
     expect(t.textOnly).toContain('Made-Up Mara: Lifestyle Made-up Hideout: not a shadowrun6-eden lifestyle → middle')
     expect(byName(t, 'Mara Testcase')).toMatchObject({ type: 'sin', system: { quality: 'GOOD_MATCH' } })
@@ -163,9 +204,10 @@ describe('items', () => {
   })
 })
 
-test('bonusChanges: attributes, edge, initiative dice; unknown targets left out', () => {
-  expect(bonusChanges([{ target: 'agi', value: 2 }, { target: 'edg', value: 1 }, { target: 'initDice', value: 1 }, { target: 'ess', value: 1 }]))
+test('bonusChanges: attributes, edge, initiative dice, Defense Rating; unknown targets left out', () => {
+  expect(bonusChanges([{ target: 'agi', value: 2 }, { target: 'edg', value: 1 }, { target: 'initDice', value: 1 }, { target: 'ess', value: 1 },
+    { target: 'defense', value: 1 }]))
     .toEqual([{ key: 'system.attributes.agi.mod', value: '2', mode: 2 }, { key: 'system.edge.max', value: '1', mode: 2 },
-      { key: 'system.initiative.physical.diceMod', value: '1', mode: 2 }])
+      { key: 'system.initiative.physical.diceMod', value: '1', mode: 2 }, { key: 'system.defenserating.physical.mod', value: '1', mode: 2 }])
   expect(bonusChanges(undefined)).toEqual([])
 })

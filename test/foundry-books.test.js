@@ -49,7 +49,7 @@ beforeEach(() => {
   const all = () => [...packs.values()]
   globalThis.game = {
     packs: { get: id => packs.get(id), filter: f => all().filter(f), some: f => all().some(f) },
-    folders, i18n: { format: (k, d) => `${k} ${JSON.stringify(d)}`, localize: k => k },
+    folders, i18n: { format: (k, d) => `${k} ${JSON.stringify(d)}`, localize: k => k }, release: { generation: 14 },
   }
   globalThis.Folder = { create: async d => {
     const f = { id: `f${++n}`, name: d.name, type: d.type, folder: folders.find(x => x.id === d.folder) ?? null,
@@ -130,4 +130,12 @@ test('Apply icons: a stock Eden image is replaced, a chosen one kept, the actor 
   const counts = await applyIcons({ index, items: [], actors: [actor], packs: [] })
   expect(counts).toEqual({ updated: 1, kept: 1, unchanged: 1 })
   expect(ups).toEqual([{ _id: 'a', img: 'modules/chummer-sr6-importer/icons/defaults/armor.webp' }])
+})
+
+test('a pack item’s effects go in in Foundry 14’s shape (system.changes)', async () => {
+  await importBook(tr(mus))
+  const q = [...packs.get('world.sr6-mus-qualities').docs.values()].find(d => d.name === 'Lucky Break')
+  expect(q.effects[0]).toMatchObject({ name: 'Lucky Break', transfer: true, disabled: false,
+    system: { changes: [{ key: 'system.attributes.agi.mod', type: 'add', value: '1' }, { key: 'system.defenserating.physical.mod', type: 'add', value: '1' }] } })
+  expect(q.effects[0]).not.toHaveProperty('changes')
 })

@@ -2,11 +2,11 @@
 // Pure: no Foundry calls.
 import { MODULE_ID } from './constants.js'
 import { docId } from './ids.js'
-import { lifestyleKey, normKey } from './eden.js'
+import { lifestyleKey, modType, normKey } from './eden.js'
 import { itemIconKey, withIcon } from './icons.js'
 import {
-  base, beingActor, critterPowerFields, escapeText, lineItem, martialArtItem, pickItem, programItem, qualityItem, techniqueItem, translateNpc,
-  weaknessLine,
+  base, beingActor, critterPowerFields, escapeText, lineItem, martialArtItem, modItem, pickItem, programItem, qualityItem, techniqueItem,
+  translateNpc, weaknessLine,
 } from './translate.js'
 
 // pack key -> [label, document type], in write order
@@ -37,17 +37,32 @@ const BEING = { npcs: 'grunt', critters: 'critter', spirits: 'spirit', sprites: 
 const PACK_OF_KIND = { grunt: 'npcs', critter: 'critters', spirit: 'spirits', sprite: 'sprites' }
 const SORT = 100000  // Foundry's CONST.SORT_INTEGER_DENSITY
 const int = v => { const n = Number(v); return Number.isFinite(n) ? Math.trunc(n) : 0 }
+/**
+ * The kind of the item an accessory fits: its host's (attrs.accessoryOf, an entry id), else what its category says
+ * (`Weapon accessories`, `Armor modifications`, `Vision enhancements`); null: not an accessory Eden has a mod for.
+ */
+export function accessoryHostKind(e, kindOf) {
+  const host = String(e.attrs?.accessoryOf ?? '').split(/[\s,]+/).find(id => kindOf(id))
+  if (host) return kindOf(host)
+  const c = String(e.attrs?.category ?? '').toLowerCase()
+  if (/(weapon|firearm|gun).*(accessor|\bmods?\b|modification)/.test(c)) return 'weapons'
+  if (/armou?r.*(accessor|\bmods?\b|modification)/.test(c)) return 'armor'
+  if (/(vision|visual|optic|audio|hearing).*enhancement|electronic.*accessor/.test(c)) return 'electronics'
+  return null
+}
 
 /**
  * sanitize: plain text -> safe HTML, as for translateRunner. Book text goes in only when descriptions is true and the
  * entry has it; otherwise the description says "See <SOURCE> p.N".
  * Returns { source, packs: { [key]: docs[] }, portraits: { [_id]: dataUrl }, tokens: { [_id]: dataUrl }, textOnly: string[] }.
  */
-export function translateBook(book, { exportedAt, appVersion, descriptions = false, sanitize = escapeText, icons = null }) {
+export function translateBook(book, { exportedAt, appVersion, descriptions = false, sanitize = escapeText, icons = null, specs = {}, complexForms = {} }) {
   const src = book.source, textOnly = [], packs = {}, portraits = {}, tokens = {}, iconSet = icons ? new Set(icons) : null
   const comp = src.compendium === true ? { compendium: true } : {}
   const see = x => `See ${x.source ?? src.id}${x.page ? ` p.${x.page}` : ''}`
-  const ctx = { exportedAt, appVersion, sanitize, icons: iconSet, ref: see, say: l => textOnly.push(l) }
+  // bookEffects: the catalog's effects as Active Effects (translate.js catalogEffects); specs, complexForms: Eden's own
+  // tables as Foundry loaded them (foundry/apply.js)
+  const ctx = { exportedAt, appVersion, sanitize, icons: iconSet, ref: see, say: l => textOnly.push(l), bookEffects: true, specs, complexForms }
   const add = (pack, doc) => (packs[pack] ??= []).push(doc)
   const bookFlags = e => ({ id: e.id, exportedAt, appVersion, source: src.id, page: e.page ?? null, canon: e.canon ?? src.canon, ...comp })
   // an item built by translate.js: our _id, the book's flags (flags.icon kept)
@@ -68,11 +83,14 @@ export function translateBook(book, { exportedAt, appVersion, descriptions = fal
   // a style's signature technique (attrs.signature, by name) -> that style's id, for the technique's Eden style link
   const styleOf = Object.fromEntries(entries.filter(e => e.kind === 'martialarts' && e.attrs?.signature).map(e => [normKey(e.attrs.signature), e.id]))
   const skipped = {}
+  const kindById = new Map(entries.map(e => [e.id, e.kind])), kindOf = id => kindById.get(id) ?? null
 
   for (const raw of entries) {
     const kind = raw.kind, e = { ...raw, description: text(raw) }
     try {
-      if (LINES.includes(kind)) add(kind, own(kind, e, lineItem({ ...e, qty: 1, bonuses: undefined }, ctx)))
+      const hostKind = LINES.includes(kind) ? accessoryHostKind(e, kindOf) : null, mod = hostKind && modType(hostKind, e.attrs?.category)
+      if (mod) add(kind, own(kind, e, modItem({ ...e, bonuses: undefined }, ctx, mod)))
+      else if (LINES.includes(kind)) add(kind, own(kind, e, lineItem({ ...e, qty: 1, bonuses: undefined }, ctx)))
       else if (PICKS.includes(kind)) add(kind, own(kind, e, pickItem({ ...e, pick: kind, bonuses: undefined }, ctx)))
       else if (kind === 'programs') add(kind, own(kind, e, programItem(e, ctx)))
       else if (kind === 'martialarts') add(kind, own(kind, e, martialArtItem(e, ctx)))

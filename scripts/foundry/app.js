@@ -4,7 +4,7 @@ import { readExport } from '../lib/read.js'
 import { escapeText, npcHeadline, translateRunner } from '../lib/translate.js'
 import { defaultChoice, planPack } from '../lib/plan.js'
 import { PACKS, PORTRAIT, translateBook } from '../lib/books.js'
-import { applyRunner, COMPENDIUM_FOLDER, edenSpecLabels, findExisting, NPC_FOLDER } from './apply.js'
+import { applyRunner, COMPENDIUM_FOLDER, edenComplexForms, edenSpecLabels, findExisting, NPC_FOLDER } from './apply.js'
 import { importBook } from './books.js'
 
 const flagOf = d => d?.flags?.[MODULE_ID]
@@ -94,7 +94,7 @@ export function createImportApp(getIcons = () => null) {
       this.books = books ? res.file.books.map(book => {
         try {
           return { book, t: translateBook(book, { exportedAt: book.exportedAt ?? res.file.exportedAt, appVersion: res.file.app?.version ?? '',
-            descriptions: res.file.descriptions === true, sanitize, icons: getIcons() }) }
+            descriptions: res.file.descriptions === true, sanitize, icons: getIcons(), specs: edenSpecLabels(), complexForms: edenComplexForms() }) }
         } catch (e) { return { book, error: e?.message ?? String(e) } }
       }) : null
       const image = s => (PORTRAIT.test(s ?? '') ? s : null)
@@ -117,7 +117,7 @@ export function createImportApp(getIcons = () => null) {
       this.busy = true
       for (const b of el.querySelectorAll('button[data-action=import], input')) b.disabled = true
       const progress = el.querySelector('.sr6i-progress')
-      const specs = edenSpecLabels(), report = []
+      const specs = edenSpecLabels(), complexForms = edenComplexForms(), report = []
       let n = 0
       for (const { row, tick, choice } of jobs) {
         const name = row.runner.streetName
@@ -125,7 +125,7 @@ export function createImportApp(getIcons = () => null) {
         if (progress) progress.textContent = F('SR6I.Progress', { n: ++n, total })
         let res, textOnly = []
         try {
-          const t = translateRunner(row.runner, { exportedAt: row.exportedAt, appVersion: this.file.app?.version ?? '', sanitize, icons: getIcons(), specs })
+          const t = translateRunner(row.runner, { exportedAt: row.exportedAt, appVersion: this.file.app?.version ?? '', sanitize, icons: getIcons(), specs, complexForms })
           textOnly = t.textOnly
           res = await applyRunner(t, choice, { portrait: row.portrait, token: row.token, exportedAt: row.exportedAt })
         } catch (error) { res = { action: 'failed', error } }  // translate threw: nothing in the world changed

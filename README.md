@@ -34,7 +34,7 @@ You get a file ending in `.sr6foundry.json` (`runners-…`, `books-…` or `comp
 
 Runners go in the Actors folder "Chummer SR6" as Player actors with linked tokens. The report at the end lists anything that was turned into notes.
 
-The module writes raw inputs only (attribute bases, skill points, specializations, magic or resonance type, Edge, items with their fields) and lets shadowrun6-eden work out dice pools, condition monitors, initiative and essence itself. Augmentation bonuses go in as effects on their items, which shadowrun6-eden applies. Every skill shadowrun6-eden knows is written, at 0 when the runner doesn't have it.
+The module writes raw inputs only (attribute bases, skill points, specializations, magic or resonance type, Edge, items with their fields) and lets shadowrun6-eden work out dice pools, condition monitors, initiative and essence itself. Augmentation bonuses (attributes, Edge, initiative dice, Defense Rating) go in as effects on their items, which shadowrun6-eden applies; an accessory's bonuses are its host's, never the runner's. Built Tough's extra Physical boxes go in as the monitor's modifier. Worn armor counts toward the Defense Rating. A commlink's or cyberdeck's device rating, attribute array and program slots go in Eden's matrix fields, and the first device of each kind is switched on. Weapon, armor and electronics accessories are shadowrun6-eden mods fitted to their host, and a program bought into a deck is installed in it. A runner's items link to their entries in the imported book compendiums (Foundry's compendium source) when those books are in the world. Every skill shadowrun6-eden knows is written, at 0 when the runner doesn't have it.
 
 ### A runner that's already in the world
 
@@ -81,7 +81,8 @@ A compendium a GM made in Chummer imports like a book, into its own folder "<com
 - Vehicles and drones are items on the runner and in "Vehicles & drones", not Vehicle actors.
 - An NPC's gear and weapon lines go in its notes as text.
 - A skill, specialization, weapon category, spirit or sprite type shadowrun6-eden doesn't know imports as a generic one, with a report line and a note.
-- A cyberdeck's or commlink's array and programs are kept as text.
+- A device array printed another way than a row of numbers is kept as text.
+- Effects Chummer read from a book's text are on the compendium entries only, not yet on a runner's own items (Chummer doesn't apply them yet). An item's source shows as Eden's book only for the books Eden lists; `genesisID` stays empty.
 
 ## Sharing
 

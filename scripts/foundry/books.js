@@ -123,8 +123,8 @@ async function writePack(pack, incoming, after) {
   }
 }
 
-// a pack actor's items with their effects in Foundry's shape (book items carry none: no bonuses in a book entry)
-const withItemData = d => (d.items ? { ...d, items: d.items.map(itemData) } : d)
+// effects in Foundry's shape: a pack item's own (the catalog's effects, lib/translate.js catalogEffects) and a pack actor's items'
+const withItemData = d => (d.items ? { ...d, items: d.items.map(itemData) } : itemData(d))
 const fail = (pack, name, error) => { console.error(`${MODULE_ID} | ${name}`, error); return { pack, name, error } }
 
 /**

@@ -1,9 +1,10 @@
 // Import decisions (scripts/lib/plan.js), ported from the Anarchy module's tests, plus Eden's play state.
 import { readFileSync } from 'node:fs'
+import { docId } from '../scripts/lib/ids.js'
 import { describe, expect, test } from 'vitest'
 import { MODULE_ID } from '../scripts/lib/constants.js'
 import { translateRunner } from '../scripts/lib/translate.js'
-import { defaultChoice, keepArt, keepItemArt, mergeActorItems, mergeJournalPages, newVersionName, planPack, replaceUpdate, tokenUpdate } from '../scripts/lib/plan.js'
+import { compendiumRef, defaultChoice, fitItems, keepArt, keepItemArt, mergeActorItems, mergeJournalPages, newVersionName, planPack, replaceUpdate, tokenUpdate } from '../scripts/lib/plan.js'
 
 const file = JSON.parse(readFileSync('samples/test-runners.json', 'utf8'))
 const OPTS = { exportedAt: file.exportedAt, appVersion: file.app.version }
@@ -36,18 +37,21 @@ describe('planning an import', () => {
     expect(keys).toContain('system.karma')
     expect(keys).toContain('img')
     expect(u.flags[MODULE_ID].id).toBe('run-mara-1')
-    for (const bad of ['system.edge.value', 'system.physical', 'system.stun', 'system.overflow', 'system.heat', 'system.reputation',
+    expect(keys).toContain('system.physical.mod')  // the extra boxes are Chummer's; damage is play state
+    for (const bad of ['system.edge.value', 'system.physical.dmg', 'system.physical.value', 'system.stun.dmg', 'system.stun.value', 'system.overflow', 'system.heat', 'system.reputation',
       'system.matrixIni', 'system.persona', 'prototypeToken', 'ownership', 'items', 'type'])
       expect(keys.some(k => k.startsWith(bad)), bad).toBe(false)
   })
 
   test('play state is dropped even if a translation carried it', () => {
     const a = structuredClone(t.actor)
-    Object.assign(a.system, { physical: { value: 3 }, stun: { value: 1 }, heat: 2, reputation: 1, matrixIni: 'vrhot', persona: {} })
+    Object.assign(a.system, { physical: { mod: 1, value: 3, dmg: 2 }, stun: { mod: 0, value: 1 }, heat: 2, reputation: 1, matrixIni: 'vrhot', persona: {} })
     a.system.edge.value = 1
     const u = replaceUpdate(a)
     expect(u.system.edge).toEqual({ max: 3 })
-    for (const k of ['physical', 'stun', 'heat', 'reputation', 'matrixIni', 'persona']) expect(u.system).not.toHaveProperty(k)
+    expect(u.system.physical).toEqual({ mod: 1 })
+    expect(u.system.stun).toEqual({ mod: 0 })
+    for (const k of ['heat', 'reputation', 'matrixIni', 'persona']) expect(u.system).not.toHaveProperty(k)
   })
 
   test('an NPC replace update: rating and GM notes in, token settings out', () => {
@@ -130,5 +134,27 @@ describe('re-import never overwrites art the user chose', () => {
     expect(k.items[0].img).toBe('worlds/test/a.webp')
     expect(keepArt({ img: 'icons/svg/item-bag.svg' }, { img: 'new.webp' }).img).toBe('new.webp')
     expect(keepArt({ pages: [] }, { name: 'J', pages: [] })).toEqual({ name: 'J', pages: [] })
+  })
+})
+
+describe('fitted items and compendium links', () => {
+  const item = (id, host, extra = {}) => ({ name: id, type: 'gear', flags: { [MODULE_ID]: { id, ...host ? { host } : {}, ...extra } }, system: {} })
+  test('a fitted item gets its host’s id in embeddedInUuid; the host a fresh id; the rest untouched', () => {
+    let n = 0
+    const items = [item('w1'), item('w1a', 'w1'), item('w1b', 'w1'), item('g1'), item('x', 'gone')]
+    const out = fitItems(items, 'ACTOR', () => `id${++n}`)
+    expect(out[0]._id).toBe('id1')
+    expect(out[1].system.embeddedInUuid).toBe('Actor.ACTOR.Item.id1')
+    expect(out[2].system.embeddedInUuid).toBe('Actor.ACTOR.Item.id1')
+    expect(out[3]).not.toHaveProperty('_id')
+    expect(out[4].system).not.toHaveProperty('embeddedInUuid')  // its host isn't on the actor: loose
+    expect(items[1].system).toEqual({})  // inputs untouched
+  })
+  test('compendiumRef: the world pack and document a book import made for the catalog entry', () => {
+    const ref = compendiumRef(item('w1', null, { catalogId: 'mus.pocket-zapper', kind: 'weapons', source: 'MUS' }))
+    expect(ref).toEqual({ pack: 'world.sr6-mus-weapons', id: docId('MUS:weapons:mus.pocket-zapper'),
+      uuid: `Compendium.world.sr6-mus-weapons.Item.${docId('MUS:weapons:mus.pocket-zapper')}` })
+    expect(compendiumRef(item('w1', null, { catalogId: 'x', kind: 'gear', source: 'SIF-NO' }), 'sr6test-').pack).toBe('world.sr6test-sr6-sif-no-gear')
+    expect(compendiumRef(item('x1', null, { catalogId: null, kind: 'gear', source: null }))).toBe(null)
   })
 })

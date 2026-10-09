@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+Needs Chummer's export with the effects, Defense Rating bonuses and monitor bonus (`schema/sr6-export.schema.json`, Chummer's current copy). An older file still imports.
+
+- Book text effects. A book entry whose text Chummer read an effect from (a quality's +1 Agility, Defense Rating, a skill bonus) gets it as an Active Effect in its compendium, which applies when the entry is dropped on a runner. An effect the book ties to a condition comes in switched off, for the GM to switch on. A test the entry calls for, and an Edge-cost reduction, go in its description. A runner's own items carry none of these yet, so Chummer and Foundry show the same numbers until Chummer applies them too.
+- Accessories are fitted. A runner's weapon, armor and electronics accessories become shadowrun6-eden mods fitted to their host, and a program bought into a cyberdeck is installed in it. A book's weapon accessories become mods, and their Attack Rating changes apply to the weapon they're fitted to. An accessory's bonuses stay its host's and are no longer added to the runner. An accessory on ware (a cyberlimb's) stays a gear item that says where it's fitted. The host lists its accessories.
+- Matrix devices. Commlinks, cyberdecks, cyberterms, dataterms and rigger consoles get their device rating, their attribute array on the attributes Eden's persona reads, and their program slots. The first device of each kind is switched on.
+- Worn armor counts toward Eden's Defense Rating.
+- A runner's Defense Rating bonuses (dermal plating) and Built Tough's extra Physical boxes reach Eden.
+- Weapons get their specialization from Chummer, as Eden's key. Complex forms get their test from Eden's own table when the name matches. Spells get multi-sense. Vehicles and drones get their ground, water or air type.
+- Nanoware, geneware, transgenics and symbionts get Eden's own types, and drugs, toxins, BTLs, slap patches, ammunition, grenades, rockets, missiles, explosives, magical formulae, lodges and security gear get Eden's gear types.
+- An item's source shows as Eden's book name and page, with Eden's "open in PDF" link, for the books Eden lists. Other books have the source in the description, as before.
+- A runner's item links to its entry in the imported book compendium (Foundry's compendium source), when that book is in the world.
+- A runner's programs come in as software, no longer as tools. Item notes go in the item's notes too. A contact's types go in its description.
+
 ## 0.2.0
 
 - Reads everything Chummer 0.9.5 exports for SR6 (`schema/sr6-export.schema.json` is Chummer's current copy): book data now has Matrix programs, martial art styles, martial art techniques and traditions.

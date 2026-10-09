@@ -78,7 +78,7 @@ describe('a critter', () => {
     expect(b.items.map(i => [i.name, i.type])).toEqual([['Made-up Glow', 'critterpower'], ['Fake Bite (2, extra)', 'critterpower'],
       ['Made-up Hum', 'critterpower']])
     const [glow, bite, hum] = b.items
-    expect(glow.system).toMatchObject({ type: 'mana', action: 'minor_action', range: 'line_of_sight', duration: 'sustained', genesisID: '', product: 'XYZ', page: 9 })
+    expect(glow.system).toMatchObject({ type: 'mana', action: 'minor_action', range: 'line_of_sight', duration: 'sustained', genesisID: '', product: '', page: 9 })  // XYZ: no Eden book code
     expect(glow.system.description).toMatch(/Shines\./)
     expect(glow.flags[M]).toMatchObject({ id: 'power:Made-up Glow', catalogId: 'xyz.glow' })
     expect(bite.system).toEqual({ genesisID: '', description: '' })
