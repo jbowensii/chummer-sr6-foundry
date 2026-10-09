@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.3.0
+
+Needs Chummer 0.11.0's export (`schema/sr6-export.schema.json` is its copy); older files still import. Includes 0.2.0, which was never released on its own. Import your books again so the compendiums get the new kinds and flags, then Replace your runners.
 
 - Active Effects on every item, a runner's own included: the book text's effects and the runner's bonuses, skill bonuses too, flagged as ours. Replace updates our items in place and swaps only our effects; a re-import keeps effects a user added. Effect targets Eden's editor lacks are added to it.
 - The compendiums hold everything: a Reference compendium per book, one journal per kind Eden has no type for (metatypes, implant grades, traditions, actions, mentor spirits and the rest), one page per entry.
@@ -9,8 +11,8 @@
 - Vehicles and drones are Eden Vehicle actors: a per-book actor compendium, and a runner's own linked to it with their mods and weapons.
 - A runner's gender, its SINs (with each SIN's gender in its description) and each SIN's lifestyles, Eden's lifestyle naming its SIN. An older file's one lifestyle goes under the first SIN.
 - A runner's martial art styles and the techniques learned under them; a style keeps its genesisID on Replace, so techniques stay tied to it.
+- A placeholder SIN (Chummer's unnamed one for an older lifestyle) shows as "Unnamed SIN (placeholder)", with a note to name it in Chummer. A technique's prerequisites go in its description, a missing one marked.
 - The catalog's flags reach Eden: a spell's opposed test and Essence threshold (`isOpposed`, `withEssence`), a metamagic's adepts/magicians and taken-again level (`adepts`, `mages`, `hasLevel`, `level`), and armor's Social (`social`). A runner's skill bonuses become the skill's modifier.
-
 - Identity: Foundry picks every document's id; the module no longer computes ids or keeps them. Each imported entry carries `chummerID` (`<book>:<kind>:<id>`) and `chummerAliases` (its keys from earlier Chummer imports) in the module's flags, and both are in every compendium's index.
 - Re-importing a book updates each entry in place, found by `chummerID` or an alias; new entries are added; nothing is deleted. A rules journal's pages keep their ids; a martial art style keeps its genesisID.
 - Migration: an entry imported with 0.2.x (an id computed from its key, no `chummerID`) is found by that id on the next import, updated in place and given `chummerID`. The report counts them.

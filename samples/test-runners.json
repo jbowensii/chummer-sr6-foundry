@@ -882,6 +882,7 @@
      "stun": 0
     },
     "defenseRating": 7,
+    "socialRating": 5,
     "composure": 6,
     "judgeIntentions": 7,
     "memory": 9,
