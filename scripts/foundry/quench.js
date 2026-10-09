@@ -397,7 +397,7 @@ export function registerQuench(quench) {
           assert.equal(c.folder?.name, TEST_FOLDER, p.name)
           assert.equal(c.index.size, p.docs.length, p.name)
         }
-        assert.deepEqual(res.counts[pack('reference').collection].books, { MUS: { created: 8, replaced: 0 }, MUX: { created: 2, replaced: 0 } })
+        assert.deepEqual(res.counts[pack('reference').collection].books, { MUS: { created: 8, replaced: 0, moved: 0 }, MUX: { created: 2, replaced: 0, moved: 0 } })
       })
       it('folders by category inside each pack: every entry in its category’s folder, none "Other" or "General"', async () => {
         for (const p of plan) {
@@ -478,11 +478,12 @@ export function registerQuench(quench) {
         const ourPage = j.pages.contents.find(p => p.flags?.['chummer-sr6-importer']?.chummerID)
         const muxBefore = (await pack('reference').getDocuments()).filter(d => flagOf(d).source === 'MUX').map(d => [d.id, d.name, d._stats.modifiedTime])
         await weapons.configure({ locked: true })
+        try {
         const changed = structuredClone(mus)
         changed.entries.find(e => e.id === 'mus.pocket-zapper').name = 'Pocket Zapper II'
         const again = await run([changed])
         assert.isEmpty(again.failed, again.failed.map(f => f.error?.message).join('; '))
-        assert.deepEqual(again.counts[weapons.collection].books, { MUS: { created: 0, replaced: plan.find(p => p.key === 'weapons').docs.length } })
+        assert.deepEqual(again.counts[weapons.collection].books, { MUS: { created: 0, replaced: plan.find(p => p.key === 'weapons').docs.length, moved: 0 } })
         assert.equal(weapons.index.size, size + 1, 'only the GM entry is new')
         assert.equal(weapons.folders.size, folders, 'no folder made twice')
         const zap = await weapons.getDocument(id)
@@ -495,7 +496,7 @@ export function registerQuench(quench) {
         assert.ok(j2.pages.get(ourPage.id), 'an imported page keeps its _id')
         const muxAfter = (await pack('reference').getDocuments()).filter(d => flagOf(d).source === 'MUX').map(d => [d.id, d.name, d._stats.modifiedTime])
         assert.deepEqual(muxAfter, muxBefore, 'the book not in the file is left alone')
-        await weapons.configure({ locked: false })
+        } finally { await weapons.configure({ locked: false }) }
       })
       it('a re-filed entry moves to its new category’s folder on re-import, even out of a folder the GM put it in', async () => {
         const weapons = pack('weapons'), zap = await byKey(weapons, 'MUS:weapons:mus.pocket-zapper')
