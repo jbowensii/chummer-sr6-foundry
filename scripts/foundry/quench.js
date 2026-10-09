@@ -412,11 +412,13 @@ export function registerQuench(quench) {
           assert.equal(t.system.style, s.system.genesisID)
         } finally { await a.delete() }
       })
-      it('a tradition is a journal with its page', async () => {
-        const j = await byKey(pack('traditions'), 'MUS:traditions:mus.made-up-path')
-        assert.equal(j.name, 'Made-up Path')
-        assert.lengthOf(j.pages.contents, 1)
-        assert.include(j.pages.contents[0].text.content, 'invented tradition')
+      it('kinds Eden has no document for are Reference journals, a page per entry (a tradition, a grade, an action)', async () => {
+        const journals = await pack('reference').getDocuments()
+        const trad = journals.find(j => j.name === 'Traditions')
+        assert.lengthOf(trad.pages.contents, 1)
+        assert.include(trad.pages.contents[0].text.content, 'invented tradition')
+        assert.equal(trad.pages.contents[0].flags['chummer-sr6-importer'].chummerID, 'MUS:traditions:mus.made-up-path')
+        assert.includeMembers(journals.map(j => j.name), ['Augmentation grades', 'Actions', 'Mentor spirits', 'Metatypes'])
       })
       it('re-import updates in place by chummerID (same _id, nothing new), keeps a user image, a GM entry and a GM page, and locks a locked pack again', async () => {
         const weapons = pack('weapons'), before = await byKey(weapons, 'MUS:weapons:mus.pocket-zapper'), id = before.id, size = weapons.index.size

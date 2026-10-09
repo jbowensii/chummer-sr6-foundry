@@ -215,6 +215,25 @@
      }
     },
     {
+     "id": "mus.made-up-grade",
+     "kind": "grades",
+     "name": "Made-up Grade",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "essence": "0.9",
+      "cost": "1.5",
+      "avail": "1"
+     },
+     "parts": [],
+     "values": {
+      "cost": 1.5,
+      "avail": 1,
+      "essence": 0.9
+     }
+    },
+    {
      "id": "mus.test-link",
      "kind": "electronics",
      "name": "Test Link",
@@ -1019,6 +1038,34 @@
      "canon": true,
      "attrs": {
       "stage": "opening"
+     },
+     "parts": [],
+     "values": {}
+    },
+    {
+     "id": "mus.made-up-shove",
+     "kind": "actions",
+     "name": "Made-up Shove",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "type": "Major",
+      "category": "Combat"
+     },
+     "parts": [],
+     "values": {},
+     "description": "An invented action."
+    },
+    {
+     "id": "mus.made-up-crow",
+     "kind": "mentorspirits",
+     "name": "Made-up Crow",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "category": "Mentor spirit"
      },
      "parts": [],
      "values": {}

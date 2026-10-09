@@ -14,11 +14,20 @@ export const PACKS = { qualities: ['Qualities', 'Item'], weapons: ['Weapons', 'I
   augmentations: ['Augmentations', 'Item'], electronics: ['Electronics', 'Item'], programs: ['Programs', 'Item'], gear: ['Gear', 'Item'],
   vehicles: ['Vehicles & drones', 'Item'], spells: ['Spells', 'Item'], rituals: ['Rituals', 'Item'], adeptpowers: ['Adept powers', 'Item'],
   complexforms: ['Complex forms', 'Item'], metamagics: ['Metamagics', 'Item'], echoes: ['Echoes', 'Item'],
-  martialarts: ['Martial arts', 'Item'], martialtechniques: ['Martial art techniques', 'Item'], traditions: ['Traditions', 'JournalEntry'],
+  martialarts: ['Martial arts', 'Item'], martialtechniques: ['Martial art techniques', 'Item'],
   critterpowers: ['Critter powers', 'Item'], lifestyles: ['Lifestyles', 'Item'], contacts: ['Contacts', 'Item'],
   npcs: ['NPCs', 'Actor'], critters: ['Critters', 'Actor'], spirits: ['Spirits', 'Actor'], sprites: ['Sprites', 'Actor'],
-  rules: ['Rules', 'JournalEntry'] }
-export const UNUSED = ['priorities', 'metatypes', 'attributes', 'skills', 'lifemodules']  // Eden has fixed skills and no metatype item
+  rules: ['Rules', 'JournalEntry'], reference: ['Reference', 'JournalEntry'] }
+// Every kind Eden has no document type for goes in the book's Reference compendium: one journal per kind, one page per
+// entry (its printed stats, lines, text, source and page, and chummerID). Labels for the kinds Chummer knows; another
+// kind (a newer Chummer's) is titled from its key.
+export const REFERENCE = { priorities: 'Priorities', metatypes: 'Metatypes', attributes: 'Attributes', skills: 'Skills',
+  grades: 'Augmentation grades', traditions: 'Traditions', lifemodules: 'Life modules', actions: 'Actions', packs: 'Gear packs',
+  vehicledesign: 'Vehicle design', ammotypes: 'Ammunition types', mentorspirits: 'Mentor spirits', datastructures: 'Data structures',
+  qualitypaths: 'Quality paths', spellfeatures: 'Spell features', contacttypes: 'Contact types', qualitysets: 'Quality sets',
+  licencetypes: 'Licence types', magictypes: 'Magic types', ruleoptions: 'Optional rules', senses: 'Senses',
+  trueelements: 'True elements', categories: 'Categories' }
+const titled = k => String(k).replace(/[-_]+/g, ' ').replace(/^\w/, c => c.toUpperCase())
 export const PORTRAIT = /^data:image\/(png|jpe?g);base64,/i
 // World pack names may only hold [A-Za-z0-9-_] (BasePackage.validateId).
 export const packName = s => s.toLowerCase().replace(/[^a-z0-9_-]/g, '-')
@@ -102,7 +111,6 @@ export function translateBook(book, { exportedAt, appVersion, descriptions = fal
         add(kind, doc)
       }
       else if (kind === 'martialtechniques') add(kind, own(kind, e, techniqueItem(e, ctx, styleOf[normKey(e.name)])))
-      else if (kind === 'traditions') add(kind, journal('traditions', e.id, e.name, e.page, [e]))
       else if (kind === 'qualities') add(kind, own(kind, e, qualityItem({ ...e, positive: !/^\s*neg/i.test(e.attrs?.kind ?? '') }, ctx)))
       else if (kind === 'critterpowers') {
         const doc = base(e, 'critterpower', ctx, [weaknessLine(e)])
@@ -124,11 +132,19 @@ export function translateBook(book, { exportedAt, appVersion, descriptions = fal
         b.actor.system.description = sanitize(e.description ?? see(e))
         add(kind, { ...b.actor, items: b.items })
         textOnly.push(...b.lines.map(l => `${e.name}: ${l}`))
-      } else if (kind !== 'rules') (skipped[kind] ??= []).push(e)
+      } else if (kind !== 'rules') (skipped[kind] ??= []).push(raw)
     } catch (err) { textOnly.push(`${e.name ?? e.id}: not imported (${err?.message ?? err})`) }
   }
-  for (const [kind, list] of Object.entries(skipped))
-    textOnly.push(UNUSED.includes(kind) ? `${list.length} ${kind}: not used by Eden` : `${list.length} ${kind}: kind not known → not imported`)
+  // the kinds Eden has no document for: a Reference journal each, a page per entry
+  const esc = v => String(v ?? '')
+  const stats = e => [...Object.entries(e.attrs ?? {}).map(([k, v]) => `${k}: ${esc(v)}`), ...(e.parts ?? []).filter(x => x.text).map(x => `${x.tag}: ${x.text}`)]
+  for (const [kind, list] of Object.entries(skipped)) {
+    add('reference', { name: REFERENCE[kind] ?? titled(kind), flags: { [MODULE_ID]: bookFlags({ id: kind, page: list[0].page }, 'reference') },
+      pages: list.map((e, i) => ({ name: e.name || e.id, type: 'text', sort: (i + 1) * SORT, title: { show: true, level: 1 },
+        flags: { [MODULE_ID]: bookFlags(e) },
+        text: { content: sanitize(stats(e).join('\n\n')) + sanitize(text(e) ?? '') + sanitize(see(e)), format: 1 } })) })
+    if (!REFERENCE[kind]) textOnly.push(`${list.length} ${kind}: a kind this module doesn't know → Reference journal "${titled(kind)}"`)
+  }
 
   // a GM's compendium: its NPCs (runners with npc) in their kind's pack, portrait and token uploaded by importBook
   for (const r of book.npcs ?? []) {

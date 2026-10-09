@@ -67,8 +67,15 @@ beforeEach(() => {
   globalThis.Item = Doc; globalThis.Actor = Doc; globalThis.JournalEntry = Doc
 })
 
-test('a book of only unused kinds makes no pack and no folder', async () => {
+test('a book of only kinds Eden has no document for: just its Reference compendium', async () => {
   const res = await importBook(tr(mux))
+  expect(res.failed).toEqual([])
+  expect([...packs.keys()]).toEqual(['world.sr6-mux-reference'])
+  expect([...packs.get('world.sr6-mux-reference').docs.values()].map(j => j.name)).toEqual(['Priorities', 'Metatypes'])
+})
+
+test('nothing at all in a book: no pack and no folder', async () => {
+  const res = await importBook(tr({ ...mux, entries: [] }))
   expect(res).toMatchObject({ counts: {}, failed: [] })
   expect(packs.size).toBe(0)
   expect(folders).toEqual([])

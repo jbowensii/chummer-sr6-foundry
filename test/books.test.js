@@ -41,15 +41,26 @@ describe('a book', () => {
       source: 'MUS', page: 10, canon: true, icon: { key: expect.stringMatching(/^weapon/) } })
     expect(byName(t, 'Pocket Zapper').flags[M].compendium).toBeUndefined()
   })
-  test('a book of only priorities and metatypes plans no pack, and the report says why', () => {
+  test('kinds Eden has no document for: the Reference compendium, a journal per kind, a page per entry with its chummerID', () => {
     const x = translateBook(mux, OPTS)
-    expect(planBookPacks(x)).toEqual([])
-    expect(x.textOnly).toEqual(['1 priorities: not used by Eden', '1 metatypes: not used by Eden'])
+    expect(planBookPacks(x)).toMatchObject([{ key: 'reference', type: 'JournalEntry', label: 'Reference — MUX' }])
+    expect(x.packs.reference.map(j => [j.name, j.flags[M].chummerID, j.pages.map(p => p.flags[M].chummerID)]))
+      .toEqual([['Priorities', 'MUX:reference:priorities', ['MUX:priorities:mux.prio-b']], ['Metatypes', 'MUX:reference:metatypes', ['MUX:metatypes:mux.troll']]])
+    expect(x.textOnly).toEqual([])
   })
-  test('unused and unknown kinds: one report line each, no document', () => {
-    expect(t.textOnly).toEqual(expect.arrayContaining(['1 skills: not used by Eden', '1 lifemodules: not used by Eden']))
+  test('a reference page: the printed stats and lines, the text, source and page', () => {
+    const grades = t.packs.reference.find(j => j.name === 'Augmentation grades')
+    expect(grades.pages[0]).toMatchObject({ name: 'Made-up Grade', type: 'text', flags: { [M]: { chummerID: 'MUS:grades:mus.made-up-grade', source: 'MUS', page: 10 } } })
+    expect(grades.pages[0].text.content).toBe('<p>essence: 0.9</p><p>cost: 1.5</p><p>avail: 1</p><p>See MUS p.10</p>')
+    const action = t.packs.reference.find(j => j.name === 'Actions').pages[0]
+    expect(action.text.content).toContain('<p>An invented action.</p>')
+    expect(t.packs.reference.map(j => j.name)).toEqual(['Priorities', 'Metatypes', 'Skills', 'Augmentation grades', 'Traditions', 'Life modules',
+      'Actions', 'Mentor spirits'])
+  })
+  test('a kind this module doesn’t know: its own Reference journal, titled from its key, and a report line', () => {
     const x = translateBook({ ...mux, entries: [...mux.entries, { ...mux.entries[0], id: 'x', kind: 'gizmos' }] }, OPTS)
-    expect(x.textOnly).toContain('1 gizmos: kind not known → not imported')
+    expect(x.packs.reference.map(j => j.name)).toContain('Gizmos')
+    expect(x.textOnly).toContain('1 gizmos: a kind this module doesn\'t know → Reference journal "Gizmos"')
   })
   test('descriptions: the text when on and present, else "See X p.N"', () => {
     expect(byName(t, 'Pocket Zapper').system.description).toContain('<p>A made-up zapper.</p>')
@@ -114,12 +125,13 @@ describe('a book', () => {
     const loose = translateBook({ ...mus, entries: mus.entries.filter(e => e.kind === 'martialtechniques') }, OPTS)
     expect(loose.packs.martialtechniques[0].system.style).toBe('')
   })
-  test('a tradition -> a journal with one page (Eden has no tradition item)', () => {
-    const [j] = t.packs.traditions
-    expect(j).toMatchObject({ name: 'Made-up Path', flags: { [M]: { id: 'mus.made-up-path', page: 10, chummerID: 'MUS:traditions:mus.made-up-path' } } })
+  test('a tradition -> a page of the Traditions reference journal (Eden has no tradition item)', () => {
+    const j = t.packs.reference.find(x => x.name === 'Traditions')
+    expect(j.flags[M].chummerID).toBe('MUS:reference:traditions')
     expect(j.pages).toHaveLength(1)
-    expect(j.pages[0]).toMatchObject({ name: 'Made-up Path', type: 'text', text: { content: '<p>An invented tradition.</p>', format: 1 } })
-    expect(planBookPacks(t).find(p => p.key === 'traditions')).toMatchObject({ type: 'JournalEntry', label: 'Traditions — MUS' })
+    expect(j.pages[0]).toMatchObject({ name: 'Made-up Path', type: 'text', flags: { [M]: { id: 'mus.made-up-path', page: 10, chummerID: 'MUS:traditions:mus.made-up-path' } } })
+    expect(j.pages[0].text.content).toContain('<p>An invented tradition.</p>')
+    expect(t.packs).not.toHaveProperty('traditions')
   })
   test('text Eden has no field for: a quality’s karma range, a mod’s slots, a weakness', () => {
     expect(byName(t, 'Lucky Break').system.description).toContain('<p>Karma: 4–8</p>')

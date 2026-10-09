@@ -58,9 +58,9 @@ export function createImportApp(getIcons = () => null) {
         name: book.source.name, id: book.source.id, error: error && F('SR6I.Failed', { reason: error }),
         canon: book.source.compendium ? F('SR6I.Compendium', { folder: COMPENDIUM_FOLDER }) : L(book.source.canon ? 'SR6I.Canon' : 'SR6I.NonCanon'),
         descriptions: L(this.file.descriptions === true ? 'SR6I.DescriptionsIn' : 'SR6I.DescriptionsOut'),
-        // after de-duplicating chummerIDs, as the write does (planUpsert); rules count their pages, not the chapter journals
+        // after de-duplicating chummerIDs, as the write does (planUpsert); rules and reference count their pages, not the journals
         counts: t && Object.keys(PACKS).filter(k => t.packs[k]?.length).map(k => { const docs = planUpsert([], t.packs[k]).creates
-          const n = k === 'rules' ? docs.reduce((n, j) => n + j.pages.length, 0) : docs.length
+          const n = k === 'rules' || k === 'reference' ? docs.reduce((n, j) => n + j.pages.length, 0) : docs.length
           return `${PACKS[k][0]} ${n}` }).join(' · ') || L('SR6I.NothingInBook'),
       }))
       const nNpc = this.rows?.filter(r => r.runner.npc).length ?? 0
