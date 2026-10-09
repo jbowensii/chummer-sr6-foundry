@@ -1,7 +1,8 @@
 // Apply one translated runner or NPC to the world. Foundry globals are only touched inside functions (node --check clean).
 import { MODULE_ID } from '../lib/constants.js'
 import { normKey } from '../lib/eden.js'
-import { compendiumRef, fitItems, keepItemArt, newVersionName, replaceUpdate, tokenUpdate } from '../lib/plan.js'
+import { INDEX_FIELDS, resolveEntry, tieLine } from '../lib/chummer-id.js'
+import { fitUpdates, keepItemArt, newVersionName, replaceUpdate, tokenUpdate } from '../lib/plan.js'
 
 export const FOLDER = 'Chummer SR6'
 export const NPC_FOLDER = 'Chummer SR6 NPCs'  // NPCs from a runners file (flags npc)
@@ -83,14 +84,61 @@ export function edenComplexForms() {
   return out
 }
 
-// _stats.compendiumSource: the entry in this module's world compendium a runner's item came from, when that pack holds it
-// (lib/plan.js compendiumRef). Foundry shows the link on the item.
-export const withCompendiumSource = (items, prefix = '') => items.map(i => {
-  const ref = compendiumRef(i, prefix)
-  return ref && game.packs.get(ref.pack)?.index?.has(ref.id) ? { ...i, _stats: { ...i._stats, compendiumSource: ref.uuid } } : i
-})
-// an actor's items ready to create: fitted to their hosts (lib/plan.js fitItems), created with keepId
-const fitted = (items, actorId) => fitItems(items, actorId, () => foundry.utils.randomID())
+/** Our identity fields in every compendium's index (lib/chummer-id.js INDEX_FIELDS), so a pack finds an entry by
+ *  chummerID without loading its documents. Called at init (main.js). */
+export function addIndexFields() {
+  for (const doc of ['Item', 'Actor', 'JournalEntry']) {
+    const c = CONFIG[doc]
+    if (!c) continue
+    c.compendiumIndexFields = [...new Set([...c.compendiumIndexFields ?? [], ...INDEX_FIELDS])]
+  }
+}
+
+// One book's world compendiums (lib/books.js: sr6-<source>-<key>, in any of its kinds' packs) as index entries for
+// lib/chummer-id.js resolveEntry, loaded once per import.
+const slug = s => String(s).toLowerCase().replace(/[^a-z0-9_-]/g, '-')
+async function bookEntries(source, prefix) {
+  const start = `world.${slug(`${prefix}sr6-${source}`)}-`, out = []
+  for (const pack of game.packs.filter(p => p.documentName === 'Item' && p.collection.startsWith(start))) {
+    const index = await pack.getIndex({ fields: INDEX_FIELDS })
+    for (const i of index.values()) {
+      const f = i.flags?.[MODULE_ID] ?? {}
+      out.push({ uuid: i.uuid ?? pack.getUuid(i._id), type: i.type, name: i.name, chummerID: f.chummerID ?? null,
+        aliases: f.chummerAliases ?? [], kind: f.kind ?? null, page: f.page ?? null })
+    }
+  }
+  return out
+}
+
+/**
+ * _stats.compendiumSource for a runner's items: the real UUID of the entry each came from in that world's compendiums
+ * for its book, found by chummerID, then its aliases, then type and name inside that one book's compendiums (ties: the
+ * same kind, then the same page). Still tied: no link, and a report line lists the candidates. Never a search by name
+ * across every compendium; a custom item (no book) is never linked. Returns { items, notes }.
+ */
+export async function linkCompendium(items, prefix = '') {
+  const books = new Map(), notes = []
+  const out = []
+  for (const i of items) {
+    const source = flagOf(i)?.source
+    if (!source || !flagOf(i)?.catalogId) { out.push(i); continue }
+    if (!books.has(source)) books.set(source, await bookEntries(source, prefix))
+    const r = resolveEntry(i, books.get(source))
+    if (r?.uuid) out.push({ ...i, _stats: { ...i._stats, compendiumSource: r.uuid } })
+    else { if (r?.candidates) notes.push(tieLine(i, r.candidates)); out.push(i) }
+  }
+  return { items: out, notes }
+}
+
+// Create an actor's items (Foundry picks their ids), then fit the mods and software to their hosts by the ids they got
+// (lib/plan.js fitUpdates). Returns the created items.
+async function createItems(doc, items) {
+  if (!items.length) return []
+  const made = await doc.createEmbeddedDocuments('Item', items)
+  const fits = fitUpdates(made, doc.id)
+  if (fits.length) await doc.updateEmbeddedDocuments('Item', fits)
+  return made
+}
 
 // Replace in place: rebuild the translated fields and every flagged embedded item; unflagged items and play state stay,
 // and so does art the user chose, on the actor and its rebuilt items (lib/plan.js replaceUpdate, keepItemArt).
@@ -98,9 +146,9 @@ const fitted = (items, actorId) => fitItems(items, actorId, () => foundry.utils.
 // so a failure never leaves the actor without its Chummer items or with them twice. Throws on failure.
 async function replaceDoc(doc, actor, items, token) {
   const old = doc.items.filter(i => flagOf(i)).map(i => i.id)
-  const fresh = fitted(keepItemArt(doc.items, items), doc.id)
+  const fresh = keepItemArt(doc.items, items)
   await doc.update({ ...replaceUpdate(actor, doc.name, doc.img), ...tokenUpdate(doc, token ?? actor.img) })
-  const made = fresh.length ? await doc.createEmbeddedDocuments('Item', fresh, { keepId: true }) : []
+  const made = await createItems(doc, fresh)
   try { if (old.length) await doc.deleteEmbeddedDocuments('Item', old) } catch (e) {
     try { await doc.deleteEmbeddedDocuments('Item', made.map(i => i.id)) } catch {}
     throw e
@@ -112,14 +160,16 @@ async function replaceDoc(doc, actor, items, token) {
  * image; without a token the token shows the img). folder: the root Actors folder, by name or a Folder (the Quench tests
  * pass their own); by default FOLDER for a runner, NPC_FOLDER for an NPC. Items go in after the actor (Eden's
  * preCreateItem runs per item), their effects inside each item's data. Never throws: a failure deletes the actor this
- * call created and returns { actor: null, action: 'failed', error } so the caller reports it and carries on.
+ * call created and returns { actor: null, action: 'failed', error } so the caller reports it and carries on. notes: the
+ * compendium link lines for the report (linkCompendium).
  */
 export async function applyRunner(t, choice, { portrait, token, exportedAt, folder = flagOf(t.actor)?.npc ? NPC_FOLDER : FOLDER } = {}) {
   const runnerId = flagOf(t.actor).id
   if (choice === 'skip') return { actor: findExisting(runnerId), action: 'skip' }
   let created = null
   try {
-    const actor = structuredClone(t.actor), items = withCompendiumSource(t.items.map(itemData))
+    const { items, notes } = await linkCompendium(t.items.map(itemData))
+    const actor = structuredClone(t.actor)
     const at = exportedAt ?? flagOf(t.actor).exportedAt
     if (portrait) actor.img = await uploadPortrait(portrait, runnerId, at)
     const tokenImg = token ? await uploadPortrait(token, runnerId, at, 'tokens') : null
@@ -129,7 +179,7 @@ export async function applyRunner(t, choice, { portrait, token, exportedAt, fold
       if (!doc) throw new Error(`${t.actor.name}: nothing to replace`)
       await replaceDoc(doc, actor, items, tokenImg)
       await dedupeUnarmed(doc)
-      return { actor: doc, action: 'replace' }
+      return { actor: doc, action: 'replace', notes }
     }
 
     const root = typeof folder === 'string' ? await ensureFolder(folder) : folder
@@ -138,9 +188,9 @@ export async function applyRunner(t, choice, { portrait, token, exportedAt, fold
     const src = tokenImg ?? actor.img
     created = await Actor.create({ ...actor, name, folder: root?.id ?? null,
       prototypeToken: { ...actor.prototypeToken, ...src ? { texture: { src } } : {} } })
-    if (items.length) await created.createEmbeddedDocuments('Item', fitted(items, created.id), { keepId: true })
+    await createItems(created, items)
     await dedupeUnarmed(created)
-    return { actor: created, action: choice === 'new' ? 'new' : 'create' }
+    return { actor: created, action: choice === 'new' ? 'new' : 'create', notes }
   } catch (error) {
     // A replaced actor cleans up its own new items (replaceDoc); ponytail: its update already applied stays, and
     // re-running the import finishes the job.

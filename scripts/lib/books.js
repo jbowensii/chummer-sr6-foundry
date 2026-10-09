@@ -1,7 +1,7 @@
 // One Chummer SR6 book (chummer-anarchy2 docs/sr6-export-format.md "Book") -> compendium document data, one pack per topic.
 // Pure: no Foundry calls.
 import { MODULE_ID } from './constants.js'
-import { docId } from './ids.js'
+import { chummerFlags, chummerKey } from './chummer-id.js'
 import { lifestyleKey, modType, normKey } from './eden.js'
 import { itemIconKey, withIcon } from './icons.js'
 import {
@@ -54,26 +54,29 @@ export function accessoryHostKind(e, kindOf) {
 /**
  * sanitize: plain text -> safe HTML, as for translateRunner. Book text goes in only when descriptions is true and the
  * entry has it; otherwise the description says "See <SOURCE> p.N".
- * Returns { source, packs: { [key]: docs[] }, portraits: { [_id]: dataUrl }, tokens: { [_id]: dataUrl }, textOnly: string[] }.
+ * Returns { source, packs: { [key]: docs[] }, portraits: { [chummerID]: dataUrl }, tokens: { [chummerID]: dataUrl }, textOnly: string[] }.
  */
-export function translateBook(book, { exportedAt, appVersion, descriptions = false, sanitize = escapeText, icons = null, specs = {}, complexForms = {} }) {
+export function translateBook(book, { exportedAt, appVersion, descriptions = false, sanitize = escapeText, icons = null, specs = {}, complexForms = {}, newGenesisId }) {
   const src = book.source, textOnly = [], packs = {}, portraits = {}, tokens = {}, iconSet = icons ? new Set(icons) : null
   const comp = src.compendium === true ? { compendium: true } : {}
   const see = x => `See ${x.source ?? src.id}${x.page ? ` p.${x.page}` : ''}`
   // bookEffects: the catalog's effects as Active Effects (translate.js catalogEffects); specs, complexForms: Eden's own
   // tables as Foundry loaded them (foundry/apply.js)
-  const ctx = { exportedAt, appVersion, sanitize, icons: iconSet, ref: see, say: l => textOnly.push(l), bookEffects: true, specs, complexForms }
+  const ctx = { exportedAt, appVersion, sanitize, icons: iconSet, ref: see, say: l => textOnly.push(l), bookEffects: true, specs, complexForms, ...newGenesisId ? { newGenesisId } : {} }
   const add = (pack, doc) => (packs[pack] ??= []).push(doc)
-  const bookFlags = e => ({ id: e.id, exportedAt, appVersion, source: src.id, page: e.page ?? null, canon: e.canon ?? src.canon, ...comp })
-  // an item built by translate.js: our _id, the book's flags (flags.icon kept)
-  const own = (kind, e, doc) => ({ _id: docId(`${src.id}:${kind}:${e.id}`), ...doc,
-    flags: { [MODULE_ID]: { ...doc.flags[MODULE_ID], ...bookFlags(e) } } })
+  // the book's flags, with our identity (lib/chummer-id.js): chummerID <source>:<kind>:<id> and its earlier keys. No
+  // _id anywhere: Foundry picks it, and a re-import finds the entry by chummerID (foundry/books.js).
+  const bookFlags = (e, kind = e.kind) => ({ id: e.id, exportedAt, appVersion, ...chummerFlags(src.id, kind, e.id, e.aliases),
+    source: src.id, page: e.page ?? null, canon: e.canon ?? src.canon, ...comp })
+  // an item built by translate.js with the book's flags (flags.icon kept)
+  const own = (kind, e, doc) => ({ ...doc, flags: { [MODULE_ID]: { ...doc.flags[MODULE_ID], ...bookFlags(e, kind) } } })
   const icon = (doc, e) => withIcon(doc, itemIconKey(doc), e.source ?? src.id, iconSet)
   const text = e => (descriptions && e.description ? e.description : undefined)
-  // a journal (key: its _id seed; flags.id the entry id, else the key): a rules chapter, or a tradition (Eden has no
-  // tradition item, only the actor's system.tradition); one page per entry in file order, at its heading level
-  const journal = (key, name, page, list, id = key) => ({ _id: docId(key), name, flags: { [MODULE_ID]: bookFlags({ id, page }) },
-    pages: list.map((r, i) => ({ _id: docId(`${src.id}:${r.kind}:${r.id}`), name: r.name || r.id, type: 'text', sort: (i + 1) * SORT,
+  // a journal (kind and id: its chummerID's, <source>:<kind>:<id>): a rules chapter, or a tradition (Eden has no
+  // tradition item, only the actor's system.tradition); one page per entry in file order, at its heading level, each
+  // page with its entry's chummerID (a re-import keeps the page's _id: foundry/books.js)
+  const journal = (kind, id, name, page, list) => ({ name, flags: { [MODULE_ID]: bookFlags({ id, page }, kind) },
+    pages: list.map((r, i) => ({ name: r.name || r.id, type: 'text', sort: (i + 1) * SORT,
       title: { show: true, level: Math.min(4, Math.max(1, int(r.attrs?.level) || 1)) }, flags: { [MODULE_ID]: bookFlags(r) },
       text: { content: sanitize(text(r) ?? see(r)), format: 1 } })) })
 
@@ -81,7 +84,7 @@ export function translateBook(book, { exportedAt, appVersion, descriptions = fal
   // the book's critter powers, by name, for the fields of a being's powers (beingActor)
   const powers = Object.fromEntries(entries.filter(e => e.kind === 'critterpowers').map(e => [normKey(e.name), e]))
   // a style's signature technique (attrs.signature, by name) -> that style's id, for the technique's Eden style link
-  const styleOf = Object.fromEntries(entries.filter(e => e.kind === 'martialarts' && e.attrs?.signature).map(e => [normKey(e.attrs.signature), e.id]))
+  const styleOf = {}
   const skipped = {}
   const kindById = new Map(entries.map(e => [e.id, e.kind])), kindOf = id => kindById.get(id) ?? null
 
@@ -93,9 +96,13 @@ export function translateBook(book, { exportedAt, appVersion, descriptions = fal
       else if (LINES.includes(kind)) add(kind, own(kind, e, lineItem({ ...e, qty: 1, bonuses: undefined }, ctx)))
       else if (PICKS.includes(kind)) add(kind, own(kind, e, pickItem({ ...e, pick: kind, bonuses: undefined }, ctx)))
       else if (kind === 'programs') add(kind, own(kind, e, programItem(e, ctx)))
-      else if (kind === 'martialarts') add(kind, own(kind, e, martialArtItem(e, ctx)))
+      else if (kind === 'martialarts') {
+        const doc = own(kind, e, martialArtItem(e, ctx))
+        if (e.attrs?.signature) styleOf[normKey(e.attrs.signature)] = doc.system.genesisID
+        add(kind, doc)
+      }
       else if (kind === 'martialtechniques') add(kind, own(kind, e, techniqueItem(e, ctx, styleOf[normKey(e.name)])))
-      else if (kind === 'traditions') add(kind, journal(`${src.id}:traditions:${e.id}`, e.name, e.page, [e], e.id))
+      else if (kind === 'traditions') add(kind, journal('traditions', e.id, e.name, e.page, [e]))
       else if (kind === 'qualities') add(kind, own(kind, e, qualityItem({ ...e, positive: !/^\s*neg/i.test(e.attrs?.kind ?? '') }, ctx)))
       else if (kind === 'critterpowers') {
         const doc = base(e, 'critterpower', ctx, [weaknessLine(e)])
@@ -115,7 +122,7 @@ export function translateBook(book, { exportedAt, appVersion, descriptions = fal
         if (!e.npc) ctx.say(`${e.name}: no NPC block in the file → an empty ${BEING[kind]}`)
         const b = beingActor(npc, { name: e.name, flags: { [MODULE_ID]: bookFlags(e) }, sanitize, icons: iconSet, powers })
         b.actor.system.description = sanitize(e.description ?? see(e))
-        add(kind, { _id: docId(`${src.id}:${kind}:${e.id}`), ...b.actor, items: b.items })
+        add(kind, { ...b.actor, items: b.items })
         textOnly.push(...b.lines.map(l => `${e.name}: ${l}`))
       } else if (kind !== 'rules') (skipped[kind] ??= []).push(e)
     } catch (err) { textOnly.push(`${e.name ?? e.id}: not imported (${err?.message ?? err})`) }
@@ -129,10 +136,11 @@ export function translateBook(book, { exportedAt, appVersion, descriptions = fal
     try {
       if (!r.npc) { textOnly.push(`${name}: not an NPC → not imported`); continue }
       const t = translateNpc(r, { exportedAt: r.exportedAt ?? exportedAt, appVersion, sanitize, icons: iconSet })
-      const pack = PACK_OF_KIND[r.npc.kind] ?? 'npcs', _id = docId(`${src.id}:npc:${r.id}`)
-      add(pack, { _id, ...t.actor, flags: { [MODULE_ID]: { ...t.actor.flags[MODULE_ID], source: src.id, canon: src.canon, ...comp } }, items: t.items })
-      if (PORTRAIT.test(r.portrait ?? '')) portraits[_id] = r.portrait
-      if (PORTRAIT.test(r.token ?? '')) tokens[_id] = r.token
+      const pack = PACK_OF_KIND[r.npc.kind] ?? 'npcs', key = chummerKey(src.id, 'npc', r.id)
+      add(pack, { ...t.actor, flags: { [MODULE_ID]: { ...t.actor.flags[MODULE_ID], chummerID: key, chummerAliases: [], source: src.id, canon: src.canon, ...comp } },
+        items: t.items })
+      if (PORTRAIT.test(r.portrait ?? '')) portraits[key] = r.portrait
+      if (PORTRAIT.test(r.token ?? '')) tokens[key] = r.token
       textOnly.push(...t.textOnly)
     } catch (err) { textOnly.push(`${name}: not imported (${err?.message ?? err})`) }
   }
@@ -145,6 +153,6 @@ export function translateBook(book, { exportedAt, appVersion, descriptions = fal
     chapters.set(ch, [...chapters.get(ch) ?? [], r])
   }
   for (const [chapter, rules] of chapters)
-    add('rules', journal(`${src.id}:rules-chapter:${chapter}`, chapter, rules[0].page, rules))
+    add('rules', journal('rules-chapter', chapter, chapter, rules[0].page, rules))
   return { source: src, packs, portraits, tokens, textOnly }
 }

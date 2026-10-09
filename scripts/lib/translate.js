@@ -1,5 +1,6 @@
 // One Chummer SR6 runner (chummer-anarchy2 docs/sr6-export-format.md) -> shadowrun6-eden 4.x document data. Pure: no Foundry calls.
 // Raw inputs only (attribute bases, skill points, items with their fields): Eden derives pools, monitors, initiative and essence.
+import { chummerFlags } from './chummer-id.js'
 import { MODULE_ID } from './constants.js'
 import { iconFor, itemIconKey, npcIconKey, withIcon } from './icons.js'
 import {
@@ -58,11 +59,14 @@ const ref = x => (x.source ? `Chummer: ${x.source}${x.page ? ` p.${x.page}` : ''
 // The fields every item carries: Eden's genesis template, our flags, the description with the entry's text and its source
 // (ctx.ref: a book's "See SRC p.N" in place of the runner's "Chummer: SRC p.N").
 // product: Eden's book code (eden.js edenBook), so the sheet names the book and links its PDF; '' when Eden has no code for
-// the source (the description and flags name it). kind: the Chummer kind, for the compendium link (foundry/apply.js).
+// the source (the description and flags name it). chummerID, chummerAliases: our identity for the entry
+// (lib/chummer-id.js), how a re-import and a runner's compendium link find it. genesisID stays empty: it is Eden's
+// own key for its translations and its Import Data, never ours.
 export function base(x, type, ctx, extra = []) {
   return {
     name: x.name, type,
-    flags: { [MODULE_ID]: { id: x.uid ?? x.id, catalogId: x.id ?? null, kind: x.kind ?? null, source: x.source ?? null, page: x.page ?? null, canon: !!x.canon,
+    flags: { [MODULE_ID]: { id: x.uid ?? x.id, catalogId: x.id ?? null, ...chummerFlags(x.source, x.kind, x.id, x.aliases),
+      kind: x.kind ?? null, source: x.source ?? null, page: x.page ?? null, canon: !!x.canon,
       exportedAt: ctx.exportedAt, appVersion: ctx.appVersion } },
     system: { genesisID: '', product: edenBook(x.source) ?? '', page: x.page ?? 0,
       description: ctx.sanitize(x.description) + extra.filter(Boolean).map(t => ctx.sanitize(t)).join('') + ctx.sanitize((ctx.ref ?? ref)(x)) },
@@ -226,13 +230,16 @@ export function programItem(x, ctx) {
   Object.assign(doc.system, { type: s.type, rating: Math.max(0, num(v.rating)), price: Math.max(0, num(v.cost)), availDef: a.avail ?? '' })
   return icon(doc, x, ctx)
 }
+/** A random genesisID, as Eden's own create button makes one for a new style (SR6ActorSheet _create_UUID). */
+export const randomGenesisId = () => globalThis.crypto.randomUUID()
 /**
- * A martial art style -> Eden martialartstyle, its printed categories as Eden's flags. Its genesisID is the Chummer id:
- * Eden lists a style's techniques on the sheet by system.style === the style's genesisID (techniqueItem).
+ * A martial art style -> Eden martialartstyle, its printed categories as Eden's flags. Eden lists a style's techniques
+ * on the sheet by system.style === the style's genesisID (techniqueItem), so a style gets a random one, as Eden's own
+ * create button gives it (ctx.newGenesisId; a re-import keeps the one the entry already has: foundry/books.js).
  */
 export function martialArtItem(x, ctx) {
   const a = x.attrs ?? {}, doc = base(x, 'martialartstyle', ctx, [a.signature && `Signature technique: ${a.signature}`])
-  Object.assign(doc.system, { genesisID: x.id ?? '', category: martialCategories(a.categories) })
+  Object.assign(doc.system, { genesisID: (ctx.newGenesisId ?? randomGenesisId)(), category: martialCategories(a.categories) })
   return icon(doc, x, ctx)
 }
 /** A martial art technique -> Eden martialarttech; style: the genesisID of its style ('' when the book ties it to none). */

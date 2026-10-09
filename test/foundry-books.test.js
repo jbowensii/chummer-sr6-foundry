@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 import { beforeEach, expect, test, vi } from 'vitest'
 import { MODULE_ID } from '../scripts/lib/constants.js'
 import { planBookPacks, translateBook } from '../scripts/lib/books.js'
+import { legacyId } from '../scripts/lib/chummer-id.js'
 import { importBook } from '../scripts/foundry/books.js'
 import { applyIcons } from '../scripts/foundry/icons.js'
 
@@ -19,6 +20,7 @@ class FakePack {
     packs.set(this.collection, this)
   }
   get index() { return this.docs }
+  async getIndex() { return this.docs }
   get documentClass() { return Doc }
   async configure({ locked }) { log.push(['lock', this.collection, locked]); this.locked = locked }
   async setFolder(f) { this.folder = f }
@@ -36,11 +38,15 @@ const Doc = {
   async createDocuments(docs, op) {
     const p = packOf(op)
     if (failCreate === p.collection) throw new Error('write failed')
-    for (const d of docs) p.docs.set(d._id, structuredClone(d))
-    return docs.map(d => ({ id: d._id }))
+    log.push(['create', p.collection, op.keepId ?? false, docs.some(d => '_id' in d)])
+    // the server's id, as Foundry picks one (no keepId)
+    const made = docs.map(d => ({ ...structuredClone(d), _id: `id${++n}` }))
+    for (const d of made) p.docs.set(d._id, d)
+    return made.map(d => ({ id: d._id }))
   },
   async deleteDocuments(ids, op) { const p = packOf(op); for (const id of ids) p.docs.delete(id) },
-  async updateDocuments(ups, op) { const p = packOf(op); for (const u of ups) Object.assign(p.docs.get(u._id), u) },
+  // recursive: false, as writePack asks: each key given replaces the old value
+  async updateDocuments(ups, op) { const p = packOf(op); log.push(['update', p.collection, op.recursive, op.diff]); for (const u of ups) Object.assign(p.docs.get(u._id), structuredClone(u)) },
 }
 
 beforeEach(() => {
@@ -84,7 +90,14 @@ test('a GM compendium goes to "Chummer SR6 compendiums"', async () => {
   expect(folders.find(f => !f.folder).name).toBe('Chummer SR6 compendiums')
 })
 
-test('re-import replaces by id, keeps a user image, a GM entry and a GM page, and locks a locked pack again', async () => {
+test('Foundry picks every id: no _id and no keepId in any create', async () => {
+  await importBook(tr(mus))
+  const creates = log.filter(l => l[0] === 'create')
+  expect(creates.length).toBeGreaterThan(5)
+  for (const [, pack, keepId, hadId] of creates) expect([pack, keepId, hadId]).toEqual([pack, false, false])
+})
+
+test('re-import updates in place by chummerID (same _id), keeps a user image, a GM entry and a GM page, and locks a locked pack again', async () => {
   await importBook(tr(mus))
   const weapons = packs.get('world.sr6-mus-weapons'), rules = packs.get('world.sr6-mus-rules')
   const [zapId] = weapons.docs.keys()
@@ -95,12 +108,50 @@ test('re-import replaces by id, keeps a user image, a GM entry and a GM page, an
   weapons.locked = true
   const res = await importBook(tr(mus))
   expect(res.failed).toEqual([])
-  expect(res.counts['sr6-mus-weapons']).toMatchObject({ created: 0, replaced: 2 })
+  expect(res.counts['sr6-mus-weapons']).toMatchObject({ created: 0, replaced: 2, migrated: 0 })
+  expect(weapons.docs.size).toBe(3)  // its two entries, updated in place, and the GM's
   expect(weapons.docs.get(zapId).img).toBe('user/art.webp')
+  expect(log.filter(l => l[0] === 'update' && l[1] === 'world.sr6-mus-weapons')).toEqual([['update', 'world.sr6-mus-weapons', false, false]])
   expect(weapons.docs.has('gm')).toBe(true)
   expect(weapons.locked).toBe(true)
   expect(log.filter(l => l[0] === 'lock')).toEqual([['lock', 'world.sr6-mus-weapons', false], ['lock', 'world.sr6-mus-weapons', true]])
-  expect([...rules.docs.values()][0].pages.map(p => p.name)).toEqual(['Made-up Basics', 'Made-up Detail', 'GM page'])
+  const pages = [...rules.docs.values()][0].pages
+  expect(pages.map(p => p.name)).toEqual(['Made-up Basics', 'Made-up Detail', 'GM page'])
+})
+
+test('a renamed entry: found by its alias and updated in place, never a second copy', async () => {
+  const gear = new FakePack('sr6-mus-gear', 'Gear — MUS', 'Item')
+  gear.docs.set('F1', { _id: 'F1', name: 'Glitter Line', img: 'user/rope.webp', flags: { [MODULE_ID]: { chummerID: 'MUS:gear:mus.glitter-line', chummerAliases: [] } } })
+  const res = await importBook(tr(mus))
+  expect(res.counts['sr6-mus-gear']).toMatchObject({ replaced: 1 })
+  expect(gear.docs.get('F1')).toMatchObject({ name: 'Glitter Rope', img: 'user/rope.webp',
+    flags: { [MODULE_ID]: { chummerID: 'MUS:gear:mus.rope', chummerAliases: ['MUS:gear:mus.glitter-line'] } } })
+  expect([...gear.docs.values()].filter(d => d.name === 'Glitter Rope')).toHaveLength(1)
+})
+
+test('migration: entries 0.2.x wrote under computed ids (no chummerID) are updated in place and get chummerID', async () => {
+  const weapons = new FakePack('sr6-mus-weapons', 'Weapons — MUS', 'Item')
+  for (const id of ['mus.pocket-zapper', 'mus.glitter-cannon']) {
+    const _id = legacyId(`MUS:weapons:${id}`)
+    weapons.docs.set(_id, { _id, name: id, folder: 'f-old', sort: 7, ownership: { default: 0 }, flags: { [MODULE_ID]: { id }, other: { kept: true } } })
+  }
+  const res = await importBook(tr(mus))
+  expect(res.counts['sr6-mus-weapons']).toMatchObject({ created: 0, replaced: 2, migrated: 2 })
+  const zap = weapons.docs.get(legacyId('MUS:weapons:mus.pocket-zapper'))
+  expect(zap).toMatchObject({ name: 'Pocket Zapper', folder: 'f-old', sort: 7, flags: { other: { kept: true }, [MODULE_ID]: { chummerID: 'MUS:weapons:mus.pocket-zapper' } } })
+  expect(weapons.docs.size).toBe(2)
+  // and the next import finds them by chummerID
+  const again = await importBook(tr(mus))
+  expect(again.counts['sr6-mus-weapons']).toMatchObject({ replaced: 2, migrated: 0, created: 0 })
+})
+
+test('a martial art style keeps the genesisID it has in the world, and the book’s technique follows it', async () => {
+  const styles = new FakePack('sr6-mus-martialarts', 'Martial arts — MUS', 'Item')
+  styles.docs.set('S1', { _id: 'S1', name: 'Made-up Fist', system: { genesisID: 'kept-g' }, flags: { [MODULE_ID]: { chummerID: 'MUS:martialarts:mus.made-up-fist' } } })
+  await importBook(tr(mus))
+  expect(styles.docs.get('S1').system.genesisID).toBe('kept-g')
+  const [tech] = packs.get('world.sr6-mus-martialtechniques').docs.values()
+  expect(tech.system.style).toBe('kept-g')
 })
 
 test('a pack this run created is deleted when its write fails; the other packs carry on', async () => {

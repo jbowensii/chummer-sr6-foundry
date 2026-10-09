@@ -1,10 +1,9 @@
 // Import decisions (scripts/lib/plan.js), ported from the Anarchy module's tests, plus Eden's play state.
 import { readFileSync } from 'node:fs'
-import { docId } from '../scripts/lib/ids.js'
 import { describe, expect, test } from 'vitest'
 import { MODULE_ID } from '../scripts/lib/constants.js'
 import { translateRunner } from '../scripts/lib/translate.js'
-import { compendiumRef, defaultChoice, fitItems, keepArt, keepItemArt, mergeActorItems, mergeJournalPages, newVersionName, planPack, replaceUpdate, tokenUpdate } from '../scripts/lib/plan.js'
+import { defaultChoice, fitUpdates, keepArt, keepItemArt, mergeActorItems, newVersionName, replaceUpdate, tokenUpdate } from '../scripts/lib/plan.js'
 
 const file = JSON.parse(readFileSync('samples/test-runners.json', 'utf8'))
 const OPTS = { exportedAt: file.exportedAt, appVersion: file.app.version }
@@ -91,23 +90,7 @@ describe('planning an import', () => {
   })
 })
 
-describe('planning a pack write', () => {
-  test('entries already in the pack are replaced, the rest created; pack-only entries are left alone', () => {
-    expect(planPack(new Set(['a', 'b', 'gm']), [{ _id: 'a' }, { _id: 'c' }, { _id: 'b' }])).toMatchObject({ replace: ['a', 'b'], create: ['c'], duplicates: [] })
-    expect(planPack(new Set(), [{ _id: 'x' }])).toMatchObject({ replace: [], create: ['x'] })
-  })
-  test('an id the file has twice: the last entry is written once and the earlier one reported', () => {
-    const first = { _id: 'a', name: 'Old' }, last = { _id: 'a', name: 'New' }
-    const p = planPack(new Set(['a']), [first, { _id: 'b' }, last])
-    expect(p.docs).toEqual([last, { _id: 'b' }])
-    expect(p).toMatchObject({ replace: ['a'], create: ['b'], duplicates: [first] })
-  })
-  test('mergeJournalPages rebuilds imported pages and keeps the GM’s own after them', () => {
-    const gm = { _id: 'gm', name: 'My note' }, oldA = { _id: 'a', flags: { [MODULE_ID]: {} } }, stale = { _id: 's', flags: { [MODULE_ID]: {} } }
-    const newA = { _id: 'a', name: 'New A' }, newB = { _id: 'b', name: 'B' }
-    expect(mergeJournalPages([oldA, stale, gm], [newA, newB])).toEqual([newA, newB, gm])
-    expect(mergeJournalPages(undefined, [newA])).toEqual([newA])
-  })
+describe('merging a pack actor', () => {
   test('mergeActorItems rebuilds flagged items and keeps the GM’s unflagged ones after them', () => {
     const gm = { _id: 'gm', name: 'GM item', flags: {} }, old = { _id: 'o', flags: { [MODULE_ID]: { id: 'x' } } }
     const fresh = { name: 'New', flags: { [MODULE_ID]: { id: 'x' } } }
@@ -137,24 +120,11 @@ describe('re-import never overwrites art the user chose', () => {
   })
 })
 
-describe('fitted items and compendium links', () => {
-  const item = (id, host, extra = {}) => ({ name: id, type: 'gear', flags: { [MODULE_ID]: { id, ...host ? { host } : {}, ...extra } }, system: {} })
-  test('a fitted item gets its host’s id in embeddedInUuid; the host a fresh id; the rest untouched', () => {
-    let n = 0
-    const items = [item('w1'), item('w1a', 'w1'), item('w1b', 'w1'), item('g1'), item('x', 'gone')]
-    const out = fitItems(items, 'ACTOR', () => `id${++n}`)
-    expect(out[0]._id).toBe('id1')
-    expect(out[1].system.embeddedInUuid).toBe('Actor.ACTOR.Item.id1')
-    expect(out[2].system.embeddedInUuid).toBe('Actor.ACTOR.Item.id1')
-    expect(out[3]).not.toHaveProperty('_id')
-    expect(out[4].system).not.toHaveProperty('embeddedInUuid')  // its host isn't on the actor: loose
-    expect(items[1].system).toEqual({})  // inputs untouched
-  })
-  test('compendiumRef: the world pack and document a book import made for the catalog entry', () => {
-    const ref = compendiumRef(item('w1', null, { catalogId: 'mus.pocket-zapper', kind: 'weapons', source: 'MUS' }))
-    expect(ref).toEqual({ pack: 'world.sr6-mus-weapons', id: docId('MUS:weapons:mus.pocket-zapper'),
-      uuid: `Compendium.world.sr6-mus-weapons.Item.${docId('MUS:weapons:mus.pocket-zapper')}` })
-    expect(compendiumRef(item('w1', null, { catalogId: 'x', kind: 'gear', source: 'SIF-NO' }), 'sr6test-').pack).toBe('world.sr6test-sr6-sif-no-gear')
-    expect(compendiumRef(item('x1', null, { catalogId: null, kind: 'gear', source: null }))).toBe(null)
+describe('fitting items to their hosts', () => {
+  const made = (id, uid, host) => ({ id, flags: { [MODULE_ID]: { id: uid, ...host ? { host } : {} } } })
+  test('once Foundry has given the items ids: a fitted item gets its host’s, the rest nothing', () => {
+    const items = [made('F1', 'w1'), made('F2', 'w1a', 'w1'), made('F3', 'w1b', 'w1'), made('F4', 'g1'), made('F5', 'x', 'gone')]
+    expect(fitUpdates(items, 'ACTOR')).toEqual([{ _id: 'F2', 'system.embeddedInUuid': 'Actor.ACTOR.Item.F1' },
+      { _id: 'F3', 'system.embeddedInUuid': 'Actor.ACTOR.Item.F1' }])  // a host not on the actor: the item stays loose
   })
 })

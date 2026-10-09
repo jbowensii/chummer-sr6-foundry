@@ -2,7 +2,8 @@
 // (node --check clean). Never throws: a failing pack is reported in `failed` and the other packs carry on.
 import { MODULE_ID } from '../lib/constants.js'
 import { planBookPacks } from '../lib/books.js'
-import { keepArt, mergeActorItems, mergeJournalPages, planPack } from '../lib/plan.js'
+import { INDEX_FIELDS, keysOf, mergeByKey, planUpsert } from '../lib/chummer-id.js'
+import { keepArt, mergeActorItems } from '../lib/plan.js'
 import { replaceable } from '../lib/icons.js'
 import { COMPENDIUM_FOLDER, dedupeUnarmed, ensureFolder, FOLDER, itemData, uploadPortrait } from './apply.js'
 
@@ -59,7 +60,7 @@ async function dropEmptyFolders(made) {
 // it. An image or token image the user chose (kept by writePack) is never replaced.
 export const portraitsAfter = (portraits = {}, tokens = {}, say) => async (docs, op) => {
   for (const d of docs) {
-    const url = portraits[d._id], tok = tokens[d._id], f = d.flags[MODULE_ID]
+    const key = keysOf(d).chummerID, url = portraits[key], tok = tokens[key], f = d.flags[MODULE_ID]
     if (!url && !tok) continue
     try {
       const up = { _id: d._id }, id = `${f.source}-${f.id}`
@@ -76,51 +77,67 @@ export const portraitsAfter = (portraits = {}, tokens = {}, say) => async (docs,
   }
 }
 
-// Replace by id: delete the entries the file has, then create all of them with their ids, in chunks. If a create
-// fails, what this run made is deleted and the replaced entries are put back, so a failure never loses them.
-// A replaced journal keeps the pages the GM added to it, a replaced actor the GM's own items, and a replaced entry
-// (and a replaced actor's rebuilt items) the image the user chose (lib/plan.js keepArt). Entries not in the file stay.
-// after(docs, op): run once everything is written, while the pack is still unlocked; then an actor pack's duplicate
-// Unarmed items go (apply.js dedupeUnarmed).
+// A re-import updates in place, never deletes (lib/chummer-id.js planUpsert): an incoming entry found in the pack by its
+// chummerID, an alias, or (migration from 0.2.x) the id 0.2.x computed for it, is updated in place, keeping its _id, its
+// folder, sort and ownership, other modules' flags, the image the user chose (lib/plan.js keepArt), a journal's pages
+// by chummerID (and the GM's own) and an actor's GM items; it gets our chummerID flag. Every other entry is created and
+// Foundry picks its id. Entries not in the file are never touched.
+// Updates go first, then creates in chunks; if a create fails, what this run created is deleted again (the updated
+// entries keep their new data), so a failure never leaves half a chunk behind.
+// after(docs, op): run once everything is written, while the pack is still unlocked, with the written documents' data
+// ({ _id, flags, img, prototypeToken }); then an actor pack's duplicate Unarmed items go (apply.js dedupeUnarmed).
+const OURS = ['name', 'type', 'img', 'system', 'effects', 'prototypeToken', 'items', 'pages', 'text', 'title']
+function updateData(old, doc) {
+  const k = keepArt(old, doc), u = { _id: old._id, flags: { ...old.flags, [MODULE_ID]: doc.flags?.[MODULE_ID] } }
+  for (const f of OURS) if (f in k) u[f] = k[f]
+  if (Array.isArray(doc.pages)) u.pages = mergeByKey(old.pages, k.pages)
+  if (Array.isArray(doc.items)) u.items = mergeActorItems(old.items, k.items)
+  return u
+}
 async function writePack(pack, incoming, after) {
   const Doc = pack.documentClass, op = { pack: pack.collection }
-  const { replace, create, duplicates, ...plan } = planPack(new Set(pack.index.keys()), incoming)
-  let docs = plan.docs
+  const index = await pack.getIndex({ fields: INDEX_FIELDS })
+  const { updates, creates, duplicates } = planUpsert([...index.values()], incoming)
   // V14 refuses writes to a locked pack, even a world pack the GM locked: unlock for this write and lock it again after.
   const locked = pack.locked
   if (locked) await pack.configure({ locked: false })
   try {
-    const old = replace.length ? (await pack.getDocuments({ _id__in: replace })).map(d => d.toObject()) : []
-    const [kept, merge] = { JournalEntry: ['pages', mergeJournalPages], Actor: ['items', mergeActorItems] }[pack.documentName] ?? []
-    if (old.length) {
-      const was = new Map(old.map(d => [d._id, d]))
-      docs = docs.map(d => {
-        const o = was.get(d._id)
-        if (!o) return d
-        const k = keepArt(o, d)
-        return merge ? { ...k, [kept]: merge(o[kept], k[kept] ?? []) } : k
-      })
-    }
-    if (replace.length) await Doc.deleteDocuments(replace, op)
+    const old = updates.length ? (await pack.getDocuments({ _id__in: updates.map(u => u._id) })).map(d => d.toObject()) : []
+    const was = new Map(old.map(d => [d._id, d]))
+    const ups = updates.map(u => updateData(was.get(u._id), u.doc))
+    for (let i = 0; i < ups.length; i += CHUNK) await Doc.updateDocuments(ups.slice(i, i + CHUNK), { ...op, recursive: false, diff: false })
     const made = []
     try {
-      for (let i = 0; i < docs.length; i += CHUNK) {
-        made.push(...await Doc.createDocuments(docs.slice(i, i + CHUNK), { ...op, keepId: true }))
-      }
+      for (let i = 0; i < creates.length; i += CHUNK) made.push(...await Doc.createDocuments(creates.slice(i, i + CHUNK), op))
     } catch (e) {
       try { if (made.length) await Doc.deleteDocuments(made.map(d => d.id), op) } catch {}
-      try { if (old.length) await Doc.createDocuments(old, { ...op, keepId: true }) } catch (restore) {
-        console.error(`${MODULE_ID} | ${pack.title}: restoring the replaced entries failed`, restore)
-        throw new Error(`${e?.message ?? e} (restoring the replaced entries failed)`, { cause: e })
-      }
       throw e
     }
-    await after?.(docs, op)
+    const written = [...ups.map(u => ({ ...u, img: u.img ?? was.get(u._id)?.img, prototypeToken: u.prototypeToken ?? was.get(u._id)?.prototypeToken })),
+      ...made.map((d, i) => ({ ...creates[i], _id: d.id }))]
+    await after?.(written, op)
     if (pack.documentName === 'Actor') for (const d of made) await dedupeUnarmed(d)  // Eden's Unarmed, once per actor
-    return { label: pack.title, created: create.length, replaced: replace.length, duplicates: duplicates.map(d => d.name ?? d._id) }
+    return { label: pack.title, created: creates.length, replaced: updates.length,
+      migrated: updates.filter(u => u.how === 'legacy').length, duplicates: duplicates.map(d => d.name ?? keysOf(d).chummerID) }
   } finally {
     if (locked) await pack.configure({ locked: true })
   }
+}
+
+/**
+ * A book's martial art styles keep the genesisID they already have in the world's pack (Eden ties a runner's techniques
+ * to it), and the book's techniques follow: new styles keep the random one translate.js gave them. Changes t in place.
+ */
+async function keepStyleIds(t, name) {
+  const styles = t.packs.martialarts ?? [], pack = game.packs.get(`world.${name}`)
+  if (!styles.length || !pack) return
+  const index = await pack.getIndex({ fields: [...INDEX_FIELDS, 'system.genesisID'] })
+  const remap = new Map()
+  for (const u of planUpsert([...index.values()], styles).updates) {
+    const old = index.get(u._id)?.system?.genesisID
+    if (old && old !== u.doc.system.genesisID) { remap.set(u.doc.system.genesisID, old); u.doc.system.genesisID = old }
+  }
+  for (const tech of t.packs.martialtechniques ?? []) if (remap.has(tech.system.style)) tech.system.style = remap.get(tech.system.style)
 }
 
 // effects in Foundry's shape: a pack item's own (the catalog's effects, lib/translate.js catalogEffects) and a pack actor's items'
@@ -137,6 +154,8 @@ export async function importBook(t, { onProgress, prefix = '', topFolder = t.sou
   const src = t.source, counts = {}, failed = [], made = [], notes = []
   // nothing to write: no pack and no folder
   const packs = planBookPacks(t, prefix)
+  const styles = packs.find(p => p.key === 'martialarts')
+  if (styles) { try { await keepStyleIds(t, styles.name) } catch (e) { console.error(`${MODULE_ID} | martial art styles`, e) } }
   const folder = lazyFolder(`${src.name} (${src.id})`, lazyFolder(topFolder, null, made), made)
   for (const [i, p] of packs.entries()) {
     onProgress?.({ key: p.key, n: i + 1, total: packs.length })

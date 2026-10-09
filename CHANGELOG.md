@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Identity: Foundry picks every document's id; the module no longer computes ids or keeps them. Each imported entry carries `chummerID` (`<book>:<kind>:<id>`) and `chummerAliases` (its keys from earlier Chummer imports) in the module's flags, and both are in every compendium's index.
+- Re-importing a book updates each entry in place, found by `chummerID` or an alias; new entries are added; nothing is deleted. A rules journal's pages keep their ids; a martial art style keeps its genesisID.
+- Migration: an entry imported with 0.2.x (an id computed from its key, no `chummerID`) is found by that id on the next import, updated in place and given `chummerID`. The report counts them.
+- A runner's or NPC's items link to their book compendium entries by `chummerID`, then alias, then type and name inside that one book (same kind, then same page, breaks a tie); a tie is not linked and the report lists the candidates.
+- genesisID stays empty everywhere; a martial art style gets a random one, as Eden's create button does.
+- Fitted mods and installed programs are linked to their host after Foundry has given the items their ids.
+
 Needs Chummer's export with the effects, Defense Rating bonuses and monitor bonus (`schema/sr6-export.schema.json`, Chummer's current copy). An older file still imports.
 
 - Book text effects. A book entry whose text Chummer read an effect from (a quality's +1 Agility, Defense Rating, a skill bonus) gets it as an Active Effect in its compendium, which applies when the entry is dropped on a runner. An effect the book ties to a condition comes in switched off, for the GM to switch on. A test the entry calls for, and an Edge-cost reduction, go in its description. A runner's own items carry none of these yet, so Chummer and Foundry show the same numbers until Chummer applies them too.

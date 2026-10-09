@@ -8,7 +8,7 @@ import { escapeText, translateRunner } from '../lib/translate.js'
 import { defaultChoice, newVersionName } from '../lib/plan.js'
 import { applyRunner, COMPENDIUM_FOLDER, edenSpecLabels, findExisting, isEdenUnarmed as edenUnarmed } from './apply.js'
 import { planBookPacks, translateBook } from '../lib/books.js'
-import { docId } from '../lib/ids.js'
+import { INDEX_FIELDS } from '../lib/chummer-id.js'
 import { iconFor, MODULE_ICON_ROOT } from '../lib/icons.js'
 import { importBook } from './books.js'
 import { applyIcons, loadIconIndex } from './icons.js'
@@ -53,6 +53,13 @@ const byName = (actor, name) => actor.items.find(i => i.name === name)
 const count = docs => docs.reduce((c, d) => ({ ...c, [d.type]: (c[d.type] ?? 0) + 1 }), {})
 // A made-up NPC block for the batch's critter, spirit and sprite (the shapes of the export's npc).
 const stat = (key, printed, value = printed) => ({ key, label: key.toUpperCase(), printed, value, ok: true })
+
+// an entry of a pack by our chummerID (lib/chummer-id.js): Foundry picked its _id
+async function byKey(pack, key) {
+  const index = await pack.getIndex({ fields: INDEX_FIELDS })
+  const hit = [...index.values()].find(i => i.flags?.['chummer-sr6-importer']?.chummerID === key)
+  return hit ? pack.getDocument(hit._id) : null
+}
 
 export function registerQuench(quench) {
   const batch = (name, fn) => quench.registerBatch(`${MODULE_ID}.${name.replace(/\W+/g, '-')}`, fn,
@@ -364,13 +371,13 @@ export function registerQuench(quench) {
         assert.notOk(game.folders.find(f => f.type === 'Compendium' && f.name === 'Made-Up Extras (MUX)'), 'empty book folder')
       })
       it('a weapon is gear with its Eden weapon type, flags and page', async () => {
-        const zap = await pack('weapons').getDocument(docId('MUS:weapons:mus.pocket-zapper'))
+        const zap = await byKey(pack('weapons'), 'MUS:weapons:mus.pocket-zapper')
         assert.equal(zap.type, 'gear')
         assert.match(zap.system.type, /^WEAPON/)
         assert.include(flagOf(zap), { id: 'mus.pocket-zapper', source: 'MUS', page: 10, canon: true, exportedAt: file.exportedAt })
       })
       it('a spirit is a Spirit actor with its spiritType; Eden derives its attributes', async () => {
-        const spirit = await pack('spirits').getDocument(docId('MUS:spirits:mus.spirit-of-man'))
+        const spirit = await byKey(pack('spirits'), 'MUS:spirits:mus.spirit-of-man')
         assert.equal(spirit.type, 'Spirit')
         assert.ok(spirit.system.spiritType)
         assert.isAbove(spirit.system.attributes.bod.pool, 0)
@@ -383,21 +390,21 @@ export function registerQuench(quench) {
           [[1, 'Made-up Basics'], [2, 'Made-up Detail']])
       })
       it('a program is Eden software that keeps its type and price through Eden’s data model', async () => {
-        const p = await pack('programs').getDocument(docId('MUS:programs:mus.made-up-sniffer'))
+        const p = await byKey(pack('programs'), 'MUS:programs:mus.made-up-sniffer')
         assert.equal(p.type, 'software')
-        assert.include(p.system, { type: 'HACKING', price: 250, availDef: '4(I)', page: 11 })
+        assert.include(p.system, { type: 'HACKING', price: 250, availDef: '4(I)', page: 10 })
       })
       it('a martial art style and its signature technique: Eden types, category flags, the technique tied to the style', async () => {
-        const style = await pack('martialarts').getDocument(docId('MUS:martialarts:mus.made-up-fist'))
-        const tech = await pack('martialtechniques').getDocument(docId('MUS:martialtechniques:mus.made-up-sweep'))
+        const style = await byKey(pack('martialarts'), 'MUS:martialarts:mus.made-up-fist')
+        const tech = await byKey(pack('martialtechniques'), 'MUS:martialtechniques:mus.made-up-sweep')
         assert.equal(style.type, 'martialartstyle')
         assert.include(style.system.category, { striking: true, grappling: true, weapon: false })
         assert.equal(tech.type, 'martialarttech')
         assert.equal(tech.system.style, style.system.genesisID)
       })
       it('a style and technique dropped on an actor show together (Eden links them by genesisID)', async () => {
-        const style = await pack('martialarts').getDocument(docId('MUS:martialarts:mus.made-up-fist'))
-        const tech = await pack('martialtechniques').getDocument(docId('MUS:martialtechniques:mus.made-up-sweep'))
+        const style = await byKey(pack('martialarts'), 'MUS:martialarts:mus.made-up-fist')
+        const tech = await byKey(pack('martialtechniques'), 'MUS:martialtechniques:mus.made-up-sweep')
         const a = await Actor.create({ name: 'Quench martial artist', type: 'Player' })
         try {
           await a.createEmbeddedDocuments('Item', [style.toObject(), tech.toObject()])
@@ -406,23 +413,26 @@ export function registerQuench(quench) {
         } finally { await a.delete() }
       })
       it('a tradition is a journal with its page', async () => {
-        const j = await pack('traditions').getDocument(docId('MUS:traditions:mus.made-up-path'))
+        const j = await byKey(pack('traditions'), 'MUS:traditions:mus.made-up-path')
         assert.equal(j.name, 'Made-up Path')
         assert.lengthOf(j.pages.contents, 1)
         assert.include(j.pages.contents[0].text.content, 'invented tradition')
       })
-      it('re-import replaces by id, keeps a user image, a GM entry and a GM page, and locks a locked pack again', async () => {
-        const weapons = pack('weapons'), id = docId('MUS:weapons:mus.pocket-zapper')
+      it('re-import updates in place by chummerID (same _id, nothing new), keeps a user image, a GM entry and a GM page, and locks a locked pack again', async () => {
+        const weapons = pack('weapons'), before = await byKey(weapons, 'MUS:weapons:mus.pocket-zapper'), id = before.id, size = weapons.index.size
         await Item.updateDocuments([{ _id: id, img: 'user/art.webp' }], { pack: weapons.collection })
         const gm = await Item.create({ name: 'GM-made weapon', type: 'gear', system: { type: 'WEAPON_FIREARMS' } }, { pack: weapons.collection })
         const [j] = await pack('rules').getDocuments()
         const gmPage = (await j.createEmbeddedDocuments('JournalEntryPage', [{ name: 'GM page', type: 'text', text: { content: '<p>mine</p>' } }]))[0]
+        const ourPage = j.pages.contents.find(p => p.flags?.['chummer-sr6-importer']?.chummerID)
         await weapons.configure({ locked: true })
         const changed = structuredClone(mus)
         changed.entries.find(e => e.id === 'mus.pocket-zapper').name = 'Pocket Zapper II'
         const again = await run(changed)
         assert.isEmpty(again.failed, again.failed.map(f => f.error?.message).join('; '))
         assert.equal(again.counts[`${PREFIX}sr6-mus-weapons`].replaced, plan.find(p => p.key === 'weapons').docs.length)
+        assert.equal(again.counts[`${PREFIX}sr6-mus-weapons`].created, 0)
+        assert.equal(weapons.index.size, size + 1, 'only the GM entry is new')
         const zap = await weapons.getDocument(id)
         assert.equal(zap.name, 'Pocket Zapper II')
         assert.equal(zap.img, 'user/art.webp')
@@ -430,7 +440,23 @@ export function registerQuench(quench) {
         assert.isTrue(weapons.locked, 'locked again')
         const j2 = await pack('rules').getDocument(j.id)
         assert.equal(j2.pages.get(gmPage.id)?.text.content, '<p>mine</p>', 'GM page kept')
+        assert.ok(j2.pages.get(ourPage.id), 'an imported page keeps its _id')
         await weapons.configure({ locked: false })
+      })
+      it('migration: an entry 0.2.x wrote under its computed id, without chummerID, is updated in place and gets chummerID', async () => {
+        const { legacyId } = await import('../lib/chummer-id.js')
+        const weapons = pack('weapons'), key = 'MUS:weapons:mus.odd-blade', old = await byKey(weapons, key)
+        if (old) await Item.deleteDocuments([old.id], { pack: weapons.collection })
+        const data = old.toObject()
+        delete data.flags['chummer-sr6-importer'].chummerID
+        data._id = legacyId(key)
+        await Item.createDocuments([data], { pack: weapons.collection, keepId: true })
+        const again = await run(structuredClone(mus))
+        assert.isEmpty(again.failed, again.failed.map(f => f.error?.message).join('; '))
+        assert.isAtLeast(again.counts[`${PREFIX}sr6-mus-weapons`].migrated, 1)
+        const doc = await weapons.getDocument(legacyId(key))
+        assert.equal(doc.flags['chummer-sr6-importer'].chummerID, key)
+        assert.lengthOf((await weapons.getIndex({ fields: INDEX_FIELDS })).filter(i => i.flags?.['chummer-sr6-importer']?.chummerID === key), 1)
       })
     })
   })
@@ -476,7 +502,7 @@ export function registerQuench(quench) {
         }
       })
       it('its NPC is in the NPCs pack, flagged compendium, with its token uploaded', async () => {
-        const tough = await pack('npcs').getDocument(docId('STREET:npc:street-npc-1'))
+        const tough = await byKey(pack('npcs'), 'STREET:npc:street-npc-1')
         assert.ok(tough, 'NPC')
         assert.equal(tough.type, 'NPC')
         assert.include(flagOf(tough), { source: 'STREET', canon: false, compendium: true })
@@ -484,7 +510,7 @@ export function registerQuench(quench) {
         assert.include(tough.prototypeToken, { actorLink: false, disposition: HOSTILE() })
       })
       it('a compendium NPC is never offered for Replace by a runners file', async () => {
-        const data = (await pack('npcs').getDocument(docId('STREET:npc:street-npc-1'))).toObject()
+        const data = (await byKey(pack('npcs'), 'STREET:npc:street-npc-1')).toObject()
         delete data._id
         const copy = await Actor.create(data)
         try { assert.isNull(findExisting('street-npc-1')) } finally { await copy.delete() }

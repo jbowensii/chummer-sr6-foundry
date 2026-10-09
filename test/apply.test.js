@@ -18,6 +18,7 @@ class FakeActor {
     if (failCreateItems) throw new Error('items failed')
     const made = arr.map(i => ({ ...i, id: `i${++n}` })); this.items.push(...made); return made
   }
+  async updateEmbeddedDocuments(_, ups) { log.push(['updateItems', ups]); for (const u of ups) Object.assign(this.items.find(i => i.id === u._id) ?? {}, u) }
   async deleteEmbeddedDocuments(_, ids) {
     log.push(['deleteItems', ids])
     if (this.failDelete && ids.some(id => this.items.find(i => i.id === id)?.old)) throw new Error('delete failed')
@@ -147,21 +148,32 @@ test('create: a duplicate Unarmed that landed during the import is removed', asy
   expect(res.actor.items.map(i => i.name)).toEqual(['Unarmed', 'Made-up Booster'])
 })
 
-test('create: a fitted mod points at its host on the new actor; a catalog item links its world compendium entry when there', async () => {
-  let r = 0
-  globalThis.foundry = { utils: { randomID: () => `rid${++r}` } }
-  const ref = 'Compendium.world.sr6-mus-weapons.Item.'
-  const { docId } = await import('../scripts/lib/ids.js')
-  const zapId = docId('MUS:weapons:mus.pocket-zapper')
-  game.packs = { get: id => (id === 'world.sr6-mus-weapons' ? { index: new Map([[zapId, {}]]) } : undefined) }
-  const gun = { name: 'Zapper', type: 'gear', flags: flags({ id: 'w1', catalogId: 'mus.pocket-zapper', kind: 'weapons', source: 'MUS' }), system: {} }
-  const sight = { name: 'Sight', type: 'mod', flags: flags({ id: 'w1a', host: 'w1', catalogId: 'mus.made-up-sight', kind: 'gear', source: 'MUS' }), system: {} }
+test('create: items get Foundry’s ids, then a fitted mod is pointed at its host’s; a catalog item links its entry by chummerID', async () => {
+  const M = MODULE_ID, entry = (id, name, key, extra = {}) => ({ _id: id, uuid: `Compendium.world.sr6-mus-weapons.Item.${id}`, type: 'gear', name,
+    flags: { [M]: { chummerID: key, chummerAliases: [], kind: 'weapons', page: 10 } }, ...extra })
+  const index = new Map([['F7', entry('F7', 'Zapper', 'MUS:weapons:mus.pocket-zapper')]])
+  game.packs = { filter: f => [{ documentName: 'Item', collection: 'world.sr6-mus-weapons', getIndex: async () => index, getUuid: id => id }].filter(f) }
+  const gun = { name: 'Zapper', type: 'gear', flags: flags({ id: 'w1', catalogId: 'mus.pocket-zapper', chummerID: 'MUS:weapons:mus.pocket-zapper', kind: 'weapons', source: 'MUS' }), system: {} }
+  const sight = { name: 'Sight', type: 'mod', flags: flags({ id: 'w1a', host: 'w1', catalogId: 'mus.made-up-sight', chummerID: 'MUS:gear:mus.made-up-sight', kind: 'gear', source: 'MUS' }), system: {} }
   const t = player(); t.items = [gun, sight]
   const res = await applyRunner(t, 'create')
   expect(res.action).toBe('create')
-  const items = log.find(([k]) => k === 'items')[1]
-  expect(items[0]).toMatchObject({ _id: 'rid1', _stats: { compendiumSource: ref + zapId } })
-  expect(items[1].system.embeddedInUuid).toBe(`Actor.${res.actor.id}.Item.rid1`)
-  expect(items[1]).not.toHaveProperty('_stats')  // its pack isn't in the world
-  delete globalThis.foundry
+  const [, items] = log.find(([k]) => k === 'items')
+  for (const i of items) expect(i).not.toHaveProperty('_id')  // Foundry picks the ids
+  expect(items[0]._stats).toEqual({ compendiumSource: 'Compendium.world.sr6-mus-weapons.Item.F7' })
+  expect(items[1]).not.toHaveProperty('_stats')  // nothing in the book's packs for it: no link
+  const [, fits] = log.find(([k]) => k === 'updateItems')
+  const made = res.actor.items
+  expect(fits).toEqual([{ _id: made.find(i => i.name === 'Sight').id, 'system.embeddedInUuid': `Actor.${res.actor.id}.Item.${made.find(i => i.name === 'Zapper').id}` }])
+})
+
+test('create: two book entries tie for a runner’s item: no link, the report lists them', async () => {
+  const M = MODULE_ID, e = (id, page) => [id, { _id: id, uuid: `U-${id}`, type: 'gear', name: 'Rope', flags: { [M]: { kind: 'gear', page } } }]
+  const index = new Map([e('A', 12), e('B', 12)])
+  game.packs = { filter: f => [{ documentName: 'Item', collection: 'world.sr6-mus-gear', getIndex: async () => index }].filter(f) }
+  const rope = { name: 'Rope', type: 'gear', flags: flags({ id: 'g1', catalogId: 'mus.rope', chummerID: 'MUS:gear:mus.rope', kind: 'gear', page: 10, source: 'MUS' }), system: {} }
+  const t = player(); t.items = [rope]
+  const res = await applyRunner(t, 'create')
+  expect(res.notes).toEqual(['Rope: 2 compendium entries match (Rope [gear] p.12, Rope [gear] p.12) → not linked'])
+  expect(log.find(([k]) => k === 'items')[1][0]).not.toHaveProperty('_stats')
 })

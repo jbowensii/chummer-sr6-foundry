@@ -63,7 +63,17 @@ In the Compendium sidebar, click **Import from Chummer**, choose the book-data f
 
 ### Importing a book again
 
-A re-import replaces the entries that came from the file by id, so links to them keep working. Entries you made yourself, pages you added to a rules journal, items you added to a pack actor and images you picked are kept. Entries missing from the file are never deleted. A locked compendium is unlocked for the write and locked again after.
+Foundry gives every document its own id; the module never sets one. Each entry it imports carries Chummer's key for it in the module's flags: `chummerID` (`<book>:<kind>:<id>`, for example `MUS:weapons:mus.pocket-zapper`) and `chummerAliases` (the keys it had in earlier Chummer imports, when Chummer renamed or re-filed it). Both are in every compendium's index.
+
+A re-import finds each entry by its `chummerID`, then by an alias, and updates it in place: it keeps its id, so links to it keep working. Anything new is added. Nothing is ever deleted: entries missing from the file, entries you made yourself, pages you added to a rules journal and items you added to a pack actor stay, and so do images you picked, the entry's folder and its ownership. A rules journal's imported pages keep their ids too. A martial art style keeps the genesisID it already has, so techniques on runners stay tied to it. A locked compendium is unlocked for the write and locked again after.
+
+**Worlds that imported books with 0.2.x or earlier.** Those versions gave each entry an id computed from its key. A re-import with this version finds such an entry by that id, updates it in place and writes `chummerID` onto it, so nothing is duplicated and links keep working. The import report counts them as migrated. After that, the entry is found by `chummerID`.
+
+### A runner's items and the book compendiums
+
+When a runner or NPC is imported, each of its items from a book is linked to its entry in that book's compendiums in this world (Foundry's compendium source, shown on the item): by `chummerID`, then by an alias, then by the same item type and name inside that one book's compendiums. Several entries with that name: the one of the same kind, then the one on the same page. Still more than one: no link, and the import report lists them. The module never matches by name across all compendiums.
+
+`genesisID` (shadowrun6-eden's own key for its translations and its Import Data) stays empty, except on martial art styles, which get a random one as Eden's own "create" button gives them, so Eden can tie techniques to their style.
 
 ## GM compendiums
 

@@ -302,6 +302,12 @@
        "value": "0,1,1,0,0"
       }
      ],
+     "aliases": [
+      {
+       "id": "mus.old-sight",
+       "kind": "weapons"
+      }
+     ],
      "id": "mus.made-up-sight",
      "kind": "gear",
      "name": "Made-up Sight",
@@ -326,6 +332,11 @@
      }
     },
     {
+     "aliases": [
+      {
+       "id": "mus.glitter-line"
+      }
+     ],
      "id": "mus.rope",
      "kind": "gear",
      "name": "Glitter Rope",

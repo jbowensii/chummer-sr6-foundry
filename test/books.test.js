@@ -2,7 +2,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, test } from 'vitest'
 import { PACKS, accessoryHostKind, planBookPacks, translateBook } from '../scripts/lib/books.js'
-import { docId } from '../scripts/lib/ids.js'
 
 const M = 'chummer-sr6-importer'
 const load = f => JSON.parse(readFileSync(`samples/${f}`, 'utf8'))
@@ -23,11 +22,19 @@ describe('a book', () => {
     expect(plan[0]).toMatchObject({ name: 'sr6-mus-qualities', label: 'Qualities — MUS', type: 'Item' })
     expect(planBookPacks(t, 'sr6test-')[0].name).toBe('sr6test-sr6-mus-qualities')
   })
-  test('_ids stable across two runs and unique', () => {
-    const ids = all(t).map(d => d._id)
-    expect(all(translateBook(mus, OPTS)).map(d => d._id)).toEqual(ids)
-    expect(new Set(ids).size).toBe(ids.length)
-    expect(byName(t, 'Pocket Zapper')._id).toBe(docId('MUS:weapons:mus.pocket-zapper'))
+  test('no _id anywhere (Foundry picks it); every entry, page and actor carries a unique chummerID <source>:<kind>:<id>', () => {
+    const docs = all(t), cid = d => d.flags[M].chummerID
+    for (const d of docs) expect(d, d.name).not.toHaveProperty('_id')
+    for (const p of t.packs.rules.flatMap(j => j.pages)) expect(p).not.toHaveProperty('_id')
+    expect(new Set(docs.map(cid)).size).toBe(docs.length)
+    expect(cid(byName(t, 'Pocket Zapper'))).toBe('MUS:weapons:mus.pocket-zapper')
+    expect(t.packs.rules[0].pages.map(cid)).toEqual(['MUS:rules:mus.rule-intro', 'MUS:rules:mus.rule-detail'])
+    expect(all(translateBook(mus, OPTS)).map(cid)).toEqual(docs.map(cid))  // the same keys every run
+  })
+  test('an entry’s earlier ids as chummerAliases (the kind it was filed as when another)', () => {
+    expect(byName(t, 'Glitter Rope').flags[M]).toMatchObject({ chummerID: 'MUS:gear:mus.rope', chummerAliases: ['MUS:gear:mus.glitter-line'] })
+    expect(byName(t, 'Made-up Sight').flags[M].chummerAliases).toEqual(['MUS:weapons:mus.old-sight'])
+    expect(byName(t, 'Pocket Zapper').flags[M].chummerAliases).toEqual([])
   })
   test('flags: entry id, export, source, page, canon; icon kept', () => {
     expect(byName(t, 'Pocket Zapper').flags[M]).toMatchObject({ id: 'mus.pocket-zapper', exportedAt: OPTS.exportedAt, appVersion: '0.9.0',
@@ -55,7 +62,7 @@ describe('a book', () => {
   test('a rules journal per chapter, pages in file order with their levels', () => {
     const j = t.packs.rules
     expect(j).toHaveLength(1)
-    expect(j[0]).toMatchObject({ _id: docId('MUS:rules-chapter:Made-up Rules'), name: 'Made-up Rules' })
+    expect(j[0]).toMatchObject({ name: 'Made-up Rules', flags: { [M]: { chummerID: 'MUS:rules-chapter:Made-up Rules' } } })
     expect(j[0].pages.map(p => [p.name, p.title.level, p.sort])).toEqual([['Made-up Basics', 1, 100000], ['Made-up Detail', 2, 200000]])
     expect(j[0].pages[0]).toMatchObject({ type: 'text', text: { content: '<p>Invented rules text.</p>', format: 1 }, flags: { [M]: { id: 'mus.rule-intro' } } })
   })
@@ -73,7 +80,7 @@ describe('a book', () => {
   })
   test('a spirit entry -> Spirit actor with spiritType; a critter has its powers with the book’s fields', () => {
     const spirit = byName(t, 'Spirit of Man')
-    expect(spirit).toMatchObject({ _id: docId('MUS:spirits:mus.spirit-of-man'), type: 'Spirit', system: { rating: 1, spiritType: expect.any(String) },
+    expect(spirit).toMatchObject({ flags: { [M]: { chummerID: 'MUS:spirits:mus.spirit-of-man' } }, type: 'Spirit', system: { rating: 1, spiritType: expect.any(String) },
       prototypeToken: { actorLink: false, disposition: -1 } })
     expect(spirit.flags[M]).toMatchObject({ id: 'mus.spirit-of-man', source: 'MUS', npc: { kind: 'spirit' } })
     const hound = byName(t, 'Fake Hound')
@@ -85,7 +92,7 @@ describe('a book', () => {
   })
   test('a program -> Eden software: its type, rating, price; no product (Eden checks it against its own book list)', () => {
     const p = byName(t, 'Made-up Sniffer')
-    expect(p).toMatchObject({ _id: docId('MUS:programs:mus.made-up-sniffer'), type: 'software',
+    expect(p).toMatchObject({ flags: { [M]: { chummerID: 'MUS:programs:mus.made-up-sniffer' } }, type: 'software',
       system: { type: 'HACKING', price: 250, availDef: '4(I)', page: 10, rating: 0 } })
     expect(p.system).not.toHaveProperty('product')
     expect(p.flags[M]).toMatchObject({ id: 'mus.made-up-sniffer', source: 'MUS', icon: { key: 'software' } })
@@ -95,8 +102,12 @@ describe('a book', () => {
   })
   test('a martial art style and its signature technique: Eden category flags, the technique tied to the style', () => {
     const style = byName(t, 'Made-up Fist'), tech = byName(t, 'Made-up Sweep')
-    expect(style).toMatchObject({ _id: docId('MUS:martialarts:mus.made-up-fist'), type: 'martialartstyle',
-      system: { genesisID: 'mus.made-up-fist', category: { striking: true, grappling: true, mobility: false, ranged: false, weapon: false } } })
+    // a random genesisID, as Eden's own create button gives a new style (never our key)
+    expect(style).toMatchObject({ flags: { [M]: { chummerID: 'MUS:martialarts:mus.made-up-fist' } }, type: 'martialartstyle',
+      system: { category: { striking: true, grappling: true, mobility: false, ranged: false, weapon: false } } })
+    expect(style.system.genesisID).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
+    expect(translateBook(mus, OPTS).packs.martialarts[0].system.genesisID).not.toBe(style.system.genesisID)
+    expect(translateBook(mus, { ...OPTS, newGenesisId: () => 'g-1' }).packs.martialtechniques[0].system.style).toBe('g-1')
     expect(style.system.description).toContain('Signature technique: Made-up Sweep')
     expect(tech).toMatchObject({ type: 'martialarttech', system: { style: style.system.genesisID, choice: '' } })
     expect(tech.system.description).toContain('Category: Striking')
@@ -105,7 +116,7 @@ describe('a book', () => {
   })
   test('a tradition -> a journal with one page (Eden has no tradition item)', () => {
     const [j] = t.packs.traditions
-    expect(j).toMatchObject({ _id: docId('MUS:traditions:mus.made-up-path'), name: 'Made-up Path', flags: { [M]: { id: 'mus.made-up-path', page: 10 } } })
+    expect(j).toMatchObject({ name: 'Made-up Path', flags: { [M]: { id: 'mus.made-up-path', page: 10, chummerID: 'MUS:traditions:mus.made-up-path' } } })
     expect(j.pages).toHaveLength(1)
     expect(j.pages[0]).toMatchObject({ name: 'Made-up Path', type: 'text', text: { content: '<p>An invented tradition.</p>', format: 1 } })
     expect(planBookPacks(t).find(p => p.key === 'traditions')).toMatchObject({ type: 'JournalEntry', label: 'Traditions — MUS' })
@@ -135,9 +146,9 @@ describe('a GM compendium', () => {
   })
   test('its NPCs go to their kind’s pack, with portrait and token collected', () => {
     const tough = c.packs.npcs.find(d => d.name === 'Street Tough')
-    expect(tough).toMatchObject({ _id: docId('STREET:npc:street-npc-1'), type: 'NPC' })
-    expect(tough.flags[M]).toMatchObject({ id: 'street-npc-1', source: 'STREET', compendium: true, npc: { kind: 'grunt' } })
-    expect(c.tokens).toEqual({ [tough._id]: street.npcs[0].token })
+    expect(tough).toMatchObject({ type: 'NPC' })
+    expect(tough.flags[M]).toMatchObject({ id: 'street-npc-1', chummerID: 'STREET:npc:street-npc-1', source: 'STREET', compendium: true, npc: { kind: 'grunt' } })
+    expect(c.tokens).toEqual({ 'STREET:npc:street-npc-1': street.npcs[0].token })
     expect(c.portraits).toEqual({})
   })
 })
@@ -155,7 +166,7 @@ describe('what Eden takes from the book text', () => {
   test('a weapon accessory -> Eden mod in its kind’s pack, its item:ar effect on the host (not transferred)', () => {
     const sight = byName(t, 'Made-up Sight')
     expect(t.packs.gear).toContain(sight)
-    expect(sight).toMatchObject({ _id: docId('MUS:gear:mus.made-up-sight'), type: 'mod', system: { type: 'accessory_weapon', price: 200, availDef: '2' } })
+    expect(sight).toMatchObject({ flags: { [M]: { chummerID: 'MUS:gear:mus.made-up-sight' } }, type: 'mod', system: { type: 'accessory_weapon', price: 200, availDef: '2' } })
     expect(sight.effects).toEqual([{ name: 'Made-up Sight', transfer: false, disabled: false,
       changes: [{ key: 'system.attackRating.1', value: '1', mode: 2 }, { key: 'system.attackRating.2', value: '1', mode: 2 }] }])
   })

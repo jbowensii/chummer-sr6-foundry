@@ -1,7 +1,6 @@
 // Pure import decisions: what to do with a runner already in the world, and what Replace may overwrite.
 import { MODULE_ID } from './constants.js'
 import { replaceable } from './icons.js'
-import { docId } from './ids.js'
 
 const time = x => Date.parse(x?.exportedAt ?? '') || 0
 
@@ -58,58 +57,21 @@ export function keepArt(old, doc) {
   return d
 }
 
-// Re-import by id: incoming entries already in the pack are replaced (deleted, then created with the same id), the
-// rest are created. Pack entries not in the file are never touched. An id the file has twice keeps its last entry
-// (`docs` is what to write); the dropped earlier ones are listed in `duplicates` for the report.
-export function planPack(existingIds, incoming) {
-  const byId = new Map(), duplicates = []
-  for (const d of incoming) {
-    if (byId.has(d._id)) duplicates.push(byId.get(d._id))
-    byId.set(d._id, d)
-  }
-  const docs = [...byId.values()], replace = [], create = []
-  for (const { _id } of docs) (existingIds.has(_id) ? replace : create).push(_id)
-  return { replace, create, docs, duplicates }
-}
-
-// Replacing a journal: its pages are rebuilt from the file; only the old pages without this module's flag (the GM's
-// own) are kept, after the imported ones. A stale or renamed imported page does not linger.
-export const mergeJournalPages = (existingPages, incomingPages) =>
-  [...incomingPages, ...(existingPages ?? []).filter(p => !p.flags?.[MODULE_ID])]
-
 // Replacing a pack actor (a book pregen): its Chummer items are rebuilt from the file; the items the GM added
 // (no module flags) are kept, after the imported ones.
 export const mergeActorItems = (existingItems, incomingItems) =>
   [...incomingItems, ...(existingItems ?? []).filter(i => !i.flags?.[MODULE_ID])]
 
 /**
- * Fitted items on one actor: each item whose flags.host names another item's uid (flags.id) gets that host's document id
- * in system.embeddedInUuid (Eden's mod and software link: Actor.<id>.Item.<id>), and each host a fresh _id (newId) so the
- * link holds when they are created together with keepId. A host that isn't among the items: no link (the item stays
- * loose, as if unfitted). Returns new item data; the inputs are untouched.
+ * Fitting items to their hosts once Foundry has given them ids: each created item whose flags.host names another
+ * created item's uid (flags.id) gets that host in system.embeddedInUuid (Eden's mod and software link,
+ * Actor.<id>.Item.<id>). created: the actor's items as created ({ id, flags }). Returns the updates
+ * ([{ _id, 'system.embeddedInUuid' }]); a host that isn't on the actor: no update (the item stays loose).
  */
-export function fitItems(items, actorId, newId) {
-  const out = items.map(i => structuredClone(i)), byUid = new Map()
-  const hosts = new Set(out.map(i => i.flags?.[MODULE_ID]?.host).filter(Boolean))
-  for (const i of out) {
-    const uid = i.flags?.[MODULE_ID]?.id
-    if (uid != null && hosts.has(uid) && !byUid.has(uid)) { i._id ??= newId(); byUid.set(uid, i._id) }
-  }
-  for (const i of out) {
+export function fitUpdates(created, actorId) {
+  const byUid = new Map(created.filter(i => i.flags?.[MODULE_ID]?.id != null).map(i => [i.flags[MODULE_ID].id, i.id ?? i._id]))
+  return created.flatMap(i => {
     const host = byUid.get(i.flags?.[MODULE_ID]?.host)
-    if (host) i.system.embeddedInUuid = `Actor.${actorId}.Item.${host}`
-  }
-  return out
-}
-
-/**
- * Where a runner's item came from in this module's world compendiums (lib/books.js: pack sr6-<source>-<kind>, document
- * docId(<source>:<kind>:<catalog id>)): { pack: the world pack's collection id, id, uuid }, or null for a custom item.
- * The caller links it (_stats.compendiumSource) only when that pack holds the document.
- */
-export function compendiumRef(item, prefix = '') {
-  const f = item.flags?.[MODULE_ID] ?? {}
-  if (!f.catalogId || !f.source || !f.kind) return null
-  const name = `${prefix}sr6-${f.source}-${f.kind}`.toLowerCase().replace(/[^a-z0-9_-]/g, '-'), id = docId(`${f.source}:${f.kind}:${f.catalogId}`)
-  return { pack: `world.${name}`, id, uuid: `Compendium.world.${name}.Item.${id}` }
+    return host ? [{ _id: i.id ?? i._id, 'system.embeddedInUuid': `Actor.${actorId}.Item.${host}` }] : []
+  })
 }
