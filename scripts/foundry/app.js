@@ -158,7 +158,9 @@ export function createImportApp(getIcons = () => null) {
       const bookName = id => { const b = jobs.find(j => j.book.source.id === id)?.book.source; return b ? `${b.name} (${b.id})` : id }
       const report = [
         ...Object.values(res.counts).map(c => ({ name: c.label, outcome: F('SR6I.TypeResult', c),
-          packs: Object.entries(c.books).map(([id, n]) => ({ text: F('SR6I.BookCount', { book: bookName(id), ...n }) })),
+          // per book, then each entry whose type changed and that moved here from its old pack
+          packs: [...Object.entries(c.books).map(([id, n]) => ({ text: F('SR6I.BookCount', { book: bookName(id), ...n }) })),
+            ...c.moves.map(m => ({ text: F(m.deleted ? 'SR6I.Moved' : 'SR6I.MovedKept', m) }))],
           textOnly: c.duplicates.map(d => F('SR6I.Duplicate', { label: c.label, name: d })) })),
         ...res.failed.map(f => ({ name: f.name, failed: true, outcome: F('SR6I.Failed', { reason: f.error?.message ?? String(f.error) }), packs: [], textOnly: [] })),
         // a book that couldn't be translated has no tick; listed as failed

@@ -410,6 +410,8 @@ export function registerQuench(quench) {
         }
         assert.includeMembers(pack('weapons').folders.map(f => f.name), ['Pocket Tasers', 'Glitter cannons'])
         assert.includeMembers(pack('martialarts').folders.map(f => f.name), ['Styles', 'Striking techniques'])
+        assert.deepEqual(pack('spirits').folders.map(f => f.name), ['Man'])  // by Eden spirit type
+        assert.deepEqual(pack('critters').folders.map(f => f.name), ['Made-up beasts'])  // the section it is printed under
       })
       it('a book of only kinds Eden has no document for: its journals in the shared Reference pack', async () => {
         const names = (await pack('reference').getDocuments()).filter(j => flagOf(j).source === 'MUX').map(j => j.name)
@@ -494,6 +496,38 @@ export function registerQuench(quench) {
         const muxAfter = (await pack('reference').getDocuments()).filter(d => flagOf(d).source === 'MUX').map(d => [d.id, d.name, d._stats.modifiedTime])
         assert.deepEqual(muxAfter, muxBefore, 'the book not in the file is left alone')
         await weapons.configure({ locked: false })
+      })
+      it('a re-filed entry moves to its new category’s folder on re-import, even out of a folder the GM put it in', async () => {
+        const weapons = pack('weapons'), zap = await byKey(weapons, 'MUS:weapons:mus.pocket-zapper')
+        const [gmFolder] = await Folder.createDocuments([{ name: 'GM favourites', type: 'Item' }], { pack: weapons.collection })
+        await Item.updateDocuments([{ _id: zap.id, folder: gmFolder.id }], { pack: weapons.collection })
+        const changed = structuredClone(mus)
+        changed.entries.find(e => e.id === 'mus.pocket-zapper').attrs.category = 'holdouts'
+        const again = await run([changed])
+        assert.isEmpty(again.failed, again.failed.map(f => f.error?.message).join('; '))
+        const after = await weapons.getDocument(zap.id)
+        assert.equal(folderName(weapons, after), 'Holdouts')
+        assert.equal(flagOf(after).category, 'Holdouts')
+      })
+      it('an entry whose type changed moves: created in its type pack, a world item’s link re-pointed, our old copy deleted, listed in the report', async () => {
+        // the spoiler as an earlier version filed it: in Gear, a world actor's item linked to that copy
+        const mods = pack('mods'), gear = pack('gear'), key = 'MUS:gear:mus.made-up-spoiler'
+        const now = await byKey(mods, key), data = now.toObject()
+        await Item.deleteDocuments([now.id], { pack: mods.collection })
+        delete data._id
+        const [oldCopy] = await Item.createDocuments([data], { pack: gear.collection })
+        const a = await Actor.create({ name: 'Quench linked runner', type: 'Player' })
+        try {
+          const [it] = await a.createEmbeddedDocuments('Item', [{ name: 'Made-up Spoiler', type: 'gear', _stats: { compendiumSource: oldCopy.uuid } }])
+          const again = await run([structuredClone(mus)])
+          assert.isEmpty(again.failed, again.failed.map(f => f.error?.message).join('; '))
+          const moved = await byKey(mods, key)
+          assert.ok(moved, 'created in Mods & accessories')
+          assert.equal(folderName(mods, moved), 'Vehicle mods')
+          assert.notOk(await byKey(gear, key), 'old copy deleted')
+          assert.equal(a.items.get(it.id)._stats.compendiumSource, moved.uuid)
+          assert.deepInclude(again.counts[mods.collection].moves, { name: 'Made-up Spoiler', from: gear.title, links: 1, deleted: true })
+        } finally { await a.delete() }
       })
       it('0.3’s per-book pack is never touched: its entry, its size and its lock as they were', async () => {
         assert.ok(game.packs.get(old.collection), 'still there')

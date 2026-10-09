@@ -1,7 +1,7 @@
 // SR6 books -> pack documents per topic (scripts/lib/books.js) on the made-up samples.
 import { readFileSync } from 'node:fs'
 import { describe, expect, test } from 'vitest'
-import { TYPES, accessoryHostKind, bookCounts, categoryOf, chunks, keepStyleIds, planTypePacks, typeKey, typeOfPack, typePackName, translateBook } from '../scripts/lib/books.js'
+import { TYPES, accessoryHostKind, bookCounts, relinkUpdates, categoryOf, chunks, keepStyleIds, planTypePacks, typeKey, typeOfPack, typePackName, translateBook } from '../scripts/lib/books.js'
 
 const M = 'chummer-sr6-importer'
 const load = f => JSON.parse(readFileSync(`samples/${f}`, 'utf8'))
@@ -256,12 +256,29 @@ describe('by type: packs, folders, report counts', () => {
     expect(categoryOf(e('armor', { category: 'armor' }), gear('ARMOR', 'ARMOR_HELMET'), 'armor', 'Core')).toBe('Helmet armor')
     expect(categoryOf(e('augmentations', { category: 'general' }), gear('CYBERWARE', 'CYBER_EYEWARE'), 'cyberware', 'Core')).toBe('Eyeware')
     expect(categoryOf(e('weapons', { category: 'misc' }), gear('WEAPON_FIREARMS', 'PISTOLS_HEAVY'), 'weapons', 'Core')).toBe('Heavy pistols')
-    expect(categoryOf(e('critters', { category: 'critter' }), { type: 'Critter', system: {} }, 'critters', 'Core')).toBe('Core')
+    expect(categoryOf(e('critters', { category: 'critter' }), { type: 'Critter', system: {} }, 'critters', 'Core')).toBe('Mundane critters')
     expect(categoryOf(e('npcs', { rating: '4' }), { type: 'NPC', system: {} }, 'npcs', 'Core')).toBe('Professional rating 4')
     expect(categoryOf(e('qualities', { category: 'qualities' }), { type: 'quality', system: { category: 'DISADVANTAGE' } }, 'qualities', 'Core')).toBe('Negative')
     expect(categoryOf(e('metamagics', {}), { type: 'metamagic', system: {} }, 'metamagics', 'Core')).toBe('All initiates')
     expect(categoryOf(e('martialtechniques', {}), { type: 'martialarttech', system: {} }, 'martialarts', 'Core')).toBe('Techniques')
     expect(categoryOf(e('gear', { category: 'heavy pistols' }), gear('WEAPON_FIREARMS', 'PISTOLS_HEAVY'), 'weapons', 'Core')).toBe('Heavy pistols')
+  })
+  test('a spirit: always by its Eden spirit type; one Eden doesn’t know by its category, then its book', () => {
+    const spirit = (name, attrs = {}) => categoryOf({ kind: 'spirits', name, attrs }, { type: 'Spirit', system: {} }, 'spirits', 'Core')
+    expect(spirit('Spirit of Man', { category: 'Hermetic spirits' })).toBe('Man')
+    expect(spirit('Fire Spirit')).toBe('Fire')
+    expect(spirit('Beast Spirit')).toBe('Beasts')
+    expect(categoryOf({ kind: 'spirits', name: 'X', npc: { from: { name: 'Guardian Spirit' } } }, { type: 'Spirit', system: {} }, 'spirits', 'Core')).toBe('Guardian')
+    expect(spirit('Glitter Thing', { category: 'Toxic spirits' })).toBe('Toxic spirits')
+    expect(spirit('Glitter Thing', { category: 'spirit' })).toBe('Core')
+  })
+  test('a critter: its printed section when it has one, else Awakened or Mundane by its Magic', () => {
+    const critter = (attrs, mag) => categoryOf({ kind: 'critters', attrs }, { type: 'Critter', system: { attributes: mag == null ? {} : { mag: { base: mag } } } }, 'critters', 'Core')
+    expect(critter({ category: 'Paracritters' })).toBe('Paracritters')
+    expect(critter({ category: 'critter' }, 4)).toBe('Awakened critters')
+    expect(critter({ mag: '3' })).toBe('Awakened critters')
+    expect(critter({ mag: '—' }, 0)).toBe('Mundane critters')
+    expect(critter({})).toBe('Mundane critters')
   })
   test('a critter power the book files as a sprite’s: an Eden sprite power in its own pack', () => {
     const power = { ...mus.entries.find(e => e.kind === 'critterpowers'), attrs: { category: 'Sprite powers' } }
@@ -291,9 +308,17 @@ describe('by type: packs, folders, report counts', () => {
   })
   test('report counts per book', () => {
     const d = src => ({ flags: { [M]: { source: src } } })
-    expect(bookCounts([{ doc: d('CRB') }, { doc: d('FS') }], [d('CRB'), d('CRB')]))
-      .toEqual({ CRB: { created: 2, replaced: 1 }, FS: { created: 0, replaced: 1 } })
+    expect(bookCounts([{ doc: d('CRB') }, { doc: d('FS') }], [d('CRB'), d('CRB')], [{ doc: d('FS') }]))
+      .toEqual({ CRB: { created: 2, replaced: 1, moved: 0 }, FS: { created: 0, replaced: 1, moved: 1 } })
     expect(bookCounts()).toEqual({})
+  })
+  test('relinkUpdates: every document pointing at a moved entry, to its new UUID; nothing else', () => {
+    const moved = new Map([['Compendium.world.chummer-sr6-gear.Item.G1', 'Compendium.world.chummer-sr6-mods.Item.M1']])
+    const docs = [{ id: 'a', _stats: { compendiumSource: 'Compendium.world.chummer-sr6-gear.Item.G1' } },
+      { _id: 'b', _stats: { compendiumSource: 'Compendium.world.chummer-sr6-gear.Item.G2' } }, { id: 'c' }]
+    expect(relinkUpdates(docs, moved)).toEqual([{ from: 'Compendium.world.chummer-sr6-gear.Item.G1',
+      update: { _id: 'a', '_stats.compendiumSource': 'Compendium.world.chummer-sr6-mods.Item.M1' } }])
+    expect(relinkUpdates(undefined, moved)).toEqual([])
   })
   test('chunks: pieces of n, the last shorter, none for nothing', () => {
     expect(chunks([1, 2, 3, 4, 5], 2)).toEqual([[1, 2], [3, 4], [5]])

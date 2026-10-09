@@ -23,6 +23,7 @@ class FakePack {
     packs.set(this.collection, this)
   }
   async getIndex() { return this.docs }
+  getUuid(id) { return `Compendium.${this.collection}.${this.documentName}.${id}` }
   get documentClass() { return Doc }
   async configure({ locked }) { log.push(['lock', this.collection, locked]); this.locked = locked }
   async setFolder(f) { this.folder = f }
@@ -64,7 +65,7 @@ beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => {})
   globalThis.game = {
     packs: { get: id => packs.get(id), filter: f => all().filter(f), some: f => all().some(f) },
-    folders, i18n: { format: (k, d) => `${k} ${JSON.stringify(d)}`, localize: k => k }, release: { generation: 14 },
+    folders, actors: [], items: [], i18n: { format: (k, d) => `${k} ${JSON.stringify(d)}`, localize: k => k }, release: { generation: 14 },
   }
   globalThis.Folder = {
     // the Compendium sidebar's folders
@@ -108,7 +109,7 @@ test('one pack per type in the Compendium folder "Chummer SR6", every entry in i
     const pack = got(p.name)
     expect(pack.docs.size, p.name).toBe(p.docs.length)
     expect([pack.title, pack.folder.name, pack.folder.folder]).toEqual([p.label, 'Chummer SR6', null])
-    expect(res.counts[pack.collection]).toMatchObject({ label: p.label, created: p.docs.length, replaced: 0, books: { MUS: { created: p.docs.length, replaced: 0 } } })
+    expect(res.counts[pack.collection]).toMatchObject({ label: p.label, created: p.docs.length, replaced: 0, books: { MUS: { created: p.docs.length, replaced: 0, moved: 0 } } })
     for (const d of pack.docs.values()) expect(pack.folderOf(d), d.name).toBe(d.flags[MODULE_ID].category)
   }
   expect(got('chummer-sr6-weapons').folders.map(f => [f.name, f.type, f.sorting])).toEqual([['Pocket Tasers', 'Item', 'a'], ['Glitter cannons', 'Item', 'a']])
@@ -122,7 +123,7 @@ test('two books merge into one pack per type, the category folders shared; the r
   expect([...weapons.docs.values()].map(cid)).toEqual(['MUS:weapons:mus.pocket-zapper', 'MUS:weapons:mus.glitter-cannon',
     'MUZ:weapons:mus.pocket-zapper', 'MUZ:weapons:mus.glitter-cannon'])
   expect(weapons.folders.map(f => f.name)).toEqual(['Pocket Tasers', 'Glitter cannons'])
-  expect(res.counts['world.chummer-sr6-weapons'].books).toEqual({ MUS: { created: 2, replaced: 0 }, MUZ: { created: 2, replaced: 0 } })
+  expect(res.counts['world.chummer-sr6-weapons'].books).toEqual({ MUS: { created: 2, replaced: 0, moved: 0 }, MUZ: { created: 2, replaced: 0, moved: 0 } })
   expect(packs.has('world.sr6-mus-weapons')).toBe(false)
 })
 
@@ -156,7 +157,7 @@ test('re-import of one book: its entries updated in place (same _id, user image,
   log = []
   const res = await importBooks([tr(changed)])
   expect(res.failed).toEqual([])
-  expect(res.counts['world.chummer-sr6-weapons']).toMatchObject({ created: 0, replaced: 2, books: { MUS: { created: 0, replaced: 2 } } })
+  expect(res.counts['world.chummer-sr6-weapons']).toMatchObject({ created: 0, replaced: 2, books: { MUS: { created: 0, replaced: 2, moved: 0 } } })
   expect(weapons.docs.size).toBe(5)  // two books' two entries each, and the GM's
   expect(weapons.docs.get(zap._id)).toMatchObject({ name: 'Pocket Zapper II', img: 'user/art.webp' })
   expect(weapons.byKey('MUZ:weapons:mus.pocket-zapper')).toEqual(other)
@@ -167,14 +168,49 @@ test('re-import of one book: its entries updated in place (same _id, user image,
   expect(rules.docs.get(j._id).pages.map(p => p.name)).toEqual(['Made-up Basics', 'Made-up Detail', 'GM page'])
 })
 
-test('an entry already in another type pack is updated where it is, never copied into its new one', async () => {
+test('a re-filed entry goes to its category’s folder on re-import, even out of one the GM put it in', async () => {
+  await importBooks([tr(mus)])
+  const weapons = got('chummer-sr6-weapons'), zap = weapons.byKey('MUS:weapons:mus.pocket-zapper')
+  weapons.folders.push({ id: 'gmf', name: 'GM favourites', folder: null })
+  zap.folder = 'gmf'
+  const changed = structuredClone(mus)
+  changed.entries.find(e => e.id === 'mus.pocket-zapper').attrs.category = 'holdouts'
+  await importBooks([tr(changed)])
+  expect(weapons.folderOf(weapons.docs.get(zap._id))).toBe('Holdouts')
+  expect(weapons.folderOf(weapons.byKey('MUS:weapons:mus.glitter-cannon'))).toBe('Glitter cannons')
+})
+
+test('an entry whose type changed moves: created in its type pack, links re-pointed, our old copy deleted, the report lists it', async () => {
   const gear = new FakePack('chummer-sr6-gear', 'Gear', 'Item')
-  gear.docs.set('G1', { _id: 'G1', name: 'Made-up Spoiler', folder: 'mine', flags: { [MODULE_ID]: { chummerID: 'MUS:gear:mus.made-up-spoiler', chummerAliases: [] } } })
+  gear.docs.set('G1', { _id: 'G1', name: 'Made-up Spoiler', img: 'user/spoiler.webp', ownership: { default: 2 }, folder: 'mine',
+    effects: [{ _id: 'u1', name: 'GM tweak', flags: {} }], flags: { [MODULE_ID]: { chummerID: 'MUS:gear:mus.made-up-spoiler', chummerAliases: [] } } })
+  gear.locked = true
+  const ups = [], old = 'Compendium.world.chummer-sr6-gear.Item.G1'
+  const item = (id, src) => ({ id, _stats: { compendiumSource: src } })
+  const runner = { name: 'Mara', _stats: {}, items: [item('i1', old), item('i2', 'Compendium.world.chummer-sr6-gear.Item.X')],
+    updateEmbeddedDocuments: async (_, u) => ups.push(['items', ...u]), update: async u => ups.push(['actor', u]) }
+  game.actors = [runner, { name: 'Copied NPC', _stats: { compendiumSource: old }, items: [], update: async u => ups.push(['npc', u]) }]
   const res = await importBooks([tr(mus)])
-  expect(res.counts['world.chummer-sr6-gear']).toMatchObject({ replaced: 1, created: 1, books: { MUS: { replaced: 1, created: 1 } } })  // the spoiler, and the rope new
-  expect(gear.docs.get('G1')).toMatchObject({ folder: 'mine', flags: { [MODULE_ID]: { category: 'Vehicle mods' } } })
-  expect(got('chummer-sr6-mods').byKey('MUS:gear:mus.made-up-spoiler')).toBeUndefined()
-  expect(got('chummer-sr6-mods').docs.size).toBe(1)  // the sight only
+  expect(res.failed).toEqual([])
+  const mods = got('chummer-sr6-mods'), spoiler = mods.byKey('MUS:gear:mus.made-up-spoiler')
+  expect(spoiler).toMatchObject({ name: 'Made-up Spoiler', type: 'gear', img: 'user/spoiler.webp', ownership: { default: 2 } })
+  expect(spoiler.effects.map(e => e.name)).toEqual(['GM tweak'])
+  expect(mods.folderOf(spoiler)).toBe('Vehicle mods')
+  const now = `Compendium.world.chummer-sr6-mods.Item.${spoiler._id}`
+  expect(ups).toEqual([['items', { _id: 'i1', '_stats.compendiumSource': now }], ['npc', { _id: undefined, '_stats.compendiumSource': now }]])
+  expect(gear.docs.has('G1')).toBe(false)
+  expect(gear.locked).toBe(true)
+  expect(res.counts['world.chummer-sr6-mods']).toMatchObject({ created: 1, moved: 1, books: { MUS: { created: 1, replaced: 0, moved: 1 } },
+    moves: [{ name: 'Made-up Spoiler', from: 'Gear', links: 2, deleted: true }] })
+})
+
+test('a moved entry that isn’t ours (no chummerID: found by its 0.2.x id) is copied and re-linked, the old one kept', async () => {
+  const { legacyId } = await import('../scripts/lib/chummer-id.js')
+  const gear = new FakePack('chummer-sr6-gear', 'Gear', 'Item'), _id = legacyId('MUS:gear:mus.made-up-spoiler')
+  gear.docs.set(_id, { _id, name: 'Spoiler', flags: { [MODULE_ID]: { id: 'mus.made-up-spoiler' } } })
+  const res = await importBooks([tr(mus)])
+  expect(gear.docs.has(_id)).toBe(true)
+  expect(res.counts['world.chummer-sr6-mods'].moves).toEqual([{ name: 'Made-up Spoiler', from: 'Gear', links: 0, deleted: false }])
 })
 
 test('a renamed entry: found by its alias and updated in place, never a second copy', async () => {

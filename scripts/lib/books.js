@@ -3,7 +3,7 @@
 import { MODULE_ID } from './constants.js'
 import { chummerFlags, chummerKey } from './chummer-id.js'
 import { LINE_KINDS, matchThing, npcThings, overrideStats, thingTie } from './npc-lines.js'
-import { lifestyleKey, modType, normKey } from './eden.js'
+import { lifestyleKey, modType, normKey, spiritKey } from './eden.js'
 import { itemIconKey, withIcon } from './icons.js'
 import {
   base, beingActor, critterPowerFields, escapeText, lineItem, martialArtItem, modItem, pickItem, programItem, qualityItem, techniqueItem,
@@ -107,13 +107,15 @@ const subtypeLabel = st => {
   else if (w.length === 2 && ['armor', 'pistols', 'rifle'].includes(w[0])) w = [w[1], w[0]]
   return sentence(w.join(' '))
 }
+const SPIRIT_LABEL = { kin: 'Man' }  // Eden's key for spirits of man
 const ACTIVATION = { major_action: 'Major action', minor_action: 'Minor action', passive: 'Passive' }
 /**
  * The folder an entry goes in inside its type pack: Chummer's category (the table or section it is printed in), never
  * "Other" or "General". A technique: "<category> techniques"; a style: "Styles". Without a usable category, by the
  * entry's own data: a quality positive or negative, a program its type, a ritual its first keyword, an adept power its
  * activation, a complex form its duration, a metamagic who takes it, a critter power mana or physical, a lifestyle its
- * Eden level, a contact its archetype, an NPC its group or Professional Rating, an item its Eden subtype; rules and
+ * Eden level, a contact its archetype, an NPC its group or Professional Rating, a critter Awakened or Mundane by its
+ * Magic, an item its Eden subtype; a spirit always by its Eden spirit type (Air, Man, …); rules and
  * reference journals, and whatever has none of these: its book's name.
  * e: the book entry ({ kind, attrs, npc? }), doc: its translated document, key: its type pack, book: the source's name.
  */
@@ -121,6 +123,9 @@ export function categoryOf(e, doc, key, book) {
   const a = e?.attrs ?? {}, s = doc?.system ?? {}, own = sentence(a.category)
   if (doc?.type === 'martialarttech') return own ? `${own} techniques` : 'Techniques'
   if (doc?.type === 'martialartstyle') return 'Styles'
+  // a spirit by its Eden spirit type, whatever its category (one Eden doesn't know: by category, then book)
+  const spirit = key === 'spirits' && spiritKey(e?.npc?.from?.name ?? e?.name)
+  if (spirit) return SPIRIT_LABEL[spirit] ?? sentence(spirit)
   const usable = own && !GENERIC.test(own) && ![e?.kind, TYPES[key]?.[0], key].some(x => x && stem(x) === stem(own))
   if (usable && key !== 'rules' && key !== 'reference') return own.slice(0, 255)
   const rating = a.rating ?? e?.npc?.rating
@@ -135,18 +140,30 @@ export function categoryOf(e, doc, key, book) {
     lifestyles: () => sentence(s.type),
     contacts: () => sentence(a.archetype),
     npcs: () => sentence(a.group ?? e?.npc?.group) || (rating != null && rating !== '' ? `Professional rating ${rating}` : ''),
+    // printed with Magic: awakened
+    critters: () => (Number(s.attributes?.mag?.base) > 0 || /^s*[1-9]/.test(String(a.mag ?? '')) ? 'Awakened critters' : 'Mundane critters'),
   }[key]
   const item = doc?.type === 'gear' || doc?.type === 'mod' ? subtypeLabel(s.subtype) || subtypeLabel(s.type) : ''
   return (derived?.() || item || sentence(book)).slice(0, 255)
 }
 
-/** Per book: how many of a pack's documents were created and replaced (flags.source). */
-export function bookCounts(updates = [], creates = []) {
-  const out = {}, src = d => d?.flags?.[MODULE_ID]?.source ?? '?'
-  for (const u of updates) (out[src(u.doc)] ??= { created: 0, replaced: 0 }).replaced++
-  for (const d of creates) (out[src(d)] ??= { created: 0, replaced: 0 }).created++
+/** Per book: how many of a pack's documents were created, replaced in place and moved in from another type pack (flags.source). */
+export function bookCounts(updates = [], creates = [], moves = []) {
+  const out = {}, src = d => d?.flags?.[MODULE_ID]?.source ?? '?', row = d => (out[src(d)] ??= { created: 0, replaced: 0, moved: 0 })
+  for (const u of updates) row(u.doc).replaced++
+  for (const d of creates) row(d).created++
+  for (const m of moves) row(m.doc).moved++
   return out
 }
+
+/**
+ * Links to moved entries: every document (an actor, an actor's item, a world item) whose _stats.compendiumSource is a
+ * key of moved (old UUID -> new UUID). Returns [{ from, update: { _id, '_stats.compendiumSource' } }].
+ */
+export const relinkUpdates = (docs, moved) => [...docs ?? []].flatMap(d => {
+  const from = d?._stats?.compendiumSource, to = from && moved.get(from)
+  return to ? [{ from, update: { _id: d.id ?? d._id, '_stats.compendiumSource': to } }] : []
+})
 /** list in pieces of n (the last one shorter): one Foundry call per piece. */
 export const chunks = (list, n) => Array.from({ length: Math.ceil(list.length / n) }, (_, i) => list.slice(i * n, (i + 1) * n))
 
@@ -321,7 +338,7 @@ export function translateBook(book, { exportedAt, appVersion, descriptions = fal
       if (!r.npc) { textOnly.push(`${name}: not an NPC → not imported`); continue }
       const t = translateNpc(r, { exportedAt: r.exportedAt ?? exportedAt, appVersion, sanitize, icons: iconSet })
       const key = chummerKey(src.id, 'npc', r.id)
-      add({ kind: 'npcs', attrs: {}, npc: r.npc }, { ...t.actor, flags: { [MODULE_ID]: { ...t.actor.flags[MODULE_ID], chummerID: key, chummerAliases: [], source: src.id, canon: src.canon, ...comp } },
+      add({ kind: 'npcs', name, attrs: {}, npc: r.npc }, { ...t.actor, flags: { [MODULE_ID]: { ...t.actor.flags[MODULE_ID], chummerID: key, chummerAliases: [], source: src.id, canon: src.canon, ...comp } },
         items: t.items })
       if (PORTRAIT.test(r.portrait ?? '')) portraits[key] = r.portrait
       if (PORTRAIT.test(r.token ?? '')) tokens[key] = r.token
