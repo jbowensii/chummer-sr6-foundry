@@ -1,5 +1,6 @@
 // Entry point: the import window is built at init; GMs get an "Import from Chummer" button in the Actors and Compendium sidebars.
 import { createImportApp } from './foundry/app.js'
+import { guardEdenItemHooks } from './foundry/eden-guard.js'
 import { addIndexFields, registerEffectTargets } from './foundry/apply.js'
 import { createIconsApp, loadIconIndex } from './foundry/icons.js'
 import { MODULE_ID } from './lib/constants.js'
@@ -34,6 +35,7 @@ function addButton(root, tab) {
 }
 
 Hooks.once('init', () => {
+  guardEdenItemHooks()  // Eden's item update hooks need an actor; a compendium entry has none (eden-guard.js)
   addIndexFields()  // chummerID and its aliases in every compendium's index (lib/chummer-id.js)
   iconsLoaded = loadIconIndex().then(i => { icons = i })
   ImportApp = createImportApp(() => icons)
@@ -46,4 +48,6 @@ Hooks.on('renderCompendiumDirectory', (app, html) => addButton(html, 'compendium
 Hooks.on('changeSidebarTab', app => { if (app.tabName === 'actors' || app.tabName === 'compendium') addButton(null, app.tabName) })
 // after Eden's own ready, which rebuilds CONFIG.SR6 (the system's hooks are registered before a module's)
 Hooks.once('ready', () => { registerEffectTargets(); addButton(null, 'actors'); addButton(null, 'compendium') })
+// again at setup, in case the system set its Item class after our init (guardEdenItemHooks runs once)
+Hooks.once('setup', () => guardEdenItemHooks())
 Hooks.on('quenchReady', quench => registerQuench(quench))
