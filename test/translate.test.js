@@ -232,3 +232,16 @@ test('the ledger: karma now, karma_total earned in play, the full ledger in our 
   expect(actor.flags['chummer-sr6-importer'].ledger).toEqual(r.ledger)
   expect(run().actor.system.karma_total).toBe(0)  // the sample's ledger has no earnings
 })
+
+test('a runner’s vehicle is also an Eden Vehicle actor: its stats, Eden’s piloting vtype, its mods as its items, tied to the runner', () => {
+  const r = mara()
+  r.purchases.find(p => p.kind === 'vehicles').accessories = [{ uid: 'v1a', kind: 'gear', name: 'Made-up Spoiler', canon: true, attrs: { category: 'Vehicle mods', slots: '2' }, parts: [], values: { cost: 300 }, qty: 1, bonuses: [], accessories: [] }]
+  const t = run(r)
+  expect(t.vehicles).toHaveLength(1)
+  const [v] = t.vehicles
+  expect(v.actor).toMatchObject({ name: 'Test Bike', type: 'Vehicle', system: { handlOn: 4, handlOff: 3, accOn: 10, accOff: 15, tspd: 120, bod: 5, arm: 4,
+    pil: 1, sen: 1, sea: 1, vtype: 'ground_craft', vehicle: { opMode: 'manual' } }, flags: { 'chummer-sr6-importer': { id: 'v1', runner: 'run-mara-1' } } })
+  expect(v.items.map(i => i.name)).toEqual(['Made-up Spoiler'])
+  expect(v.items[0].system.description).toMatch(/Fitted to Test Bike\./)
+  expect(byName(t, 'Test Bike').type).toBe('gear')  // and the runner keeps it as Eden's vehicle item
+})

@@ -7,13 +7,13 @@ import { lifestyleKey, modType, normKey } from './eden.js'
 import { itemIconKey, withIcon } from './icons.js'
 import {
   base, beingActor, critterPowerFields, escapeText, lineItem, martialArtItem, modItem, pickItem, programItem, qualityItem, techniqueItem,
-  translateNpc, weaknessLine,
+  translateNpc, vehicleActor, weaknessLine,
 } from './translate.js'
 
 // pack key -> [label, document type], in write order
 export const PACKS = { qualities: ['Qualities', 'Item'], weapons: ['Weapons', 'Item'], armor: ['Armor', 'Item'],
   augmentations: ['Augmentations', 'Item'], electronics: ['Electronics', 'Item'], programs: ['Programs', 'Item'], gear: ['Gear', 'Item'],
-  vehicles: ['Vehicles & drones', 'Item'], spells: ['Spells', 'Item'], rituals: ['Rituals', 'Item'], adeptpowers: ['Adept powers', 'Item'],
+  vehicles: ['Vehicles & drones', 'Item'], vehicleactors: ['Vehicles & drones (actors)', 'Actor'], spells: ['Spells', 'Item'], rituals: ['Rituals', 'Item'], adeptpowers: ['Adept powers', 'Item'],
   complexforms: ['Complex forms', 'Item'], metamagics: ['Metamagics', 'Item'], echoes: ['Echoes', 'Item'],
   martialarts: ['Martial arts', 'Item'], martialtechniques: ['Martial art techniques', 'Item'],
   critterpowers: ['Critter powers', 'Item'], lifestyles: ['Lifestyles', 'Item'], contacts: ['Contacts', 'Item'],
@@ -136,7 +136,14 @@ export function translateBook(book, { exportedAt, appVersion, descriptions = fal
   for (const raw of entries) {
     const kind = raw.kind, e = { ...raw, description: text(raw) }
     try {
-      if (LINES.includes(kind)) add(kind, itemDoc(e))
+      if (LINES.includes(kind)) {
+        add(kind, itemDoc(e))
+        // a vehicle or drone is also a Vehicle actor, in the book's actor compendium (its chummerID's kind: vehicleactors)
+        if (kind === 'vehicles') {
+          const v = vehicleActor({ ...e, qty: 1 }, ctx)
+          add('vehicleactors', { ...v.actor, flags: { [MODULE_ID]: { ...v.actor.flags[MODULE_ID], ...bookFlags(e, 'vehicleactors') } }, items: [] })
+        }
+      }
       else if (PICKS.includes(kind)) add(kind, own(kind, e, pickItem({ ...e, pick: kind, bonuses: undefined }, ctx)))
       else if (kind === 'programs') add(kind, own(kind, e, programItem(e, ctx)))
       else if (kind === 'martialarts') {

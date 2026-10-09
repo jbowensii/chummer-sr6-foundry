@@ -214,6 +214,34 @@ async function replaceDoc(doc, actor, items, token) {
 }
 
 /**
+ * A runner's vehicles and drones as Eden Vehicle actors (translate.js vehicleActor) linked to it (system.vehicle.belongs:
+ * the owner's actor id), in "<runner> vehicles" inside its folder: the world copy of each (flags runner + id, the
+ * purchase's uid) replaced in place as a runner is (its mods and weapons by uid, a user's effects and items kept), a
+ * missing one created. A vehicle the GM made is never touched. Never throws: a failure is a report line.
+ */
+export async function applyVehicles(t, owner, root) {
+  const runnerId = flagOf(t.actor).id, notes = []
+  let vf = null
+  const vFolder = async () => (vf ??= await ensureFolder(`${owner.name} vehicles`, root ?? null))
+  for (const v of t.vehicles ?? []) {
+    try {
+      const uid = flagOf(v.actor).id, actor = structuredClone(v.actor), items = v.items.map(itemData)
+      actor.system.vehicle = { ...actor.system.vehicle, belongs: owner.id }
+      const existing = game.actors.find(a => a.type === 'Vehicle' && flagOf(a)?.runner === runnerId && flagOf(a)?.id === uid)
+      if (existing) await replaceDoc(existing, actor, items, null)
+      else {
+        const made = await Actor.create({ ...actor, folder: (await vFolder())?.id ?? null, prototypeToken: { actorLink: true, ...actor.img ? { texture: { src: actor.img } } : {} } })
+        await createItems(made, items)
+      }
+    } catch (e) {
+      console.error(`${MODULE_ID} | ${v.actor.name}`, e)
+      notes.push(`${v.actor.name}: vehicle actor not written (${e?.message ?? e})`)
+    }
+  }
+  return notes
+}
+
+/**
  * choice: 'create' | 'new' | 'replace' | 'skip'. portrait / token: image data URLs (the actor's img, its prototype token's
  * image; without a token the token shows the img). folder: the root Actors folder, by name or a Folder (the Quench tests
  * pass their own); by default FOLDER for a runner, NPC_FOLDER for an NPC. Items go in after the actor (Eden's
@@ -238,6 +266,7 @@ export async function applyRunner(t, choice, { portrait, token, exportedAt, fold
       if (!doc) throw new Error(`${t.actor.name}: nothing to replace`)
       await replaceDoc(doc, actor, items, tokenImg)
       await dedupeUnarmed(doc)
+      notes.push(...await applyVehicles(t, doc, doc.folder ?? null))
       return { actor: doc, action: 'replace', notes }
     }
 
@@ -249,6 +278,7 @@ export async function applyRunner(t, choice, { portrait, token, exportedAt, fold
       prototypeToken: { ...actor.prototypeToken, ...src ? { texture: { src } } : {} } })
     await createItems(created, items)
     await dedupeUnarmed(created)
+    if (choice === 'create') notes.push(...await applyVehicles(t, created, root))
     return { actor: created, action: choice === 'new' ? 'new' : 'create', notes }
   } catch (error) {
     // A replaced actor cleans up its own new items (replaceDoc); ponytail: its update already applied stays, and

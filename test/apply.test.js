@@ -199,3 +199,22 @@ test('replace: our item kept in place (same id, play state and other flags kept)
   expect(item.effects.map(e => e.name)).toEqual(['GM buff', 'Booster II'])
   expect(log.filter(([k]) => k === 'deleteItems')).toEqual([])  // nothing of ours dropped, nothing re-created
 })
+
+test('create: a runner’s vehicle becomes a Vehicle actor that belongs to it, in "<runner> vehicles"; replace updates it in place', async () => {
+  const folders = []
+  globalThis.Folder = { create: async d => { const f = { id: `f${folders.length + 1}`, ...d }; folders.push(f); return f } }
+  game.folders = folders
+  const t = player()
+  t.vehicles = [{ actor: { name: 'Bike', type: 'Vehicle', flags: flags({ id: 'v1', runner: 'r1' }), system: { bod: 5, vehicle: { opMode: 'manual' } } },
+    items: [{ name: 'Spoiler', type: 'gear', flags: flags({ id: 'v1a' }), system: {} }] }]
+  const res = await applyRunner(t, 'create')
+  const bike = world.find(a => a.type === 'Vehicle')
+  expect(bike.system.vehicle).toEqual({ opMode: 'manual', belongs: res.actor.id })
+  expect(bike.items.map(i => i.name)).toEqual(['Spoiler'])
+  expect(folders.find(f => f.id === bike.folder).name).toBe('Mara vehicles')
+  t.vehicles[0].actor.system.bod = 6
+  const again = await applyRunner(t, 'replace')
+  expect(again.action).toBe('replace')
+  expect(world.filter(a => a.type === 'Vehicle')).toHaveLength(1)  // the same actor, updated
+  expect(log.filter(([k, u]) => k === 'update' && u.system?.bod === 6)).toHaveLength(1)
+})

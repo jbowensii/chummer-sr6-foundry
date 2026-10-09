@@ -199,3 +199,11 @@ describe('what Eden takes from the book text', () => {
     expect(accessoryHostKind({ attrs: { category: 'Vehicle mods' } }, kindOf)).toBe(null)
   })
 })
+
+test('a book’s vehicles and drones are also Vehicle actors in their own compendium', () => {
+  const t = translateBook(mus, OPTS)
+  const [drone] = t.packs.vehicleactors
+  expect(drone).toMatchObject({ name: 'Test Drone', type: 'Vehicle', items: [], system: { vtype: 'aircraft', tspd: 60, bod: 2 },
+    flags: { [M]: { chummerID: 'MUS:vehicleactors:mus.test-drone', source: 'MUS', page: 10 } } })
+  expect(planBookPacks(t).find(p => p.key === 'vehicleactors')).toMatchObject({ type: 'Actor', label: 'Vehicles & drones (actors) — MUS' })
+})

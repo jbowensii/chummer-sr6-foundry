@@ -254,6 +254,25 @@ export function techniqueItem(x, ctx, style = '') {
 }
 
 // Everything a runner file holds as items, for runners and NPCs alike (an NPC's build is usually blank).
+// Eden's Vehicle actor vtype: its piloting specialization keys (actor.js maps the gear item's GROUND/WATER/AIR to them)
+const ACTOR_VTYPE = { GROUND: 'ground_craft', WATER: 'watercraft', AIR: 'aircraft' }
+/**
+ * A vehicle or drone (a book entry or a runner's purchase) as Eden's Vehicle actor: its handling, acceleration, speed
+ * interval, top speed, body, armor, pilot, sensor and seats; on a runner its mods and mounted weapons (the purchase's
+ * accessories) as its own items. vehicle.belongs (the owner's actor id) is set by foundry/apply.js once the runner exists.
+ */
+export function vehicleActor(p, ctx) {
+  const g = lineItem({ ...p, accessories: [], bonuses: undefined }, ctx), s = g.system
+  const items = (p.accessories ?? []).map(a => { const d = lineItem({ ...a, accessories: [] }, { ...ctx, host: p }); d.system.description += ctx.sanitize(`Fitted to ${p.name}.`); return d })
+  const actor = { name: p.name, type: 'Vehicle', img: g.img,
+    flags: { [MODULE_ID]: { ...g.flags[MODULE_ID] } },
+    system: { handlOn: s.handlOn, handlOff: s.handlOff, accOn: s.accOn, accOff: s.accOff, spdiOn: s.spdiOn, spdiOff: s.spdiOff,
+      tspd: s.tspd, bod: s.bod, arm: s.arm, pil: s.pil, sen: s.sen, sea: s.sea, vtype: ACTOR_VTYPE[s.vtype] ?? 'ground_craft',
+      vehicle: { opMode: 'manual' }, description: s.description, notes: '' } }
+  if (!actor.img) delete actor.img
+  return { actor, items }
+}
+
 function runnerItems(r, ctx) {
   const { sanitize } = ctx, items = []
   const flag = id => ({ [MODULE_ID]: { id, exportedAt: ctx.exportedAt, appVersion: ctx.appVersion } })
@@ -360,7 +379,13 @@ export function translateRunner(r, opts) {
   actor.system.attributes.res.submersion = num(m.submersion)
   // the boxes beyond Eden's own formula (Built Tough's): Eden's stored monitor modifiers
   if (d?.monitorBonus) { actor.system.physical = { mod: num(d.monitorBonus.physical) }; actor.system.stun = { mod: num(d.monitorBonus.stun) } }
-  return { actor, items, textOnly: lines.map(t => `${name}: ${t}`) }
+  // its vehicles and drones also as Vehicle actors (Eden's tokens), linked to it by foundry/apply.js
+  const vehicles = (r.purchases ?? []).filter(p => p.kind === 'vehicles').map(p => {
+    const v = vehicleActor(p, ctx)
+    v.actor.flags[MODULE_ID].runner = r.id
+    return v
+  })
+  return { actor, items, vehicles, textOnly: lines.map(t => `${name}: ${t}`) }
 }
 
 // NPCs (Chummer's src/sr6/engine/npc.ts): kind -> [Eden actor type, headline label, rating label].
