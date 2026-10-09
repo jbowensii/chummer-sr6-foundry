@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.1
+
+- Quench: the migration check uses an entry the sample book has (Glitter Cannon), and says so if the sample lacks it.
+
 ## 0.3.0
 
 Needs Chummer 0.11.0's export (`schema/sr6-export.schema.json` is its copy); older files still import. Includes 0.2.0, which was never released on its own. Import your books again so the compendiums get the new kinds and flags, then Replace your runners.
