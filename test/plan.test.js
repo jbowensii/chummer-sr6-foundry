@@ -113,6 +113,16 @@ describe('merging a pack actor', () => {
     expect(r.create.map(i => i.flags[MODULE_ID].id)).toEqual(['w9', 'q1'])  // another type is a new item
     expect(r.remove).toEqual(['B', 'C'])
   })
+  test('planItems: a martial art style keeps the genesisID it has on the actor, and our techniques follow it', () => {
+    const f = uid => ({ [MODULE_ID]: { id: uid } })
+    const r = planItems([{ id: 'S', type: 'martialartstyle', flags: f('m1'), system: { genesisID: 'oldgen' } }],
+      [{ type: 'martialartstyle', flags: f('m1'), system: { genesisID: 'newgen' } },
+        { type: 'martialarttech', flags: f('m1t1'), system: { style: 'newgen' } },
+        { type: 'martialartstyle', flags: f('m2'), system: { genesisID: 'other' } },
+        { type: 'martialarttech', flags: f('m2t1'), system: { style: 'other' } }])
+    expect(r.update[0].item.system.genesisID).toBe('oldgen')
+    expect(r.create.map(i => i.system.style ?? i.system.genesisID)).toEqual(['oldgen', 'other', 'other'])
+  })
 })
 
 describe('re-import never overwrites art the user chose', () => {

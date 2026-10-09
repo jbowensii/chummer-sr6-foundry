@@ -103,6 +103,16 @@ export function planItems(existing, incoming) {
   const id = i => i.id ?? i._id
   const old = new Map((existing ?? []).filter(i => i.flags?.[MODULE_ID]?.id != null).map(i => [i.flags[MODULE_ID].id, i])), used = new Set()
   const update = [], create = []
+  // a martial art style keeps the genesisID it has on the actor, and our techniques follow it (Eden ties them by it), so a
+  // technique the user added to that style stays tied to it
+  const remap = new Map()
+  for (const it of incoming ?? []) {
+    const o = old.get(it.flags?.[MODULE_ID]?.id), g = o?.system?.genesisID
+    if (it.type === 'martialartstyle' && o?.type === it.type && g && g !== it.system?.genesisID) remap.set(it.system.genesisID, g)
+  }
+  if (remap.size) incoming = incoming.map(it =>
+    it.type === 'martialartstyle' && remap.has(it.system?.genesisID) ? { ...it, system: { ...it.system, genesisID: remap.get(it.system.genesisID) } }
+    : it.type === 'martialarttech' && remap.has(it.system?.style) ? { ...it, system: { ...it.system, style: remap.get(it.system.style) } } : it)
   for (const it of incoming ?? []) {
     const o = old.get(it.flags?.[MODULE_ID]?.id)
     if (o && o.type === it.type && !used.has(id(o))) { used.add(id(o)); update.push({ old: o, item: it }) } else create.push(it)

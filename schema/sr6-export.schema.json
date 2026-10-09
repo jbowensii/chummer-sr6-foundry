@@ -492,6 +492,38 @@
         }
       }
     },
+    "martialArt": {
+      "description": "A martial arts style on a runner, with the techniques learned under it (its signature one included).",
+      "$ref": "#/$defs/item",
+      "unevaluatedProperties": false,
+      "required": [
+        "uid",
+        "techniques"
+      ],
+      "properties": {
+        "uid": {
+          "type": "string"
+        },
+        "techniques": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/technique"
+          }
+        }
+      }
+    },
+    "technique": {
+      "$ref": "#/$defs/item",
+      "unevaluatedProperties": false,
+      "required": [
+        "uid"
+      ],
+      "properties": {
+        "uid": {
+          "type": "string"
+        }
+      }
+    },
     "quality": {
       "$ref": "#/$defs/item",
       "unevaluatedProperties": false,
@@ -808,6 +840,10 @@
           "type": "string"
         },
         "realName": {
+          "type": "string"
+        },
+        "gender": {
+          "description": "Optional, as the player wrote it.",
           "type": "string"
         },
         "finalized": {
@@ -1144,6 +1180,13 @@
             "$ref": "#/$defs/pick"
           }
         },
+        "martialArts": {
+          "description": "Absent in files written before martial arts were added.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/martialArt"
+          }
+        },
         "purchases": {
           "type": "array",
           "items": {
@@ -1221,7 +1264,8 @@
             "cost": {
               "type": "number"
             }
-          }
+          },
+          "description": "Deprecated (kept for the module's older versions): the first lifestyle of the first SIN that has one, as sins[].lifestyles has it without its uid; null when no SIN has one."
         },
         "sins": {
           "type": "array",
@@ -1231,7 +1275,8 @@
               "uid",
               "name",
               "kind",
-              "licences"
+              "licences",
+              "lifestyles"
             ],
             "properties": {
               "uid": {
@@ -1249,6 +1294,10 @@
               "rating": {
                 "type": "number"
               },
+              "gender": {
+                "description": "The identity's own gender, optional.",
+                "type": "string"
+              },
               "licences": {
                 "type": "array",
                 "items": {
@@ -1262,6 +1311,38 @@
                       "type": "string"
                     },
                     "rating": {
+                      "type": "number"
+                    }
+                  }
+                }
+              },
+              "lifestyles": {
+                "description": "The lifestyles paid under this SIN (a lifestyle always belongs to a SIN; a SIN may have none).",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "uid",
+                    "id",
+                    "name",
+                    "months"
+                  ],
+                  "properties": {
+                    "uid": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "months": {
+                      "type": "number"
+                    },
+                    "cost": {
+                      "description": "Nuyen a month, as the book prints it.",
                       "type": "number"
                     }
                   }

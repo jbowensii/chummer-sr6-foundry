@@ -120,9 +120,16 @@ export function registerQuench(quench) {
         assert.equal(bike.system.vehicle.belongs, mara.id)
         assert.equal(bike.folder?.name, `${mara.name} vehicles`)
       })
-      it('keeps the genesisID of knowledge and language skills only', () => {
+      it('keeps the genesisID of knowledge and language skills only (and a martial art style’s own)', () => {
         assert.sameMembers(itemsOf(mara, 'skill').map(i => i.system.genesisID), ['knowledge', 'language', 'language'])
-        for (const i of ours(mara).filter(i => i.type !== 'skill')) assert.equal(i.system.genesisID ?? '', '', i.name)
+        for (const i of ours(mara).filter(i => !['skill', 'martialartstyle'].includes(i.type))) assert.equal(i.system.genesisID ?? '', '', i.name)
+      })
+      it('her gender, her lifestyle under its SIN, her martial art style with its technique tied to it', () => {
+        assert.equal(mara.system.gender, 'Made-up gender')
+        assert.equal(itemsOf(mara, 'lifestyle')[0]?.system.sin, 'Mara Testcase')
+        const style = itemsOf(mara, 'martialartstyle')[0]
+        assert.ok(style?.system.genesisID, 'style genesisID')
+        assert.deepEqual(itemsOf(mara, 'martialarttech').map(x => x.system.style), [style.system.genesisID])
       })
     })
   })

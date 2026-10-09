@@ -312,16 +312,29 @@ function runnerItems(r, ctx) {
     items.push(icon({ name: c.name, type: 'contact', flags: flag(c.uid),
       system: { genesisID: '', rating: num(c.connection), loyalty: num(c.loyalty), type: c.archetype ?? '',
         description: c.types?.length ? sanitize(`Contact types: ${c.types.map(t => TYPES[t] ?? t).join(', ')}`) : '' } }, c, ctx))
-  if (r.lifestyle) {
-    const l = r.lifestyle, key = lifestyleKey(l.name)
-    if (!key) ctx.say(`Lifestyle ${l.name}: not a shadowrun6-eden lifestyle → middle`)
-    items.push(icon({ name: l.name, type: 'lifestyle', flags: flag(l.id),
-      system: { genesisID: '', type: key ?? 'middle', paid: num(l.months), cost: num(l.cost) } }, l, ctx))
+  // martial arts: each style (a random genesisID, as Eden's create button gives it) and the techniques learned under it
+  for (const m of r.martialArts ?? []) {
+    const style = martialArtItem(m, ctx)
+    items.push(style, ...(m.techniques ?? []).map(t => techniqueItem(t, ctx, style.system.genesisID)))
   }
-  for (const s of r.sins ?? [])
+  // each SIN's lifestyles, Eden's lifestyle.system.sin naming the SIN (a text field); a file written before SINs held
+  // their lifestyles has only the runner's one lifestyle
+  const lifestyle = (l, sin) => {
+    const key = lifestyleKey(l.name)
+    if (!key) ctx.say(`Lifestyle ${l.name}: not a shadowrun6-eden lifestyle → middle`)
+    const f = flag(l.uid ?? l.id)
+    Object.assign(f[MODULE_ID], { catalogId: l.id ?? null, ...sin ? { sin: sin.uid } : {} })
+    return icon({ name: l.name, type: 'lifestyle', flags: f,
+      system: { genesisID: '', type: key ?? 'middle', paid: num(l.months), cost: num(l.cost), sin: sin?.name ?? '' } }, l, ctx)
+  }
+  const sins = r.sins ?? []
+  if (sins.some(s => Array.isArray(s.lifestyles))) for (const s of sins) for (const l of s.lifestyles ?? []) items.push(lifestyle(l, s))
+  else if (r.lifestyle) items.push(lifestyle(r.lifestyle, sins[0]))
+  for (const s of sins)
     items.push(icon({ name: s.name, type: 'sin', flags: flag(s.uid),
       system: { genesisID: '', quality: sinQuality(s.kind, s.rating),
-        description: sanitize((s.licences ?? []).map(l => `Licence: ${l.name} (rating ${l.rating})`).join('\n\n')) } }, s, ctx))
+        description: sanitize([s.gender && `Gender: ${s.gender}`, ...(s.licences ?? []).map(l => `Licence: ${l.name} (rating ${l.rating})`)]
+          .filter(Boolean).join('\n\n')) } }, s, ctx))
   return items
 }
 const noSkills = () => Object.fromEntries(SKILLS.map(k => [k, { points: 0, specialization: '', expertise: '' }]))
@@ -363,7 +376,7 @@ export function translateRunner(r, opts) {
     // the full career ledger in our flags (Eden ignores them), for a ledger tab later
     name, type: 'Player', flags: { [MODULE_ID]: { ...flag(r.id)[MODULE_ID], ledger: structuredClone(r.ledger ?? []) } }, prototypeToken: { actorLink: true },
     system: {
-      name: r.realName ?? '', metatype: r.metatype?.name ?? '', mortype: MOR[m.kind] ?? 'mundane',
+      name: r.realName ?? '', gender: r.gender ?? '', metatype: r.metatype?.name ?? '', mortype: MOR[m.kind] ?? 'mundane',
       // karma: what the runner has now; karma_total: what it has earned in play (the ledger's earn entries)
       nuyen: Math.max(0, Math.trunc(num(r.nuyen))), karma: Math.max(0, Math.trunc(num(r.karma))),
       karma_total: Math.max(0, Math.trunc((r.ledger ?? []).filter(l => l.type === 'earn').reduce((t, l) => t + num(l.karma), 0))),

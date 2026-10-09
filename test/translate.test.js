@@ -77,9 +77,9 @@ describe('skills', () => {
 })
 
 describe('items', () => {
-  test('genesisID empty on all but the skill items; flags and source on catalog items; product only for a book Eden has', () => {
+  test('genesisID empty on all but the skill items and martial art styles; flags and source on catalog items; product only for a book Eden has', () => {
     const t = run()
-    for (const i of t.items) if (i.type !== 'skill') expect(i.system.genesisID, i.name).toBe('')
+    for (const i of t.items) if (!['skill', 'martialartstyle'].includes(i.type)) expect(i.system.genesisID, i.name).toBe('')
     expect(byName(t, 'Lucky Break')).toMatchObject({ flags: { 'chummer-sr6-importer': { id: 'q1', catalogId: 'mus.lucky-break', kind: 'qualities', source: 'MUS', page: 10, canon: true } },
       system: { product: '', page: 10 } })
     const r = mara()
@@ -199,11 +199,33 @@ describe('items', () => {
   test('contacts, lifestyle, SINs', () => {
     const t = run()
     expect(byName(t, 'Fake Fixer')).toMatchObject({ type: 'contact', system: { rating: 4, loyalty: 2, type: 'Fixer', description: '<p>Contact types: Street</p>' } })
-    expect(byName(t, 'Made-up Hideout')).toMatchObject({ type: 'lifestyle', system: { type: 'middle', paid: 2, cost: 450 } })
+    expect(byName(t, 'Made-up Hideout')).toMatchObject({ type: 'lifestyle', system: { type: 'middle', paid: 2, cost: 450, sin: 'Mara Testcase' },
+      flags: { 'chummer-sr6-importer': { id: 'ls1', sin: 's1', catalogId: 'mus.made-up-squat' } } })
+    expect(t.items.filter(i => i.type === 'lifestyle')).toHaveLength(1)  // the deprecated runner.lifestyle is not a second one
     expect(t.textOnly).toContain('Made-Up Mara: Lifestyle Made-up Hideout: not a shadowrun6-eden lifestyle → middle')
     expect(byName(t, 'Mara Testcase')).toMatchObject({ type: 'sin', system: { quality: 'GOOD_MATCH' } })
     expect(byName(t, 'Mara Testcase').system.description).toMatch(/Licence: Made-up Permit \(rating 3\)/)
     expect(byName(t, 'Birth Record').system.quality).toBe('REAL_SIN')
+    expect(byName(t, 'Mara Testcase').system.description).toMatch(/^<p>Gender: Made-up cover gender<\/p>/)
+  })
+  test('the runner’s gender; several lifestyles, each under its SIN; an older file’s one lifestyle under the first SIN', () => {
+    expect(run().actor.system.gender).toBe('Made-up gender')
+    const r = mara()
+    r.sins[1].lifestyles = [{ uid: 'ls2', id: 'mus.made-up-squat', name: 'Made-up Low', months: 1 }]
+    expect(run(r).items.filter(i => i.type === 'lifestyle').map(i => [i.name, i.system.sin])).toEqual([['Made-up Hideout', 'Mara Testcase'], ['Made-up Low', 'Birth Record']])
+    const old = mara()
+    for (const s of old.sins) delete s.lifestyles
+    delete old.gender
+    const t = run(old)
+    expect(t.items.filter(i => i.type === 'lifestyle').map(i => [i.name, i.system.sin, i.flags['chummer-sr6-importer'].id])).toEqual([['Made-up Hideout', 'Mara Testcase', 'mus.made-up-squat']])
+    expect(t.actor.system.gender).toBe('')
+  })
+  test('martial arts: the style with a random genesisID, its techniques tied to it, both linkable by chummerID', () => {
+    const t = run(), style = t.items.find(i => i.type === 'martialartstyle'), tech = t.items.filter(i => i.type === 'martialarttech')
+    expect(style).toMatchObject({ name: 'Made-up Fist', flags: { 'chummer-sr6-importer': { id: 'm1', chummerID: 'MUS:martialarts:mus.made-up-fist' } } })
+    expect(style.system.genesisID).toMatch(/\S{8,}/)
+    expect(tech.map(x => [x.name, x.system.style, x.flags['chummer-sr6-importer'].id])).toEqual([['Made-up Sweep', style.system.genesisID, 'm1t1']])
+    expect(run().items.find(i => i.type === 'martialartstyle').system.genesisID).not.toBe(style.system.genesisID)
   })
 })
 

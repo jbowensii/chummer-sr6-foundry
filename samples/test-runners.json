@@ -15,6 +15,7 @@
    "exportedAt": "2026-10-04T09:00:00.000Z",
    "streetName": "Made-Up Mara",
    "realName": "Mara Testcase",
+   "gender": "Made-up gender",
    "finalized": true,
    "metatype": {
     "id": "mus.elf",
@@ -359,6 +360,41 @@
      "uid": "p5",
      "pick": "metamagics",
      "bonuses": []
+    }
+   ],
+   "martialArts": [
+    {
+     "id": "mus.made-up-fist",
+     "kind": "martialarts",
+     "name": "Made-up Fist",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "categories": "Striking, Grappling",
+      "signature": "Made-up Sweep"
+     },
+     "parts": [],
+     "values": {},
+     "description": "An invented style.",
+     "uid": "m1",
+     "techniques": [
+      {
+       "id": "mus.made-up-sweep",
+       "kind": "martialtechniques",
+       "name": "Made-up Sweep",
+       "source": "MUS",
+       "page": 10,
+       "canon": true,
+       "attrs": {
+        "category": "Striking"
+       },
+       "parts": [],
+       "values": {},
+       "description": "An invented technique.",
+       "uid": "m1t1"
+      }
+     ]
     }
    ],
    "purchases": [
@@ -789,10 +825,20 @@
      "name": "Mara Testcase",
      "kind": "fake",
      "rating": 3,
+     "gender": "Made-up cover gender",
      "licences": [
       {
        "name": "Made-up Permit",
        "rating": 3
+      }
+     ],
+     "lifestyles": [
+      {
+       "uid": "ls1",
+       "id": "mus.made-up-squat",
+       "name": "Made-up Hideout",
+       "months": 2,
+       "cost": 450
       }
      ]
     },
@@ -800,7 +846,8 @@
      "uid": "s2",
      "name": "Birth Record",
      "kind": "real",
-     "licences": []
+     "licences": [],
+     "lifestyles": []
     }
    ],
    "karma": 7,
@@ -969,6 +1016,7 @@
    "knowledge": [],
    "qualities": [],
    "picks": [],
+   "martialArts": [],
    "purchases": [],
    "contacts": [],
    "lifestyle": null,
