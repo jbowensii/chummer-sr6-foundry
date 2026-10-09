@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.4.0
+
+Import your books again after updating: the compendiums are new. Then Replace your runners so their items link to the new entries, and delete the old per-book compendiums and their folders yourself (the import never touches them).
+
+- One compendium per type with every book merged into it, in the Compendium folder "Chummer SR6": Weapons, Armor, Cyberware, Bioware, Geneware & nanoware, Electronics, Matrix programs, Gear, Mods & accessories, Drugs & toxins, Vehicles & drones (items and actors), Qualities, Spells, Rituals, Adept powers, Complex forms, Echoes, Metamagics, Foci, Critter powers, Sprite powers, Martial arts (styles and techniques), Lifestyles, Contacts, NPCs, Critters, Spirits, Sprites, Rules and Reference. No more folder and compendium set per book.
+- Inside each compendium, folders by Chummer's category (Holdouts, Heavy pistols; Eyeware, Cyberlimbs; Combat, Detection …), shared by every book. Never an "Other" or "General" folder: an entry without a useful category is filed by its own data (positive or negative, activation, duration, Professional Rating, Eden subtype …) or, failing that, by its book. Spirits go by their Eden spirit type (Air, Fire, Man …); critters by the section they are printed under, else Awakened or Mundane critters by their Magic. Every entry keeps its book and page.
+- Re-import upserts by `chummerID`, then alias, across all the type compendiums: an entry keeps its id and always goes to its category's folder (a re-filed entry moves, even out of a folder the GM chose); a book not in the file is left alone. User effects, user art, a style's genesisID (its techniques remapped), a rules journal's pages and a locked compendium's lock are kept as before.
+- An entry whose type changed moves to its new type compendium: created there from the old one, every link in the world (runners', NPCs' and world items' compendium source) re-pointed at it, and the old copy deleted only when it is the module's own (it has `chummerID`). The report lists each move.
+- A GM compendium keeps its own compendiums, one per type, in "Chummer SR6 compendiums/<name> (<id>)".
+- The import writes a type at a time in chunks of a hundred, with progress per chunk; the report has a line per compendium with each book's created and updated counts.
+- A runner's and an NPC's items link to the type compendiums only: `chummerID`, then alias, then type and name, preferring the item's own type compendium, then its own book; ties are reported with each candidate's book. The 0.3 per-book compendiums (`world.sr6-<book>-<topic>`) are never read or written; Apply icons works on the new compendiums.
+- A critter power the book files under a sprite category imports as an Eden sprite power.
+
 ## 0.3.2
 
 - The import window's book and runner lists scroll inside the window, so the Import button stays on screen with many books; the window can be resized.

@@ -1,13 +1,18 @@
-// Write a translated book (lib/books.js translateBook) into world compendiums. Foundry globals only inside functions
-// (node --check clean). Never throws: a failing pack is reported in `failed` and the other packs carry on.
+// Write translated books (lib/books.js translateBook) into world compendiums, one per TYPE with every book merged into
+// it (lib/books.js planTypePacks), each entry in its category's folder inside the pack. Foundry globals only inside
+// functions (node --check clean). Never throws: a failing pack is reported in `failed` and the other packs carry on.
+// Only this module's type packs (world.<prefix>chummer-sr6-…) are read or written; 0.3's per-book packs
+// (world.sr6-<book>-<topic>) are never touched.
 import { MODULE_ID } from '../lib/constants.js'
-import { planBookPacks } from '../lib/books.js'
+import { bookCounts, chunks, keepStyleIds, planTypePacks, relinkUpdates, typeOfPack } from '../lib/books.js'
 import { INDEX_FIELDS, keysOf, mergeByKey, planUpsert } from '../lib/chummer-id.js'
 import { keepArt, keepUserEffects, mergeActorItems } from '../lib/plan.js'
 import { replaceable } from '../lib/icons.js'
 import { COMPENDIUM_FOLDER, dedupeUnarmed, ensureFolder, FOLDER, itemData, uploadPortrait } from './apply.js'
 
 const CHUNK = 100
+// let the window repaint between chunks
+const breathe = () => new Promise(r => setTimeout(r, 0))
 
 // The world pack `name`, created in `folder` when missing (the server fills path, system and package: 'world').
 // { pack, made }: made when this call created it.
@@ -25,17 +30,8 @@ async function getPack(name, label, type, folder) {
 }
 const dropPack = async pack => { try { await pack.deleteCompendium() } catch (e) { console.error(`${MODULE_ID} | ${pack.title}: deleting the empty compendium failed`, e) } }
 
-// Write docs into the pack, creating it only now that there is something to write. A pack this call created is
-// deleted again when the write fails, so a failure never leaves an empty compendium behind.
-async function writeNew(name, label, type, folder, docs, after) {
-  const { pack, made } = await getPack(name, label, type, folder)
-  try { return await writePack(pack, docs, after) } catch (e) {
-    if (made) await dropPack(pack)
-    throw e
-  }
-}
-
-// A folder made only when needed (ensureFolder), remembering whether this run made it so an unused one can go again.
+// A Compendium sidebar folder made only when needed (ensureFolder), remembering whether this run made it so an unused
+// one can go again.
 const lazyFolder = (name, parent, made) => {
   let f
   return async () => {
@@ -77,15 +73,25 @@ export const portraitsAfter = (portraits = {}, tokens = {}, say) => async (docs,
   }
 }
 
-// A re-import updates in place, never deletes (lib/chummer-id.js planUpsert): an incoming entry found in the pack by its
-// chummerID, an alias, or (migration from 0.2.x) the id 0.2.x computed for it, is updated in place, keeping its _id, its
-// folder, sort and ownership, other modules' flags, the image the user chose (lib/plan.js keepArt), a journal's pages
-// by chummerID (and the GM's own) and an actor's GM items; it gets our chummerID flag. Every other entry is created and
-// Foundry picks its id. Entries not in the file are never touched.
-// Updates go first, then creates in chunks; if a create fails, what this run created is deleted again (the updated
-// entries keep their new data), so a failure never leaves half a chunk behind.
-// after(docs, op): run once everything is written, while the pack is still unlocked, with the written documents' data
-// ({ _id, flags, img, prototypeToken }); then an actor pack's duplicate Unarmed items go (apply.js dedupeUnarmed).
+// The pack's category folders (top level, by name, any case) for the documents about to be created: the missing ones
+// made in one call per chunk, alphabetical. Returns { id(name), made: [Folder] }.
+async function categoryFolders(pack, docs) {
+  const have = new Map(), lc = s => String(s ?? '').toLowerCase()
+  for (const f of pack.folders ?? []) if (!f.folder) have.set(lc(f.name), f.id)
+  const missing = [...new Set(docs.map(d => d.flags?.[MODULE_ID]?.category).filter(c => c && !have.has(lc(c))))]
+    .filter((c, i, all) => all.findIndex(x => lc(x) === lc(c)) === i)
+  const made = []
+  for (const c of chunks(missing, CHUNK))
+    made.push(...await Folder.createDocuments(c.map(name => ({ name, type: pack.documentName, folder: null, sorting: 'a' })), { pack: pack.collection }))
+  for (const f of made) have.set(lc(f.name), f.id)
+  return { id: name => have.get(lc(name)) ?? null, made }
+}
+
+// A re-import updates in place (lib/chummer-id.js planUpsert, run by importBooks over every one of our packs): the entry
+// keeps its _id, sort and ownership, other modules' flags, the image the user chose (lib/plan.js keepArt), a journal's
+// pages by chummerID (and the GM's own) and an actor's GM items; it gets our chummerID flag and goes to its category's
+// folder (always: a re-filed entry moves, even out of a folder the GM put it in). Every other entry is created, in its
+// category's folder, and Foundry picks its id. Entries not in the file are never touched.
 const OURS = ['name', 'type', 'img', 'system', 'effects', 'prototypeToken', 'items', 'pages', 'text', 'title']
 function updateData(old, doc) {
   const k = keepArt(old, doc), u = { _id: old._id, flags: { ...old.flags, [MODULE_ID]: doc.flags?.[MODULE_ID] } }
@@ -96,76 +102,172 @@ function updateData(old, doc) {
   u.effects = keepUserEffects(old.effects, k.effects ?? [])
   return u
 }
-async function writePack(pack, incoming, after) {
-  const Doc = pack.documentClass, op = { pack: pack.collection }
-  const index = await pack.getIndex({ fields: INDEX_FIELDS })
-  const { updates, creates, duplicates } = planUpsert([...index.values()], incoming)
+// Updates first, then creates, CHUNK documents per Foundry call, the window told after each (progress(done, of)). If a
+// create fails, what this call created (entries, and category folders no updated entry went into) is deleted again (the
+// updated entries keep their new data), so a failure never leaves half a write behind. after(docs, op): run once everything is written, while the
+// pack is still unlocked, with the written documents' data ({ _id, flags, img, prototypeToken }); then an actor pack's
+// new actors lose Eden's duplicate Unarmed items (apply.js dedupeUnarmed).
+async function writePack(pack, updates, creates, { after, progress } = {}) {
+  const Doc = pack.documentClass, op = { pack: pack.collection }, of = updates.length + creates.length
+  let done = 0
+  const step = async n => { progress?.(done += n, of); await breathe() }
   // V14 refuses writes to a locked pack, even a world pack the GM locked: unlock for this write and lock it again after.
   const locked = pack.locked
   if (locked) await pack.configure({ locked: false })
   try {
-    const old = updates.length ? (await pack.getDocuments({ _id__in: updates.map(u => u._id) })).map(d => d.toObject()) : []
-    const was = new Map(old.map(d => [d._id, d]))
-    const ups = updates.map(u => updateData(was.get(u._id), u.doc))
-    for (let i = 0; i < ups.length; i += CHUNK) await Doc.updateDocuments(ups.slice(i, i + CHUNK), { ...op, recursive: false, diff: false })
+    const old = []
+    for (const c of chunks(updates, CHUNK)) old.push(...(await pack.getDocuments({ _id__in: c.map(u => u._id) })).map(d => d.toObject()))
+    const was = new Map(old.map(d => [d._id, d])), cat = d => d.flags?.[MODULE_ID]?.category
+    const folders = await categoryFolders(pack, [...creates, ...updates.map(u => u.doc)])
+    const ups = updates.filter(u => was.has(u._id)).map(u => {
+      const f = folders.id(cat(u.doc))
+      return { ...updateData(was.get(u._id), u.doc), ...f ? { folder: f } : {} }
+    })
+    for (const c of chunks(ups, CHUNK)) { await Doc.updateDocuments(c, { ...op, recursive: false, diff: false }); await step(c.length) }
     const made = []
     try {
-      for (let i = 0; i < creates.length; i += CHUNK) made.push(...await Doc.createDocuments(creates.slice(i, i + CHUNK), op))
+      for (const c of chunks(creates, CHUNK)) {
+        made.push(...await Doc.createDocuments(c.map(d => ({ ...d, folder: folders.id(cat(d)) })), op))
+        await step(c.length)
+      }
     } catch (e) {
       try { if (made.length) await Doc.deleteDocuments(made.map(d => d.id), op) } catch {}
+      const empty = folders.made.filter(f => !ups.some(u => u.folder === f.id)).map(f => f.id)
+      try { if (empty.length) await Folder.deleteDocuments(empty, op) } catch {}
       throw e
     }
     const written = [...ups.map(u => ({ ...u, img: u.img ?? was.get(u._id)?.img, prototypeToken: u.prototypeToken ?? was.get(u._id)?.prototypeToken })),
       ...made.map((d, i) => ({ ...creates[i], _id: d.id }))]
     await after?.(written, op)
     if (pack.documentName === 'Actor') for (const d of made) await dedupeUnarmed(d)  // Eden's Unarmed, once per actor
-    return { label: pack.title, created: creates.length, replaced: updates.length,
-      migrated: updates.filter(u => u.how === 'legacy').length, duplicates: duplicates.map(d => d.name ?? keysOf(d).chummerID) }
+    return { replaced: ups.length, migrated: updates.filter(u => u.how === 'legacy').length, ids: made.map(d => d.id) }
   } finally {
     if (locked) await pack.configure({ locked: true })
   }
-}
-
-/**
- * A book's martial art styles keep the genesisID they already have in the world's pack (Eden ties a runner's techniques
- * to it), and the book's techniques follow: new styles keep the random one translate.js gave them. Changes t in place.
- */
-async function keepStyleIds(t, name) {
-  const styles = t.packs.martialarts ?? [], pack = game.packs.get(`world.${name}`)
-  if (!styles.length || !pack) return
-  const index = await pack.getIndex({ fields: [...INDEX_FIELDS, 'system.genesisID'] })
-  const remap = new Map()
-  for (const u of planUpsert([...index.values()], styles).updates) {
-    const old = index.get(u._id)?.system?.genesisID
-    if (old && old !== u.doc.system.genesisID) { remap.set(u.doc.system.genesisID, old); u.doc.system.genesisID = old }
-  }
-  for (const tech of t.packs.martialtechniques ?? []) if (remap.has(tech.system.style)) tech.system.style = remap.get(tech.system.style)
 }
 
 // effects in Foundry's shape: a pack item's own (the catalog's effects, lib/translate.js catalogEffects) and a pack actor's items'
 const withItemData = d => (d.items ? { ...d, items: d.items.map(itemData) } : itemData(d))
 const fail = (pack, name, error) => { console.error(`${MODULE_ID} | ${name}`, error); return { pack, name, error } }
 
+// An entry moving to another type pack: its new data on the old document's (as updateData), ownership kept, no _id.
+const moveData = (old, doc) => { const { _id, ...d } = updateData(old, doc); return { ...d, ownership: old.ownership } }
+
+// Every link in the world to a moved entry (an actor's _stats.compendiumSource, its items', a world item's) re-pointed at
+// its new UUID. moved: old UUID -> new UUID. Returns Map(old UUID -> links re-pointed); a failure is a note.
+async function relinkWorld(moved, say) {
+  const n = new Map(), tally = list => { for (const r of list) n.set(r.from, (n.get(r.from) ?? 0) + 1) }
+  const run = async (list, write, what) => {
+    if (!list.length) return
+    try { await write(list.map(r => r.update)); tally(list) } catch (e) {
+      console.error(`${MODULE_ID} | ${what}: re-pointing compendium links`, e)
+      say(`${what}: compendium links not re-pointed (${e?.message ?? e})`)
+    }
+  }
+  for (const a of game.actors ?? []) {
+    await run(relinkUpdates(a.items, moved), u => a.updateEmbeddedDocuments('Item', u), a.name)
+    await run(relinkUpdates([a], moved), ([u]) => a.update(u), a.name)
+  }
+  await run(relinkUpdates(game.items, moved), u => Item.updateDocuments(u), 'World items')
+  return n
+}
+const groupBy = (list, key) => list.reduce((m, x) => m.set(key(x), [...m.get(key(x)) ?? [], x]), new Map())
+
 /**
- * t: translateBook output. onProgress({ key, n, total }), key = the pack key before each pack is written. Packs go in
- * `<book name> (<source id>)` inside topFolder (by default FOLDER, COMPENDIUM_FOLDER for a GM's compendium); pack names
- * get `prefix` (Quench). Actor packs upload the compendium NPCs' portraits and tokens after their write.
- * Returns { source, counts: { [pack name]: { label, created, replaced, duplicates: [entry name] } }, failed: [{ pack, name, error }], notes: [portrait lines] }.
+ * ts: translateBook outputs (the books ticked in the window). Each type pack (lib/books.js planTypePacks) goes in the
+ * Compendium folder topFolder ("Chummer SR6"); a GM compendium's in "<name> (<id>)" inside compendiumFolder
+ * ("Chummer SR6 compendiums"). Pack names get `prefix` (Quench). One upsert over every one of our packs of a document
+ * type (by chummerID, then alias), so a book not in the file leaves its entries alone. An entry found in another type
+ * pack than its own now (its type changed) MOVES: created in its type pack from the old one's data (user art, effects,
+ * pages, GM items, ownership kept), every link in the world to the old one re-pointed at it, and the old copy deleted
+ * only when it is ours (it has our chummerID flag). Actor packs upload the compendium NPCs' portraits and tokens after
+ * their write. onProgress({ label, n, total, done, of }): before each pack and after each chunk.
+ * Returns { counts: { [pack collection]: { label, created, replaced, moved, migrated, books: { [source]: { created,
+ * replaced, moved } }, moves: [{ name, from, links, deleted }], duplicates: [entry name] } }, failed: [{ pack, name,
+ * error }], notes: [portrait and move lines] }.
  */
-export async function importBook(t, { onProgress, prefix = '', topFolder = t.source.compendium ? COMPENDIUM_FOLDER : FOLDER } = {}) {
-  const src = t.source, counts = {}, failed = [], made = [], notes = []
-  // nothing to write: no pack and no folder
-  const packs = planBookPacks(t, prefix)
-  const styles = packs.find(p => p.key === 'martialarts')
-  if (styles) { try { await keepStyleIds(t, styles.name) } catch (e) { console.error(`${MODULE_ID} | martial art styles`, e) } }
-  const folder = lazyFolder(`${src.name} (${src.id})`, lazyFolder(topFolder, null, made), made)
-  for (const [i, p] of packs.entries()) {
-    onProgress?.({ key: p.key, n: i + 1, total: packs.length })
+export async function importBooks(ts, { onProgress, prefix = '', topFolder = FOLDER, compendiumFolder = COMPENDIUM_FOLDER } = {}) {
+  const counts = {}, failed = [], made = [], notes = []
+  const plans = planTypePacks(ts, prefix).map(p => ({ ...p, docs: p.docs.map(withItemData) }))
+  if (!plans.length) return { counts, failed, notes }
+  const portraits = Object.assign({}, ...ts.map(t => t.portraits)), tokens = Object.assign({}, ...ts.map(t => t.tokens))
+
+  // every one of our packs' index (one read per pack), with the fields the planner and a style's genesisID need
+  const existing = []
+  for (const pack of game.packs.filter(p => typeOfPack(p.collection, prefix))) {
     try {
-      const after = p.type === 'Actor' ? portraitsAfter(t.portraits, t.tokens, l => notes.push(l)) : undefined
-      counts[p.name] = await writeNew(p.name, p.label, p.type, await folder(), p.docs.map(withItemData), after)
-    } catch (error) { failed.push(fail(p.name, p.label, error)) }
+      const index = await pack.getIndex({ fields: [...INDEX_FIELDS, 'system.genesisID'] })
+      for (const i of index.values()) existing.push({ ...i, pack: pack.collection, documentName: pack.documentName })
+    } catch (error) { failed.push(fail(pack.collection, pack.title, error)) }
+  }
+
+  // one write per type pack: the entries already in it updated, the new ones created, the ones found elsewhere moved in
+  const jobs = new Map(plans.map(p => [`world.${p.name}`, { plan: p, updates: [], creates: [], moves: [], duplicates: [] }]))
+  const planOf = new Map(plans.flatMap(p => p.docs.map(d => [d, p]))), jobOf = d => jobs.get(`world.${planOf.get(d).name}`)
+  for (const type of ['Item', 'Actor', 'JournalEntry']) {
+    const incoming = plans.filter(p => p.type === type).flatMap(p => p.docs)
+    if (!incoming.length) continue
+    const { updates, creates, duplicates } = planUpsert(existing.filter(e => e.documentName === type), incoming)
+    keepStyleIds(updates, incoming)
+    for (const u of updates) { const j = jobOf(u.doc); (u.hit.pack === `world.${j.plan.name}` ? j.updates : j.moves).push(u) }
+    for (const d of creates) jobOf(d).creates.push(d)
+    for (const d of duplicates) jobOf(d).duplicates.push(d.name ?? keysOf(d).chummerID)
+  }
+
+  const top = lazyFolder(topFolder, null, made), compTop = lazyFolder(compendiumFolder, null, made), compFolders = new Map()
+  const folderOf = c => {
+    if (!c) return top()
+    if (!compFolders.has(c.id)) compFolders.set(c.id, lazyFolder(`${c.name} (${c.id})`, compTop, made))
+    return compFolders.get(c.id)()
+  }
+  const moved = new Map(), movedIn = []  // old UUID -> new UUID; [{ m: the move, old: its old UUID, id: the pack it went to }]
+  const oldKey = h => `${h.pack}.${h._id}`
+  const todo = [...jobs.entries()].filter(([, j]) => j.updates.length || j.creates.length || j.moves.length)
+  for (const [i, [id, j]] of todo.entries()) {
+    const label = j.plan.label, progress = (done, of) => onProgress?.({ label, n: i + 1, total: todo.length, done, of })
+    progress(0, j.updates.length + j.creates.length + j.moves.length)
+    let created = false, pack = game.packs.get(id)
+    try {
+      // the moved entries' old documents (one that vanished since the index was read is simply created)
+      const olds = new Map()
+      for (const [from, ms] of groupBy(j.moves, m => m.hit.pack)) for (const c of chunks(ms, CHUNK))
+        for (const d of await game.packs.get(from).getDocuments({ _id__in: c.map(m => m.hit._id) })) olds.set(`${from}.${d.id ?? d._id}`, d.toObject())
+      const moves = j.moves.filter(m => olds.has(oldKey(m.hit)))
+      const creates = [...j.creates, ...j.moves.filter(m => !olds.has(oldKey(m.hit))).map(m => m.doc)]
+      const moving = moves.map(m => moveData(olds.get(oldKey(m.hit)), m.doc))
+      // a pack of ours by that name holding another document type: getPack refuses it (PackTypeClash)
+      if (!pack || pack.documentName !== j.plan.type) ({ pack, made: created } = await getPack(j.plan.name, j.plan.label, j.plan.type, await folderOf(j.plan.compendium)))
+      const after = pack.documentName === 'Actor' ? portraitsAfter(portraits, tokens, l => notes.push(l)) : undefined
+      const r = await writePack(pack, j.updates, [...creates, ...moving], { after, progress })
+      moves.forEach((m, k) => {
+        const old = m.hit.uuid ?? game.packs.get(m.hit.pack).getUuid(m.hit._id)
+        moved.set(old, pack.getUuid(r.ids[creates.length + k]))
+        movedIn.push({ m, old, id })
+      })
+      counts[id] = { label: pack.title, created: creates.length, replaced: r.replaced, moved: moves.length, migrated: r.migrated,
+        books: bookCounts(j.updates, creates, moves), moves: [], duplicates: j.duplicates }
+    } catch (error) {
+      if (created) await dropPack(pack)
+      failed.push(fail(id, label, error))
+    }
+  }
+
+  // the moved entries: every link re-pointed, then the old copies that are ours deleted (a locked pack locked again)
+  if (moved.size) {
+    const links = await relinkWorld(moved, l => notes.push(l)), gone = new Set()
+    for (const [from, xs] of groupBy(movedIn.filter(x => keysOf(x.m.hit).chummerID), x => x.m.hit.pack)) {
+      const pack = game.packs.get(from), locked = pack.locked
+      try {
+        if (locked) await pack.configure({ locked: false })
+        for (const c of chunks(xs, CHUNK)) { await pack.documentClass.deleteDocuments(c.map(x => x.m.hit._id), { pack: from }); c.forEach(x => gone.add(x)) }
+      } catch (e) {
+        console.error(`${MODULE_ID} | ${pack.title}: deleting moved entries`, e)
+        notes.push(`${pack.title}: moved entries not deleted there (${e?.message ?? e})`)
+      } finally { if (locked) await pack.configure({ locked: true }) }
+    }
+    for (const x of movedIn) counts[x.id].moves.push({ name: x.m.doc.name, from: game.packs.get(x.m.hit.pack)?.title ?? x.m.hit.pack,
+      links: links.get(x.old) ?? 0, deleted: gone.has(x) })
   }
   await dropEmptyFolders(made)
-  return { source: src, counts, failed, notes }
+  return { counts, failed, notes }
 }

@@ -3,6 +3,7 @@
 // (replaceable). Foundry globals only inside functions.
 import { MODULE_ID } from '../lib/constants.js'
 import { iconFor, replaceable } from '../lib/icons.js'
+import { typeOfPack } from '../lib/books.js'
 
 export const INDEX = `modules/${MODULE_ID}/icons/index.json`
 
@@ -36,11 +37,11 @@ function writesFor(items, actors, change, op) {
 
 /**
  * Re-apply icons to every item with flags.icon. Defaults: world items, world actors' items, and the module's world
- * compendiums (world.sr6-…, unlocked for the write and locked again). The Quench tests pass their own lists.
+ * type compendiums (world.chummer-sr6-…, lib/books.js typeOfPack; unlocked for the write and locked again). The Quench tests pass their own lists.
  * Returns { updated, kept (an image the user chose), unchanged }.
  */
 export async function applyIcons({ index, items = game.items.contents, actors = game.actors.contents,
-  packs = game.packs.filter(p => p.collection.startsWith('world.sr6-')) } = {}) {
+  packs = game.packs.filter(p => typeOfPack(p.collection)) } = {}) {
   const has = new Set(index ?? []), counts = { updated: 0, kept: 0, unchanged: 0 }
   const change = d => {
     const f = d.flags?.[MODULE_ID]?.icon

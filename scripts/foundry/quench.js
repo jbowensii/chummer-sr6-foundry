@@ -7,17 +7,17 @@ import { readExport } from '../lib/read.js'
 import { escapeText, translateRunner } from '../lib/translate.js'
 import { defaultChoice, newVersionName } from '../lib/plan.js'
 import { applyRunner, COMPENDIUM_FOLDER, edenSpecLabels, findExisting, isEdenUnarmed as edenUnarmed } from './apply.js'
-import { planBookPacks, translateBook } from '../lib/books.js'
+import { planTypePacks, translateBook, TYPES } from '../lib/books.js'
 import { INDEX_FIELDS } from '../lib/chummer-id.js'
 import { iconFor, MODULE_ICON_ROOT } from '../lib/icons.js'
-import { importBook } from './books.js'
+import { importBooks } from './books.js'
 import { applyIcons, loadIconIndex } from './icons.js'
 
 const TEST_FOLDER = 'Chummer SR6 Importer tests'
 const SAMPLE = `modules/${MODULE_ID}/samples/test-runners.json`
 const BOOKS = `modules/${MODULE_ID}/samples/test-books.json`
 const COMPENDIUM = `modules/${MODULE_ID}/samples/test-compendium.json`
-const PREFIX = 'sr6test-'  // world packs these tests make: world.sr6test-sr6-<source>-<topic>
+const PREFIX = 'sr6test-'  // world packs these tests make: world.sr6test-chummer-sr6-<type> (and a stand-in 0.3 pack, world.sr6test-sr6-mus-weapons)
 const flagOf = d => d?.flags?.[MODULE_ID]
 const HOSTILE = () => CONST.TOKEN_DISPOSITIONS.HOSTILE
 
@@ -345,55 +345,78 @@ export function registerQuench(quench) {
   })
 
   batch('books', ({ describe, it, assert, before, after }) => {
-    // Imports the made-up book file as the window does, into packs named sr6test-… in the Compendium folder
-    // "Chummer SR6 Importer tests". before() and after() both clean up (cleanBooks), so a crashed run leaves nothing behind.
+    // Imports the made-up book file as the window does (both books in one write), into type packs named
+    // sr6test-chummer-sr6-… in the Compendium folder "Chummer SR6 Importer tests". A stand-in for a 0.3 per-book pack
+    // (sr6test-sr6-mus-weapons, locked, holding an entry with the same chummerID) must come out untouched. before() and
+    // after() both clean up (cleanBooks), so a crashed run leaves nothing behind.
     describe('importing the book sample', function () {
-      this.timeout(60000)
+      this.timeout(120000)
       const clean = foundry.utils.cleanHTML ?? (h => h)
-      let file, mus, mux, res, muxRes, plan
-      const pack = (k, book = 'mus') => game.packs.get(`world.${PREFIX}sr6-${book}-${k}`)
+      let file, mus, mux, res, plan, old, oldEntry
+      const pack = k => game.packs.get(`world.${PREFIX}chummer-sr6-${k}`)
       const translate = book => translateBook(book, { exportedAt: book.exportedAt ?? file.exportedAt,
         appVersion: file.app?.version ?? '', descriptions: file.descriptions === true, sanitize: s => clean(escapeText(s)) })
-      const run = book => importBook(translate(book), { prefix: PREFIX, topFolder: TEST_FOLDER })
-      // Every world pack named sr6test-… (only these tests make them), the sample books' folders inside the top-level
-      // Compendium folder "Chummer SR6 Importer tests", then that folder.
+      const run = books => importBooks(books.map(translate), { prefix: PREFIX, topFolder: TEST_FOLDER })
+      const folderName = (p, d) => p.folders.get(d.folder?.id ?? d.folder)?.name ?? null
+      // Every world pack named sr6test-… (only these tests make them), then the top-level Compendium folder
+      // "Chummer SR6 Importer tests" (and the per-book folders an earlier version of this batch made in it).
       const cleanBooks = async () => {
-        for (const p of game.packs.filter(p => p.collection.startsWith(`world.${PREFIX}`))) await p.deleteCompendium()
+        for (const p of game.packs.filter(p => p.collection.startsWith(`world.${PREFIX}`))) {
+          if (p.locked) await p.configure({ locked: false })
+          await p.deleteCompendium()
+        }
         const top = game.folders.find(f => f.type === 'Compendium' && f.name === TEST_FOLDER && !f.folder)
-        if (!top) return
-        const names = new Set(file.books.map(b => `${b.source.name} (${b.source.id})`))
-        for (const f of game.folders.filter(f => f.type === 'Compendium' && f.folder?.id === top.id && names.has(f.name))) await f.delete()
-        await top.delete()
+        if (top) await top.delete({ deleteSubfolders: true })
       }
       before(async function () {
         const r = readExport(await (await fetch(BOOKS)).text())
         if (!r.ok) throw new Error(r.reason)
         file = r.file; [mus, mux] = file.books
         await cleanBooks()
-        plan = planBookPacks(translate(mus), PREFIX)
-        res = await run(mus)
-        muxRes = await run(mux)
+        // 0.3's pack for this book's weapons, as a world that imported it then still has it
+        old = await foundry.documents.collections.CompendiumCollection.createCompendium({ name: `${PREFIX}sr6-mus-weapons`, label: 'Weapons — MUS', type: 'Item' })
+        const [e] = await Item.createDocuments([{ name: 'Pocket Zapper (0.3)', type: 'gear',
+          flags: { [MODULE_ID]: { chummerID: 'MUS:weapons:mus.pocket-zapper', chummerAliases: [], source: 'MUS' } } }], { pack: old.collection })
+        oldEntry = [e.id, e.name, e._stats.modifiedTime, flagOf(e).chummerID]
+        await old.configure({ locked: true })
+        plan = planTypePacks([translate(mus), translate(mux)], PREFIX)
+        res = await run([mus, mux])
       })
       after(async function () { if (file) await cleanBooks() })
 
       it('imports every pack without a failure', () => {
-        for (const r of [res, muxRes]) assert.isEmpty(r.failed, r.failed.map(f => f.error?.message).join('; '))
+        assert.isEmpty(res.failed, res.failed.map(f => f.error?.message).join('; '))
       })
-      it('puts one pack per planned topic in "<test folder>/Made-Up Streets (MUS)", entry counts as planned', () => {
-        assert.sameMembers(Object.keys(res.counts), plan.map(p => p.name))
+      it('one pack per type, named by type, in "<test folder>" (no per-book folder), entry counts as planned, counted per book', () => {
+        assert.sameMembers(Object.keys(res.counts), plan.map(p => `world.${p.name}`))
         for (const p of plan) {
           const c = game.packs.get(`world.${p.name}`)
           assert.ok(c, p.name)
-          assert.equal(c.title, p.label)
+          assert.equal(c.title, TYPES[p.key][0])
           assert.equal(c.documentName, p.type, p.name)
-          assert.equal(c.folder?.name, 'Made-Up Streets (MUS)', p.name)
-          assert.equal(c.folder?.folder?.name, TEST_FOLDER, p.name)
+          assert.equal(c.folder?.name, TEST_FOLDER, p.name)
           assert.equal(c.index.size, p.docs.length, p.name)
         }
+        assert.deepEqual(res.counts[pack('reference').collection].books, { MUS: { created: 8, replaced: 0 }, MUX: { created: 2, replaced: 0 } })
       })
-      it('a book of only kinds Eden has no document for gets just its Reference compendium', () => {
-        assert.sameMembers(game.packs.filter(p => p.collection.startsWith(`world.${PREFIX}sr6-mux-`)).map(p => p.collection),
-          [`world.${PREFIX}sr6-mux-reference`])
+      it('folders by category inside each pack: every entry in its category’s folder, none "Other" or "General"', async () => {
+        for (const p of plan) {
+          const c = game.packs.get(`world.${p.name}`)
+          for (const d of await c.getDocuments()) {
+            const name = folderName(c, d)
+            assert.equal(name, flagOf(d).category, `${p.name}: ${d.name}`)
+            assert.notMatch(name, /^(other|general)$/i)
+          }
+        }
+        assert.includeMembers(pack('weapons').folders.map(f => f.name), ['Pocket Tasers', 'Glitter cannons'])
+        assert.includeMembers(pack('martialarts').folders.map(f => f.name), ['Styles', 'Striking techniques'])
+        assert.deepEqual(pack('spirits').folders.map(f => f.name), ['Man'])  // by Eden spirit type
+        assert.deepEqual(pack('critters').folders.map(f => f.name), ['Made-up beasts'])  // the section it is printed under
+      })
+      it('a book of only kinds Eden has no document for: its journals in the shared Reference pack', async () => {
+        const names = (await pack('reference').getDocuments()).filter(j => flagOf(j).source === 'MUX').map(j => j.name)
+        assert.sameMembers(names, ['Priorities', 'Metatypes'])
+        assert.notOk(game.packs.some(p => p.collection.startsWith(`world.${PREFIX}sr6-mux-`)))
       })
       it('a weapon is gear with its Eden weapon type, flags and page', async () => {
         const zap = await byKey(pack('weapons'), 'MUS:weapons:mus.pocket-zapper')
@@ -419,9 +442,9 @@ export function registerQuench(quench) {
         assert.equal(p.type, 'software')
         assert.include(p.system, { type: 'HACKING', price: 250, availDef: '4(I)', page: 10 })
       })
-      it('a martial art style and its signature technique: Eden types, category flags, the technique tied to the style', async () => {
+      it('a martial art style and its signature technique, in one pack: Eden types, category flags, the technique tied to the style', async () => {
         const style = await byKey(pack('martialarts'), 'MUS:martialarts:mus.made-up-fist')
-        const tech = await byKey(pack('martialtechniques'), 'MUS:martialtechniques:mus.made-up-sweep')
+        const tech = await byKey(pack('martialarts'), 'MUS:martialtechniques:mus.made-up-sweep')
         assert.equal(style.type, 'martialartstyle')
         assert.include(style.system.category, { striking: true, grappling: true, weapon: false })
         assert.equal(tech.type, 'martialarttech')
@@ -429,7 +452,7 @@ export function registerQuench(quench) {
       })
       it('a style and technique dropped on an actor show together (Eden links them by genesisID)', async () => {
         const style = await byKey(pack('martialarts'), 'MUS:martialarts:mus.made-up-fist')
-        const tech = await byKey(pack('martialtechniques'), 'MUS:martialtechniques:mus.made-up-sweep')
+        const tech = await byKey(pack('martialarts'), 'MUS:martialtechniques:mus.made-up-sweep')
         const a = await Actor.create({ name: 'Quench martial artist', type: 'Player' })
         try {
           await a.createEmbeddedDocuments('Item', [style.toObject(), tech.toObject()])
@@ -438,28 +461,30 @@ export function registerQuench(quench) {
         } finally { await a.delete() }
       })
       it('kinds Eden has no document for are Reference journals, a page per entry (a tradition, a grade, an action)', async () => {
-        const journals = await pack('reference').getDocuments()
+        const journals = (await pack('reference').getDocuments()).filter(j => flagOf(j).source === 'MUS')
         const trad = journals.find(j => j.name === 'Traditions')
         assert.lengthOf(trad.pages.contents, 1)
         assert.include(trad.pages.contents[0].text.content, 'invented tradition')
         assert.equal(trad.pages.contents[0].flags['chummer-sr6-importer'].chummerID, 'MUS:traditions:mus.made-up-path')
         assert.includeMembers(journals.map(j => j.name), ['Augmentation grades', 'Actions', 'Mentor spirits', 'Metatypes'])
       })
-      it('re-import updates in place by chummerID (same _id, nothing new), keeps a user image, a GM entry and a GM page, and locks a locked pack again', async () => {
+      it('re-importing one book updates its entries in place across the merged packs (same _id, nothing new, user image, GM entry and page kept, locked again) and leaves the other book’s alone', async () => {
         const weapons = pack('weapons'), before = await byKey(weapons, 'MUS:weapons:mus.pocket-zapper'), id = before.id, size = weapons.index.size
+        const folders = weapons.folders.size
         await Item.updateDocuments([{ _id: id, img: 'user/art.webp' }], { pack: weapons.collection })
         const gm = await Item.create({ name: 'GM-made weapon', type: 'gear', system: { type: 'WEAPON_FIREARMS' } }, { pack: weapons.collection })
         const [j] = await pack('rules').getDocuments()
         const gmPage = (await j.createEmbeddedDocuments('JournalEntryPage', [{ name: 'GM page', type: 'text', text: { content: '<p>mine</p>' } }]))[0]
         const ourPage = j.pages.contents.find(p => p.flags?.['chummer-sr6-importer']?.chummerID)
+        const muxBefore = (await pack('reference').getDocuments()).filter(d => flagOf(d).source === 'MUX').map(d => [d.id, d.name, d._stats.modifiedTime])
         await weapons.configure({ locked: true })
         const changed = structuredClone(mus)
         changed.entries.find(e => e.id === 'mus.pocket-zapper').name = 'Pocket Zapper II'
-        const again = await run(changed)
+        const again = await run([changed])
         assert.isEmpty(again.failed, again.failed.map(f => f.error?.message).join('; '))
-        assert.equal(again.counts[`${PREFIX}sr6-mus-weapons`].replaced, plan.find(p => p.key === 'weapons').docs.length)
-        assert.equal(again.counts[`${PREFIX}sr6-mus-weapons`].created, 0)
+        assert.deepEqual(again.counts[weapons.collection].books, { MUS: { created: 0, replaced: plan.find(p => p.key === 'weapons').docs.length } })
         assert.equal(weapons.index.size, size + 1, 'only the GM entry is new')
+        assert.equal(weapons.folders.size, folders, 'no folder made twice')
         const zap = await weapons.getDocument(id)
         assert.equal(zap.name, 'Pocket Zapper II')
         assert.equal(zap.img, 'user/art.webp')
@@ -468,43 +493,69 @@ export function registerQuench(quench) {
         const j2 = await pack('rules').getDocument(j.id)
         assert.equal(j2.pages.get(gmPage.id)?.text.content, '<p>mine</p>', 'GM page kept')
         assert.ok(j2.pages.get(ourPage.id), 'an imported page keeps its _id')
+        const muxAfter = (await pack('reference').getDocuments()).filter(d => flagOf(d).source === 'MUX').map(d => [d.id, d.name, d._stats.modifiedTime])
+        assert.deepEqual(muxAfter, muxBefore, 'the book not in the file is left alone')
         await weapons.configure({ locked: false })
       })
-      it('migration: an entry 0.2.x wrote under its computed id, without chummerID, is updated in place and gets chummerID', async () => {
-        const { legacyId } = await import('../lib/chummer-id.js')
-        const weapons = pack('weapons'), key = 'MUS:weapons:mus.glitter-cannon', old = await byKey(weapons, key)
-        assert.ok(old, `the sample book has ${key}`)
-        const data = old.toObject()
-        await Item.deleteDocuments([old.id], { pack: weapons.collection })
-        delete data.flags['chummer-sr6-importer'].chummerID
-        data._id = legacyId(key)
-        await Item.createDocuments([data], { pack: weapons.collection, keepId: true })
-        const again = await run(structuredClone(mus))
+      it('a re-filed entry moves to its new category’s folder on re-import, even out of a folder the GM put it in', async () => {
+        const weapons = pack('weapons'), zap = await byKey(weapons, 'MUS:weapons:mus.pocket-zapper')
+        const [gmFolder] = await Folder.createDocuments([{ name: 'GM favourites', type: 'Item' }], { pack: weapons.collection })
+        await Item.updateDocuments([{ _id: zap.id, folder: gmFolder.id }], { pack: weapons.collection })
+        const changed = structuredClone(mus)
+        changed.entries.find(e => e.id === 'mus.pocket-zapper').attrs.category = 'holdouts'
+        const again = await run([changed])
         assert.isEmpty(again.failed, again.failed.map(f => f.error?.message).join('; '))
-        assert.isAtLeast(again.counts[`${PREFIX}sr6-mus-weapons`].migrated, 1)
-        const doc = await weapons.getDocument(legacyId(key))
-        assert.equal(doc.flags['chummer-sr6-importer'].chummerID, key)
-        assert.lengthOf((await weapons.getIndex({ fields: INDEX_FIELDS })).filter(i => i.flags?.['chummer-sr6-importer']?.chummerID === key), 1)
+        const after = await weapons.getDocument(zap.id)
+        assert.equal(folderName(weapons, after), 'Holdouts')
+        assert.equal(flagOf(after).category, 'Holdouts')
+      })
+      it('an entry whose type changed moves: created in its type pack, a world item’s link re-pointed, our old copy deleted, listed in the report', async () => {
+        // the spoiler as an earlier version filed it: in Gear, a world actor's item linked to that copy
+        const mods = pack('mods'), gear = pack('gear'), key = 'MUS:gear:mus.made-up-spoiler'
+        const now = await byKey(mods, key), data = now.toObject()
+        await Item.deleteDocuments([now.id], { pack: mods.collection })
+        delete data._id
+        const [oldCopy] = await Item.createDocuments([data], { pack: gear.collection })
+        const a = await Actor.create({ name: 'Quench linked runner', type: 'Player' })
+        try {
+          const [it] = await a.createEmbeddedDocuments('Item', [{ name: 'Made-up Spoiler', type: 'gear', _stats: { compendiumSource: oldCopy.uuid } }])
+          const again = await run([structuredClone(mus)])
+          assert.isEmpty(again.failed, again.failed.map(f => f.error?.message).join('; '))
+          const moved = await byKey(mods, key)
+          assert.ok(moved, 'created in Mods & accessories')
+          assert.equal(folderName(mods, moved), 'Vehicle mods')
+          assert.notOk(await byKey(gear, key), 'old copy deleted')
+          assert.equal(a.items.get(it.id)._stats.compendiumSource, moved.uuid)
+          assert.deepInclude(again.counts[mods.collection].moves, { name: 'Made-up Spoiler', from: gear.title, links: 1, deleted: true })
+        } finally { await a.delete() }
+      })
+      it('0.3’s per-book pack is never touched: its entry, its size and its lock as they were', async () => {
+        assert.ok(game.packs.get(old.collection), 'still there')
+        assert.isTrue(old.locked)
+        const docs = await old.getDocuments()
+        assert.lengthOf(docs, 1)
+        assert.deepEqual([docs[0].id, docs[0].name, docs[0]._stats.modifiedTime, flagOf(docs[0]).chummerID], oldEntry)
+        assert.notOk(Object.keys(res.counts).includes(old.collection))
       })
     })
   })
 
   batch('compendium', ({ describe, it, assert, before, after }) => {
     // Imports the made-up compendium file as the window does (no topFolder: a compendium goes to the Compendium folder
-    // "Chummer SR6 compendiums"), into packs named sr6test-sr6-street-…. Cleanup deletes those packs, the book folder, and
-    // "Chummer SR6 compendiums" only when this batch made it and it is left empty.
+    // "Chummer SR6 compendiums"), into packs named sr6test-chummer-sr6-c-street-…. Cleanup deletes those packs, the
+    // compendium's folder, and "Chummer SR6 compendiums" only when this batch made it and it is left empty.
     // ponytail: the NPC's token file stays in worlds/<world>/chummer/tokens (no delete call); its name is fixed, so
     // every run overwrites it.
     describe('importing the compendium sample', function () {
       this.timeout(60000)
       const clean = foundry.utils.cleanHTML ?? (h => h)
       let file, street, res, hadTop
-      const pack = k => game.packs.get(`world.${PREFIX}sr6-street-${k}`)
+      const pack = k => game.packs.get(`world.${PREFIX}chummer-sr6-c-street-${k}`)
       const top = () => game.folders.find(f => f.type === 'Compendium' && f.name === COMPENDIUM_FOLDER && !f.folder)
-      const bookFolder = () => game.folders.find(f => f.type === 'Compendium' && f.name === 'Street Kit (STREET)' && f.folder?.id === top()?.id)
+      const compFolder = () => game.folders.find(f => f.type === 'Compendium' && f.name === 'Street Kit (STREET)' && f.folder?.id === top()?.id)
       const cleanUpHouse = async () => {
-        for (const p of game.packs.filter(p => p.collection.startsWith(`world.${PREFIX}sr6-street-`))) await p.deleteCompendium()
-        await bookFolder()?.delete()
+        for (const p of game.packs.filter(p => p.collection.startsWith(`world.${PREFIX}chummer-sr6-c-street-`))) await p.deleteCompendium()
+        await compFolder()?.delete()
         const t = top()
         if (t && !hadTop && !t.getSubfolders().length && !game.packs.some(p => p.folder?.id === t.id)) await t.delete()
       }
@@ -514,12 +565,12 @@ export function registerQuench(quench) {
         file = r.file; [street] = file.books
         hadTop = !!top()
         await cleanUpHouse()
-        res = await importBook(translateBook(street, { exportedAt: file.exportedAt, appVersion: file.app?.version ?? '',
-          descriptions: file.descriptions === true, sanitize: s => clean(escapeText(s)) }), { prefix: PREFIX })
+        res = await importBooks([translateBook(street, { exportedAt: file.exportedAt, appVersion: file.app?.version ?? '',
+          descriptions: file.descriptions === true, sanitize: s => clean(escapeText(s)) })], { prefix: PREFIX })
       })
       after(async function () { if (file) await cleanUpHouse() })
 
-      it('imports every pack into "Chummer SR6 compendiums/Street Kit (STREET)", labelled (House)', () => {
+      it('imports a pack per type into "Chummer SR6 compendiums/Street Kit (STREET)", labelled (House), entries in category folders', async () => {
         assert.isEmpty(res.failed, res.failed.map(f => f.error?.message).join('; '))
         for (const k of ['weapons', 'npcs', 'spirits']) {
           const p = pack(k)
@@ -527,7 +578,9 @@ export function registerQuench(quench) {
           assert.equal(p.folder?.name, 'Street Kit (STREET)', k)
           assert.equal(p.folder?.folder?.name, COMPENDIUM_FOLDER, k)
           assert.match(p.title, / — STREET \(House\)$/, k)
+          for (const d of await p.getDocuments()) assert.equal(p.folders.get(d.folder?.id ?? d.folder)?.name, flagOf(d).category, d.name)
         }
+        assert.deepEqual(pack('weapons').folders.map(f => f.name), ['Zappers'])
       })
       it('its NPC is in the NPCs pack, flagged compendium, with its token uploaded', async () => {
         const tough = await byKey(pack('npcs'), 'STREET:npc:street-npc-1')

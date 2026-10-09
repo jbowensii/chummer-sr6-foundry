@@ -1,7 +1,7 @@
 // SR6 books -> pack documents per topic (scripts/lib/books.js) on the made-up samples.
 import { readFileSync } from 'node:fs'
 import { describe, expect, test } from 'vitest'
-import { PACKS, accessoryHostKind, planBookPacks, translateBook } from '../scripts/lib/books.js'
+import { TYPES, accessoryHostKind, bookCounts, relinkUpdates, categoryOf, chunks, keepStyleIds, planTypePacks, typeKey, typeOfPack, typePackName, translateBook } from '../scripts/lib/books.js'
 
 const M = 'chummer-sr6-importer'
 const load = f => JSON.parse(readFileSync(`samples/${f}`, 'utf8'))
@@ -14,13 +14,14 @@ const all = tr => Object.values(tr.packs).flat()
 const byName = (tr, name) => all(tr).find(d => d.name === name)
 
 describe('a book', () => {
-  test('one pack per topic present, none for a topic without entries, in PACKS order', () => {
-    const plan = planBookPacks(t)
-    expect(plan.map(p => p.key)).toEqual(Object.keys(PACKS))  // the sample has every topic
-    const noRules = planBookPacks(translateBook({ ...mus, entries: mus.entries.filter(e => e.kind !== 'rules') }, OPTS))
+  test('one pack per type present, none for a type without entries, in TYPES order', () => {
+    const plan = planTypePacks([t])
+    // the sample has every type but these (Chummer's export has no sprite power kind; no drug, foci or ware other than cyberware)
+    expect(plan.map(p => p.key)).toEqual(Object.keys(TYPES).filter(k => !['bioware', 'geneware', 'drugs', 'foci', 'spritepowers'].includes(k)))
+    const noRules = planTypePacks([translateBook({ ...mus, entries: mus.entries.filter(e => e.kind !== 'rules') }, OPTS)])
     expect(noRules.map(p => p.key)).not.toContain('rules')
-    expect(plan[0]).toMatchObject({ name: 'sr6-mus-qualities', label: 'Qualities — MUS', type: 'Item' })
-    expect(planBookPacks(t, 'sr6test-')[0].name).toBe('sr6test-sr6-mus-qualities')
+    expect(plan[0]).toMatchObject({ key: 'weapons', name: 'chummer-sr6-weapons', label: 'Weapons', type: 'Item', compendium: null })
+    expect(planTypePacks([t], 'sr6test-')[0].name).toBe('sr6test-chummer-sr6-weapons')
   })
   test('no _id anywhere (Foundry picks it); every entry, page and actor carries a unique chummerID <source>:<kind>:<id>', () => {
     const docs = all(t), cid = d => d.flags[M].chummerID
@@ -43,7 +44,7 @@ describe('a book', () => {
   })
   test('kinds Eden has no document for: the Reference compendium, a journal per kind, a page per entry with its chummerID', () => {
     const x = translateBook(mux, OPTS)
-    expect(planBookPacks(x)).toMatchObject([{ key: 'reference', type: 'JournalEntry', label: 'Reference — MUX' }])
+    expect(planTypePacks([x])).toMatchObject([{ key: 'reference', type: 'JournalEntry', label: 'Reference', name: 'chummer-sr6-reference' }])
     expect(x.packs.reference.map(j => [j.name, j.flags[M].chummerID, j.pages.map(p => p.flags[M].chummerID)]))
       .toEqual([['Priorities', 'MUX:reference:priorities', ['MUX:priorities:mux.prio-b']], ['Metatypes', 'MUX:reference:metatypes', ['MUX:metatypes:mux.troll']]])
     expect(x.textOnly).toEqual([])
@@ -118,12 +119,12 @@ describe('a book', () => {
       system: { category: { striking: true, grappling: true, mobility: false, ranged: false, weapon: false } } })
     expect(style.system.genesisID).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
     expect(translateBook(mus, OPTS).packs.martialarts[0].system.genesisID).not.toBe(style.system.genesisID)
-    expect(translateBook(mus, { ...OPTS, newGenesisId: () => 'g-1' }).packs.martialtechniques[0].system.style).toBe('g-1')
+    expect(translateBook(mus, { ...OPTS, newGenesisId: () => 'g-1' }).packs.martialarts.find(d => d.type === 'martialarttech').system.style).toBe('g-1')
     expect(style.system.description).toContain('Signature technique: Made-up Sweep')
     expect(tech).toMatchObject({ type: 'martialarttech', system: { style: style.system.genesisID, choice: '' } })
     expect(tech.system.description).toContain('Category: Striking')
     const loose = translateBook({ ...mus, entries: mus.entries.filter(e => e.kind === 'martialtechniques') }, OPTS)
-    expect(loose.packs.martialtechniques[0].system.style).toBe('')
+    expect(loose.packs.martialarts[0].system.style).toBe('')
   })
   test('a tradition -> a page of the Traditions reference journal (Eden has no tradition item)', () => {
     const j = t.packs.reference.find(x => x.name === 'Traditions')
@@ -152,7 +153,9 @@ describe('a GM compendium', () => {
   const [street] = comp.books
   const c = translateBook(street, { ...OPTS, descriptions: comp.descriptions })
   test('labels end with "(House)" and docs are flagged compendium', () => {
-    expect(planBookPacks(c).map(p => p.label)).toEqual(['Weapons — STREET (House)', 'NPCs — STREET (House)', 'Spirits — STREET (House)'])
+    expect(planTypePacks([c]).map(p => [p.name, p.label])).toEqual([['chummer-sr6-c-street-weapons', 'Weapons — STREET (House)'],
+      ['chummer-sr6-c-street-npcs', 'NPCs — STREET (House)'], ['chummer-sr6-c-street-spirits', 'Spirits — STREET (House)']])
+    expect(planTypePacks([c])[0].compendium).toEqual({ id: 'STREET', name: 'Street Kit' })
     expect(byName(c, 'Zapper').flags[M]).toMatchObject({ source: 'STREET', canon: false, compendium: true })
     expect(byName(c, 'Zapper').system.description).toContain('<p>Made-up.</p>')
   })
@@ -175,9 +178,9 @@ describe('what Eden takes from the book text', () => {
       { name: 'Lucky Break (conditional)', transfer: true, disabled: true, changes: [{ key: 'system.skills.firearms.modifier', value: '2', mode: 2 }], flags: { 'chummer-sr6-importer': { chummer: true } } }])
     expect(q.system.description).toContain('<p>Test: Perception + Intuition (3).</p>')
   })
-  test('a weapon accessory -> Eden mod in its kind’s pack, its item:ar effect on the host (not transferred)', () => {
+  test('a weapon accessory -> Eden mod in the Mods & accessories pack, its item:ar effect on the host (not transferred)', () => {
     const sight = byName(t, 'Made-up Sight')
-    expect(t.packs.gear).toContain(sight)
+    expect(t.packs.mods).toContain(sight)
     expect(sight).toMatchObject({ flags: { [M]: { chummerID: 'MUS:gear:mus.made-up-sight' } }, type: 'mod', system: { type: 'accessory_weapon', price: 200, availDef: '2' } })
     expect(sight.effects).toEqual([{ name: 'Made-up Sight', transfer: false, disabled: false,
       changes: [{ key: 'system.attackRating.1', value: '1', mode: 2 }, { key: 'system.attackRating.2', value: '1', mode: 2 }], flags: { 'chummer-sr6-importer': { chummer: true } } }])
@@ -205,5 +208,127 @@ test('a book’s vehicles and drones are also Vehicle actors in their own compen
   const [drone] = t.packs.vehicleactors
   expect(drone).toMatchObject({ name: 'Test Drone', type: 'Vehicle', items: [], system: { vtype: 'aircraft', tspd: 60, bod: 2 },
     flags: { [M]: { chummerID: 'MUS:vehicleactors:mus.test-drone', source: 'MUS', page: 10 } } })
-  expect(planBookPacks(t).find(p => p.key === 'vehicleactors')).toMatchObject({ type: 'Actor', label: 'Vehicles & drones (actors) — MUS' })
+  expect(planTypePacks([t]).find(p => p.key === 'vehicleactors')).toMatchObject({ type: 'Actor', label: 'Vehicles & drones (actors)' })
+  expect(t.packs.vehicles.map(d => d.name)).toEqual(['Test Drone'])  // and a gear item, for runners' and NPCs' links
+})
+
+describe('by type: packs, folders, report counts', () => {
+  const t = translateBook(mus, OPTS), cat = d => d.flags[M].category
+  const gear = (type, subtype, extra = {}) => ({ type: 'gear', system: { type, subtype }, flags: { [M]: { kind: 'gear', ...extra } } })
+  test('every Eden type and gear type has its pack', () => {
+    const items = { quality: 'qualities', spell: 'spells', ritual: 'rituals', adeptpower: 'adeptpowers', complexform: 'complexforms', echo: 'echoes',
+      metamagic: 'metamagics', focus: 'foci', critterpower: 'critterpowers', spritepower: 'spritepowers', martialartstyle: 'martialarts',
+      martialarttech: 'martialarts', lifestyle: 'lifestyles', contact: 'contacts', software: 'programs', mod: 'mods', skill: 'gear', sin: 'gear' }
+    for (const [type, key] of Object.entries(items)) expect(typeKey({ type, system: {}, flags: {} }), type).toBe(key)
+    const actors = { NPC: 'npcs', Critter: 'critters', Spirit: 'spirits', sprite: 'sprites', Vehicle: 'vehicleactors' }
+    for (const [type, key] of Object.entries(actors)) expect(typeKey({ type, system: {}, flags: {} }), type).toBe(key)
+    const gears = { WEAPON_FIREARMS: 'weapons', WEAPON_CLOSE_COMBAT: 'weapons', WEAPON_RANGED: 'weapons', WEAPON_SPECIAL: 'weapons',
+      AMMUNITION: 'weapons', ARMOR: 'armor', CYBERWARE: 'cyberware', BIOWARE: 'bioware', GENETICS: 'geneware', NANOWARE: 'geneware',
+      ELECTRONICS: 'electronics', SOFTWARE: 'programs', CHEMICALS: 'drugs', VEHICLES: 'vehicles', DRONES: 'vehicles', DRONE_SMALL: 'vehicles',
+      DRONE_MICRO: 'vehicles', TOOLS: 'gear', SURVIVAL: 'gear', BIOLOGY: 'gear', MAGICAL: 'gear' }
+    for (const [type, key] of Object.entries(gears)) expect(typeKey(gear(type, '')), type).toBe(key)
+  })
+  test('a vehicle mod or other accessory Eden has no mod for goes with the mods; a cyberlimb accessory stays cyberware', () => {
+    expect(typeKey(gear('TOOLS', 'TOOLS'), 'Vehicle mods')).toBe('mods')
+    expect(typeKey(gear('TOOLS', 'TOOLS', { category: 'Drone modifications' }))).toBe('mods')
+    expect(typeKey(gear('CYBERWARE', 'CYBER_LIMBS', { kind: 'augmentations' }), 'Cyberlimb accessories')).toBe('cyberware')
+    expect(typeKey(gear('TOOLS', 'TOOLS'), 'Modular tools')).toBe('gear')
+  })
+  test('every sample entry has a category folder, never Other or General', () => {
+    for (const b of [mus, mux, ...comp.books]) for (const d of Object.values(translateBook(b, OPTS).packs).flat()) {
+      expect(cat(d), d.name).toBeTruthy()
+      expect(cat(d), d.name).not.toMatch(/^(other|general|misc)/i)
+    }
+    const folders = Object.fromEntries(Object.entries(t.packs).map(([k, docs]) => [k, docs.map(cat)]))
+    expect(folders).toMatchObject({ weapons: ['Pocket Tasers', 'Glitter cannons'], armor: ['Body armor'], cyberware: ['Bodyware'],
+      electronics: ['Commlinks', 'Cyberdecks'], programs: ['Hacking'], mods: ['Vehicle mods', 'Weapon accessories'], gear: ['Survival gear'],
+      spells: ['Combat'], martialarts: ['Styles', 'Striking techniques'], qualities: ['Positive'], adeptpowers: ['Minor action'],
+      complexforms: ['Sustained'], metamagics: ['Adepts'], critterpowers: ['Physical', 'Mana'], lifestyles: ['Middle'], contacts: ['Fixer'],
+      npcs: ['Made-up Crew'], critters: ['Made-up beasts'], vehicleactors: ['Small drones (air)'], rituals: ['Anchored'] })
+    // nothing in the entry to file it by: its book
+    expect(folders.echoes).toEqual(['Made-Up Streets'])
+    expect(folders.rules).toEqual(['Made-Up Streets'])
+    expect(new Set(folders.reference)).toEqual(new Set(['Made-Up Streets']))
+  })
+  test('a category that says nothing or only names its kind: the entry’s own data instead', () => {
+    const e = (kind, attrs) => ({ kind, attrs })
+    expect(categoryOf(e('armor', { category: 'Other' }), gear('ARMOR', 'ARMOR_BODY'), 'armor', 'Core')).toBe('Body armor')
+    expect(categoryOf(e('armor', { category: 'armor' }), gear('ARMOR', 'ARMOR_HELMET'), 'armor', 'Core')).toBe('Helmet armor')
+    expect(categoryOf(e('augmentations', { category: 'general' }), gear('CYBERWARE', 'CYBER_EYEWARE'), 'cyberware', 'Core')).toBe('Eyeware')
+    expect(categoryOf(e('weapons', { category: 'misc' }), gear('WEAPON_FIREARMS', 'PISTOLS_HEAVY'), 'weapons', 'Core')).toBe('Heavy pistols')
+    expect(categoryOf(e('critters', { category: 'critter' }), { type: 'Critter', system: {} }, 'critters', 'Core')).toBe('Mundane critters')
+    expect(categoryOf(e('npcs', { rating: '4' }), { type: 'NPC', system: {} }, 'npcs', 'Core')).toBe('Professional rating 4')
+    expect(categoryOf(e('qualities', { category: 'qualities' }), { type: 'quality', system: { category: 'DISADVANTAGE' } }, 'qualities', 'Core')).toBe('Negative')
+    expect(categoryOf(e('metamagics', {}), { type: 'metamagic', system: {} }, 'metamagics', 'Core')).toBe('All initiates')
+    expect(categoryOf(e('martialtechniques', {}), { type: 'martialarttech', system: {} }, 'martialarts', 'Core')).toBe('Techniques')
+    expect(categoryOf(e('gear', { category: 'heavy pistols' }), gear('WEAPON_FIREARMS', 'PISTOLS_HEAVY'), 'weapons', 'Core')).toBe('Heavy pistols')
+  })
+  test('a spirit: always by its Eden spirit type; one Eden doesn’t know by its category, then its book', () => {
+    const spirit = (name, attrs = {}) => categoryOf({ kind: 'spirits', name, attrs }, { type: 'Spirit', system: {} }, 'spirits', 'Core')
+    expect(spirit('Spirit of Man', { category: 'Hermetic spirits' })).toBe('Man')
+    expect(spirit('Fire Spirit')).toBe('Fire')
+    expect(spirit('Beast Spirit')).toBe('Beasts')
+    expect(categoryOf({ kind: 'spirits', name: 'X', npc: { from: { name: 'Guardian Spirit' } } }, { type: 'Spirit', system: {} }, 'spirits', 'Core')).toBe('Guardian')
+    expect(spirit('Glitter Thing', { category: 'Toxic spirits' })).toBe('Toxic spirits')
+    expect(spirit('Glitter Thing', { category: 'spirit' })).toBe('Core')
+  })
+  test('a critter: its printed section when it has one, else Awakened or Mundane by its Magic', () => {
+    const critter = (attrs, mag) => categoryOf({ kind: 'critters', attrs }, { type: 'Critter', system: { attributes: mag == null ? {} : { mag: { base: mag } } } }, 'critters', 'Core')
+    expect(critter({ category: 'Paracritters' })).toBe('Paracritters')
+    expect(critter({ category: 'critter' }, 4)).toBe('Awakened critters')
+    expect(critter({ mag: '3' })).toBe('Awakened critters')
+    expect(critter({ mag: '—' }, 0)).toBe('Mundane critters')
+    expect(critter({})).toBe('Mundane critters')
+  })
+  test('a critter power the book files as a sprite’s: an Eden sprite power in its own pack', () => {
+    const power = { ...mus.entries.find(e => e.kind === 'critterpowers'), attrs: { category: 'Sprite powers' } }
+    const x = translateBook({ ...mus, entries: [power] }, OPTS)
+    expect(x.packs.spritepowers.map(d => [d.type, cat(d)])).toEqual([['spritepower', 'Made-Up Streets']])
+  })
+  test('pack names: by type, a GM compendium’s with its id, never the 0.3 per-book names', () => {
+    expect(typePackName('weapons')).toBe('chummer-sr6-weapons')
+    expect(typePackName('npcs', 'sr6test-', 'STREET')).toBe('sr6test-chummer-sr6-c-street-npcs')
+    expect(typeOfPack('world.chummer-sr6-weapons')).toEqual({ key: 'weapons', compendium: false })
+    expect(typeOfPack('world.chummer-sr6-vehicleactors')).toEqual({ key: 'vehicleactors', compendium: false })
+    expect(typeOfPack('world.chummer-sr6-c-street-kit-vehicles')).toEqual({ key: 'vehicles', compendium: true })
+    expect(typeOfPack('world.sr6test-chummer-sr6-weapons', 'sr6test-')).toEqual({ key: 'weapons', compendium: false })
+    for (const old of ['world.sr6-mus-weapons', 'world.sr6test-sr6-mus-weapons', 'world.chummer-sr6-glitter', 'world.sr6test-chummer-sr6-weapons'])
+      expect(typeOfPack(old), old).toBe(null)
+  })
+  test('two books merge into one pack per type; a GM compendium keeps its own, after them', () => {
+    const other = translateBook({ ...mus, source: { ...mus.source, id: 'MUZ', name: 'Made-Up Zones' },
+      entries: mus.entries.map(e => ({ ...e, source: 'MUZ' })) }, OPTS)
+    const house = translateBook(comp.books[0], { ...OPTS, descriptions: true })
+    const plan = planTypePacks([t, other, house])
+    const weapons = plan.find(p => p.name === 'chummer-sr6-weapons')
+    expect(weapons.docs.map(d => d.flags[M].chummerID)).toEqual(['MUS:weapons:mus.pocket-zapper', 'MUS:weapons:mus.glitter-cannon',
+      'MUZ:weapons:mus.pocket-zapper', 'MUZ:weapons:mus.glitter-cannon'])
+    expect(plan.filter(p => p.key === 'weapons').map(p => p.name)).toEqual(['chummer-sr6-weapons', 'chummer-sr6-c-street-weapons'])
+    expect(plan.findIndex(p => p.compendium)).toBe(plan.length - 3)
+  })
+  test('report counts per book', () => {
+    const d = src => ({ flags: { [M]: { source: src } } })
+    expect(bookCounts([{ doc: d('CRB') }, { doc: d('FS') }], [d('CRB'), d('CRB')], [{ doc: d('FS') }]))
+      .toEqual({ CRB: { created: 2, replaced: 1, moved: 0 }, FS: { created: 0, replaced: 1, moved: 1 } })
+    expect(bookCounts()).toEqual({})
+  })
+  test('relinkUpdates: every document pointing at a moved entry, to its new UUID; nothing else', () => {
+    const moved = new Map([['Compendium.world.chummer-sr6-gear.Item.G1', 'Compendium.world.chummer-sr6-mods.Item.M1']])
+    const docs = [{ id: 'a', _stats: { compendiumSource: 'Compendium.world.chummer-sr6-gear.Item.G1' } },
+      { _id: 'b', _stats: { compendiumSource: 'Compendium.world.chummer-sr6-gear.Item.G2' } }, { id: 'c' }]
+    expect(relinkUpdates(docs, moved)).toEqual([{ from: 'Compendium.world.chummer-sr6-gear.Item.G1',
+      update: { _id: 'a', '_stats.compendiumSource': 'Compendium.world.chummer-sr6-mods.Item.M1' } }])
+    expect(relinkUpdates(undefined, moved)).toEqual([])
+  })
+  test('chunks: pieces of n, the last shorter, none for nothing', () => {
+    expect(chunks([1, 2, 3, 4, 5], 2)).toEqual([[1, 2], [3, 4], [5]])
+    expect(chunks([], 100)).toEqual([])
+    expect(chunks(Array.from({ length: 250 }, (_, i) => i), 100).map(c => c.length)).toEqual([100, 100, 50])
+  })
+  test('keepStyleIds: a style found in the world keeps its genesisID, the incoming techniques follow it', () => {
+    const style = { type: 'martialartstyle', system: { genesisID: 'new' } }, tech = { type: 'martialarttech', system: { style: 'new' } }
+    const fresh = { type: 'martialartstyle', system: { genesisID: 'n2' } }
+    keepStyleIds([{ doc: style, hit: { system: { genesisID: 'kept' } } }, { doc: fresh, hit: {} }], [style, tech, fresh])
+    expect([style.system.genesisID, tech.system.style, fresh.system.genesisID]).toEqual(['kept', 'kept', 'n2'])
+  })
 })

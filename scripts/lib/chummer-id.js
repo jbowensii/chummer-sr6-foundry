@@ -36,7 +36,8 @@ export const keysOf = d => ({ chummerID: flagsOf(d).chummerID ?? null, aliases: 
  * alias. A match is an update in place, keeping the entry's _id; anything else is created and gets Foundry's id. Each
  * existing entry is matched at most once. Nothing is ever deleted. A key the file has twice keeps its last document;
  * the dropped ones are listed in `duplicates`.
- * existing: the pack's index entries ({ _id, flags }). Returns { updates: [{ _id, doc, how }], creates: [doc], duplicates }.
+ * existing: the packs' index entries ({ _id, flags, … }). Returns { updates: [{ _id, doc, how, hit }], creates: [doc], duplicates }
+ * (hit: the existing entry matched, as given).
  */
 export function planUpsert(existing, incoming) {
   const byKey = new Map(), byAlias = new Map(), byId = new Map(), claimed = new Set()
@@ -61,7 +62,7 @@ export function planUpsert(existing, incoming) {
       ['legacy', () => byId.get(legacyId(k))], ...aliases.map(a => ['legacy', () => byId.get(legacyId(a))])]
     let hit = null, how = null
     for (const [h, f] of tries) { if (k && (hit = free(f()))) { how = h; break } }
-    if (hit) { claimed.add(hit._id); updates.push({ _id: hit._id, doc: d, how }) } else creates.push(d)
+    if (hit) { claimed.add(hit._id); updates.push({ _id: hit._id, doc: d, how, hit }) } else creates.push(d)
   }
   return { updates, creates, duplicates }
 }
@@ -84,12 +85,13 @@ export function mergeByKey(existing = [], incoming = []) {
 
 const norm = s => String(s ?? '').toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, ' ').trim()
 /**
- * Which compendium entry a runner's item came from. entries: the index entries of that one book's compendiums
- * ({ uuid, type, name, chummerID, aliases, kind, page }). In order: the item's chummerID; its aliases (or an entry
- * listing the item's key as an alias); then the same Foundry type and name (case and punctuation aside), ties broken by
- * the same kind, then the same page. Returns { uuid, how }, { candidates } when still tied, or null.
+ * Which compendium entry a runner's item came from. entries: the index entries of this module's type packs, every book
+ * ({ uuid, type, name, chummerID, aliases, kind, page, source, pack }); pack: the item's type pack (lib/books.js typeKey).
+ * In order: the item's chummerID; its aliases (or an entry listing the item's key as an alias); then the same Foundry
+ * type and name (case and punctuation aside), preferring the item's type pack, then its book (source), then its kind,
+ * then its page. Returns { uuid, how }, { candidates } when still tied, or null.
  */
-export function resolveEntry(item, entries) {
+export function resolveEntry(item, entries, pack = null) {
   const f = flagsOf(item), k = f.chummerID, aliases = f.chummerAliases ?? []
   const one = (list, how) => (list.length === 1 ? { uuid: list[0].uuid, how } : list.length > 1 ? { candidates: list } : null)
   if (k) {
@@ -98,10 +100,14 @@ export function resolveEntry(item, entries) {
     if (r) return r
   }
   let list = entries.filter(e => e.type === item.type && norm(e.name) === norm(item.name))
-  if (list.length > 1 && f.kind) { const same = list.filter(e => e.kind === f.kind); if (same.length) list = same }
-  if (list.length > 1 && f.page != null) { const same = list.filter(e => e.page === f.page); if (same.length) list = same }
+  for (const [have, same] of [[pack, e => e.pack === pack], [f.source, e => e.source === f.source], [f.kind, e => e.kind === f.kind],
+    [f.page != null, e => e.page === f.page]]) {
+    if (list.length < 2 || !have) continue
+    const hit = list.filter(same)
+    if (hit.length) list = hit
+  }
   return one(list, 'name')
 }
 /** The report line for an item left unlinked because several entries tie. */
 export const tieLine = (item, candidates) => `${item.name}: ${candidates.length} compendium entries match (${
-  candidates.map(c => `${c.name}${c.kind ? ` [${c.kind}]` : ''}${c.page != null ? ` p.${c.page}` : ''}`).join(', ')}) → not linked`
+  candidates.map(c => `${c.name}${c.kind ? ` [${c.kind}]` : ''}${c.source ? ` ${c.source}` : ''}${c.page != null ? ` p.${c.page}` : ''}`).join(', ')}) → not linked`

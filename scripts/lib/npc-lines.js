@@ -1,7 +1,7 @@
 // An NPC's or critter's gear, weapon and augmentation lines from its printed stat block, to real compendium items: each
 // line split into things (a top-level comma list), each thing's name, its bracketed stats and its "w/" accessories,
-// matched by name inside that one book (the same matching as a runner's items, a line having no chummerID): the kinds
-// its part names, the first of those kinds winning a tie, then the NPC's own page. Still tied: no item, and the report
+// matched by name (the same matching as a runner's items, a line having no chummerID): the kinds its part names, the
+// first of those kinds winning a tie, then the NPC's own book, then its own page. Still tied: no item, and the report
 // lists the candidates; unmatched: the line stays text (the notes). Pure: no Foundry calls.
 import { splitTop } from './translate.js'
 
@@ -37,12 +37,14 @@ export const npcThings = npc => (npc?.lines ?? []).filter(l => LINE_KINDS[l.part
   .flatMap(l => splitTop(l.text).map(t => ({ part: l.part, ...parseThing(t) })))
 
 /**
- * A thing's catalog entry. entries: the book's entries ({ kind, name, page, … }); kinds: LINE_KINDS[part] (or any kind
- * for an accessory); page: the NPC's page. Returns { entry }, { candidates }, or null.
+ * A thing's catalog entry. entries: the entries to look in ({ kind, name, page, source, … }: a book's own, or every book's
+ * in this world's type packs); kinds: LINE_KINDS[part] (or any kind for an accessory); page and source: the NPC's page
+ * and book, preferred in a tie (the book first). Returns { entry }, { candidates }, or null.
  */
-export function matchThing(name, entries, kinds, page) {
+export function matchThing(name, entries, kinds, page, source = null) {
   let list = entries.filter(e => (!kinds || kinds.includes(e.kind)) && norm(e.name) === norm(name))
   if (list.length > 1 && kinds) { const first = kinds.find(k => list.some(e => e.kind === k)); list = list.filter(e => e.kind === first) }
+  if (list.length > 1 && source) { const same = list.filter(e => e.source === source); if (same.length) list = same }
   if (list.length > 1 && page != null) { const same = list.filter(e => e.page === page); if (same.length) list = same }
   return list.length === 1 ? { entry: list[0] } : list.length > 1 ? { candidates: list } : null
 }
@@ -60,4 +62,4 @@ export function overrideStats(system, stats) {
 
 /** The report line for a thing left as text because several entries tie. */
 export const thingTie = (thing, candidates) => `${thing.printed}: ${candidates.length} compendium entries match (${
-  candidates.map(c => `${c.name}${c.kind ? ` [${c.kind}]` : ''}${c.page != null ? ` p.${c.page}` : ''}`).join(', ')}) → notes`
+  candidates.map(c => `${c.name}${c.kind ? ` [${c.kind}]` : ''}${c.source ? ` ${c.source}` : ''}${c.page != null ? ` p.${c.page}` : ''}`).join(', ')}) → notes`
