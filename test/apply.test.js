@@ -155,10 +155,13 @@ test('create: a duplicate Unarmed that landed during the import is removed', asy
 })
 
 test('create: items get Foundry’s ids, then a fitted mod is pointed at its host’s; a catalog item links its entry by chummerID', async () => {
-  const M = MODULE_ID, entry = (id, name, key, extra = {}) => ({ _id: id, uuid: `Compendium.world.sr6-mus-weapons.Item.${id}`, type: 'gear', name,
+  const M = MODULE_ID, entry = (id, name, key, extra = {}) => ({ _id: id, uuid: `Compendium.world.chummer-sr6-weapons.Item.${id}`, type: 'gear', name,
     flags: { [M]: { chummerID: key, chummerAliases: [], kind: 'weapons', page: 10 } }, ...extra })
   const index = new Map([['F7', entry('F7', 'Zapper', 'MUS:weapons:mus.pocket-zapper')]])
-  game.packs = { filter: f => [{ documentName: 'Item', collection: 'world.sr6-mus-weapons', getIndex: async () => index, getUuid: id => id }].filter(f) }
+  // 0.3's per-book pack holds the same entry: never read
+  const old = new Map([['OLD', entry('OLD', 'Zapper', 'MUS:weapons:mus.pocket-zapper', { uuid: 'Compendium.world.sr6-mus-weapons.Item.OLD' })]])
+  game.packs = { filter: f => [{ documentName: 'Item', collection: 'world.sr6-mus-weapons', getIndex: async () => old },
+    { documentName: 'Item', collection: 'world.chummer-sr6-weapons', getIndex: async () => index, getUuid: id => id }].filter(f) }
   const gun = { name: 'Zapper', type: 'gear', flags: flags({ id: 'w1', catalogId: 'mus.pocket-zapper', chummerID: 'MUS:weapons:mus.pocket-zapper', kind: 'weapons', source: 'MUS' }), system: {} }
   const sight = { name: 'Sight', type: 'mod', flags: flags({ id: 'w1a', host: 'w1', catalogId: 'mus.made-up-sight', chummerID: 'MUS:gear:mus.made-up-sight', kind: 'gear', source: 'MUS' }), system: {} }
   const t = player(); t.items = [gun, sight]
@@ -166,7 +169,7 @@ test('create: items get Foundry’s ids, then a fitted mod is pointed at its hos
   expect(res.action).toBe('create')
   const [, items] = log.find(([k]) => k === 'items')
   for (const i of items) expect(i).not.toHaveProperty('_id')  // Foundry picks the ids
-  expect(items[0]._stats).toEqual({ compendiumSource: 'Compendium.world.sr6-mus-weapons.Item.F7' })
+  expect(items[0]._stats).toEqual({ compendiumSource: 'Compendium.world.chummer-sr6-weapons.Item.F7' })
   expect(items[1]).not.toHaveProperty('_stats')  // nothing in the book's packs for it: no link
   const [, fits] = log.find(([k]) => k === 'updateItems')
   const made = res.actor.items
@@ -174,13 +177,13 @@ test('create: items get Foundry’s ids, then a fitted mod is pointed at its hos
 })
 
 test('create: two book entries tie for a runner’s item: no link, the report lists them', async () => {
-  const M = MODULE_ID, e = (id, page) => [id, { _id: id, uuid: `U-${id}`, type: 'gear', name: 'Rope', flags: { [M]: { kind: 'gear', page } } }]
+  const M = MODULE_ID, e = (id, page) => [id, { _id: id, uuid: `U-${id}`, type: 'gear', name: 'Rope', flags: { [M]: { kind: 'gear', page, source: 'MUS' } } }]
   const index = new Map([e('A', 12), e('B', 12)])
-  game.packs = { filter: f => [{ documentName: 'Item', collection: 'world.sr6-mus-gear', getIndex: async () => index }].filter(f) }
+  game.packs = { filter: f => [{ documentName: 'Item', collection: 'world.chummer-sr6-gear', getIndex: async () => index }].filter(f) }
   const rope = { name: 'Rope', type: 'gear', flags: flags({ id: 'g1', catalogId: 'mus.rope', chummerID: 'MUS:gear:mus.rope', kind: 'gear', page: 10, source: 'MUS' }), system: {} }
   const t = player(); t.items = [rope]
   const res = await applyRunner(t, 'create')
-  expect(res.notes).toEqual(['Rope: 2 compendium entries match (Rope [gear] p.12, Rope [gear] p.12) → not linked'])
+  expect(res.notes).toEqual(['Rope: 2 compendium entries match (Rope [gear] MUS p.12, Rope [gear] MUS p.12) → not linked'])
   expect(log.find(([k]) => k === 'items')[1][0]).not.toHaveProperty('_stats')
 })
 

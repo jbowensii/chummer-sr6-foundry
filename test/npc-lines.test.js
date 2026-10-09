@@ -57,9 +57,12 @@ let fetched
 beforeEach(() => { fetched = [] })
 
 test('a runners-file NPC: its lines from its book’s compendiums in this world, linked, the stat block’s values kept', async () => {
-  const entry = (id, name, kind, system) => ({ _id: id, uuid: `U-${id}`, type: 'gear', name, flags: { [M]: { chummerID: `MUS:${kind}:x-${id}`, kind, page: 10 } }, system })
-  const index = new Map([['Z', entry('Z', 'Pocket Zapper', 'weapons', { dmg: 3 })], ['R1', entry('R1', 'Rope', 'gear', {})], ['R2', entry('R2', 'Rope', 'gear', {})]])
-  globalThis.game = { packs: { filter: f => [{ documentName: 'Item', collection: 'world.sr6-mus-weapons', getIndex: async () => index }].filter(f) } }
+  const entry = (id, name, kind, system, source = 'MUS') => ({ _id: id, uuid: `U-${id}`, type: 'gear', name, flags: { [M]: { chummerID: `${source}:${kind}:x-${id}`, kind, page: 10, source } }, system })
+  const index = new Map([['Z', entry('Z', 'Pocket Zapper', 'weapons', { dmg: 3 })], ['Z2', entry('Z2', 'Pocket Zapper', 'weapons', { dmg: 9 }, 'FS')],
+    ['R1', entry('R1', 'Rope', 'gear', {})], ['R2', entry('R2', 'Rope', 'gear', {})]])
+  // the merged type packs only (another book's Zapper loses to the NPC's own book's); 0.3's per-book pack is never read
+  globalThis.game = { packs: { filter: f => [{ documentName: 'Item', collection: 'world.chummer-sr6-weapons', getIndex: async () => index },
+    { documentName: 'Item', collection: 'world.sr6-mus-weapons', getIndex: async () => { throw new Error('read an old pack') } }].filter(f) } }
   globalThis.fromUuid = async uuid => { fetched.push(uuid); const e = [...index.values()].find(x => x.uuid === uuid); return { toObject: () => structuredClone({ ...e, folder: 'f', sort: 1, ownership: {} }) } }
   const t = { npc: { from: { source: 'MUS', page: 10 }, lines: [{ part: 'weapons', text: 'Pocket Zapper [DV 6P]' }, { part: 'gear', text: 'Rope, Unknown Thing' }] } }
   const r = await npcLineItems(t)
@@ -68,6 +71,6 @@ test('a runners-file NPC: its lines from its book’s compendiums in this world,
     flags: { [M]: { id: 'line:weapons:Pocket Zapper [DV 6P]', npcLine: 'Pocket Zapper [DV 6P]' } } })
   expect(r.items[0]).not.toHaveProperty('_id')
   expect(r.items[0]).not.toHaveProperty('folder')
-  expect(r.notes).toEqual(['Rope: 2 compendium entries match (Rope [gear] p.10, Rope [gear] p.10) → notes'])
+  expect(r.notes).toEqual(['Rope: 2 compendium entries match (Rope [gear] MUS p.10, Rope [gear] MUS p.10) → notes'])
   expect(await npcLineItems({ npc: { from: null, lines: t.npc.lines } })).toEqual({ items: [], notes: [] })  // no book: none
 })

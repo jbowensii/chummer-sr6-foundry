@@ -4,9 +4,9 @@ import { readExport } from '../lib/read.js'
 import { escapeText, npcHeadline, translateRunner } from '../lib/translate.js'
 import { defaultChoice } from '../lib/plan.js'
 import { planUpsert } from '../lib/chummer-id.js'
-import { PACKS, PORTRAIT, translateBook } from '../lib/books.js'
+import { PORTRAIT, TYPES, translateBook } from '../lib/books.js'
 import { applyRunner, COMPENDIUM_FOLDER, edenComplexForms, edenSpecLabels, findExisting, NPC_FOLDER } from './apply.js'
-import { importBook } from './books.js'
+import { importBooks } from './books.js'
 
 const flagOf = d => d?.flags?.[MODULE_ID]
 const time = x => Date.parse(x ?? '') || 0
@@ -59,9 +59,9 @@ export function createImportApp(getIcons = () => null) {
         canon: book.source.compendium ? F('SR6I.Compendium', { folder: COMPENDIUM_FOLDER }) : L(book.source.canon ? 'SR6I.Canon' : 'SR6I.NonCanon'),
         descriptions: L(this.file.descriptions === true ? 'SR6I.DescriptionsIn' : 'SR6I.DescriptionsOut'),
         // after de-duplicating chummerIDs, as the write does (planUpsert); rules and reference count their pages, not the journals
-        counts: t && Object.keys(PACKS).filter(k => t.packs[k]?.length).map(k => { const docs = planUpsert([], t.packs[k]).creates
+        counts: t && Object.keys(TYPES).filter(k => t.packs[k]?.length).map(k => { const docs = planUpsert([], t.packs[k]).creates
           const n = k === 'rules' || k === 'reference' ? docs.reduce((n, j) => n + j.pages.length, 0) : docs.length
-          return `${PACKS[k][0]} ${n}` }).join(' · ') || L('SR6I.NothingInBook'),
+          return `${TYPES[k][0]} ${n}` }).join(' · ') || L('SR6I.NothingInBook'),
       }))
       const nNpc = this.rows?.filter(r => r.runner.npc).length ?? 0
       const summary = nNpc ? F('SR6I.RunnersAndNpcs', { runners: this.rows.length - nNpc, npcs: nNpc, folder: NPC_FOLDER }) : ''
@@ -140,6 +140,8 @@ export function createImportApp(getIcons = () => null) {
       this.render()
     }
 
+    // All ticked books in one write, a type pack at a time (foundry/books.js importBooks); the report has a row per
+    // type pack written (its counts per book), one per pack that failed, then each book's text-only lines.
     async #importBooks() {
       if (this.busy || game.system.id !== SYSTEM) return
       const el = this.element
@@ -148,25 +150,24 @@ export function createImportApp(getIcons = () => null) {
       if (!jobs.length) { if (progress) progress.textContent = L('SR6I.NothingSelected'); return }
       this.busy = true
       for (const b of el.querySelectorAll('button[data-action=import], input')) b.disabled = true
-      // A book that couldn't be translated has no tick; the report lists it as failed.
-      const report = this.books.filter(b => b.error).map(({ book, error }) =>
-        ({ name: book.source.name, failed: true, outcome: F('SR6I.Failed', { reason: error }), packs: [], textOnly: [] }))
-      let n = 0
-      for (const { book, t } of jobs) {
-        const name = book.source.name
-        if (progress) progress.textContent = F('SR6I.BookProgress', { name, n: ++n, total: jobs.length })
-        const onProgress = ({ key, n: i, total }) => {
-          if (progress) progress.textContent = F('SR6I.BookPackProgress', { name, pack: PACKS[key][0], n: i, total })
-        }
-        let res
-        try { res = await importBook(t, { onProgress }) } catch (error) { res = { counts: {}, failed: [{ name, error }] } }  // importBook shouldn't throw; the window mustn't stick busy
-        // one line per pack written or failed; an id the file has twice is noted with the report lines
-        const counts = Object.values(res.counts)
-        const packs = [...counts.map(c => ({ text: F('SR6I.PackResult', c) })),
-          ...res.failed.map(f => ({ failed: true, text: F('SR6I.PackFailed', { label: f.name, reason: f.error?.message ?? String(f.error) }) }))]
-        const dupes = counts.flatMap(c => c.duplicates.map(d => F('SR6I.Duplicate', { label: c.label, name: d })))
-        report.push({ name, packs, outcome: packs.length ? '' : L('SR6I.NothingInBook'), textOnly: [...t.textOnly, ...(res.notes ?? []), ...dupes] })
+      const onProgress = ({ label, n, total, done, of }) => {
+        if (progress) progress.textContent = F('SR6I.TypeProgress', { pack: label, n, total, done, of })
       }
+      let res
+      try { res = await importBooks(jobs.map(j => j.t), { onProgress }) } catch (error) { res = { counts: {}, failed: [{ name: L('SR6I.Title'), error }], notes: [] } }  // importBooks shouldn't throw; the window mustn't stick busy
+      const bookName = id => { const b = jobs.find(j => j.book.source.id === id)?.book.source; return b ? `${b.name} (${b.id})` : id }
+      const report = [
+        ...Object.values(res.counts).map(c => ({ name: c.label, outcome: F('SR6I.TypeResult', c),
+          packs: Object.entries(c.books).map(([id, n]) => ({ text: F('SR6I.BookCount', { book: bookName(id), ...n }) })),
+          textOnly: c.duplicates.map(d => F('SR6I.Duplicate', { label: c.label, name: d })) })),
+        ...res.failed.map(f => ({ name: f.name, failed: true, outcome: F('SR6I.Failed', { reason: f.error?.message ?? String(f.error) }), packs: [], textOnly: [] })),
+        // a book that couldn't be translated has no tick; listed as failed
+        ...this.books.filter(b => b.error).map(({ book, error }) =>
+          ({ name: book.source.name, failed: true, outcome: F('SR6I.Failed', { reason: error }), packs: [], textOnly: [] })),
+        ...jobs.filter(j => j.t.textOnly.length).map(({ book, t }) => ({ name: book.source.name, outcome: '', packs: [], textOnly: t.textOnly })),
+      ]
+      if (res.notes?.length) report.push({ name: L('SR6I.Portraits'), outcome: '', packs: [], textOnly: res.notes })
+      if (!report.length) report.push({ name: L('SR6I.Title'), outcome: L('SR6I.NothingInBook'), packs: [], textOnly: [] })
       Object.assign(this, { busy: false, report, bookReport: true })
       this.render()
     }

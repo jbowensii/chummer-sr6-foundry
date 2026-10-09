@@ -29,7 +29,7 @@ describe('keys', () => {
 describe('re-import upsert', () => {
   test('found by chummerID: an update in place with the entry’s own _id; not found: created (Foundry picks the id)', () => {
     const r = planUpsert([entry('F1', 'MUS:gear:mus.a'), entry('F9', 'MUS:gear:mus.gm-own')], [doc('MUS:gear:mus.a'), doc('MUS:gear:mus.b')])
-    expect(r.updates).toEqual([{ _id: 'F1', doc: doc('MUS:gear:mus.a'), how: 'chummerID' }])
+    expect(r.updates).toEqual([{ _id: 'F1', doc: doc('MUS:gear:mus.a'), how: 'chummerID', hit: entry('F1', 'MUS:gear:mus.a') }])
     expect(r.creates).toEqual([doc('MUS:gear:mus.b')])
     expect(r.creates[0]).not.toHaveProperty('_id')
   })
@@ -54,7 +54,7 @@ describe('re-import upsert', () => {
   })
   test('chummerID wins over the legacy id; each existing entry is matched once', () => {
     const r = planUpsert([entry('F1', 'MUS:gear:mus.a'), entry(docId('MUS:gear:mus.a'), null)], [doc('MUS:gear:mus.a')])
-    expect(r.updates).toEqual([{ _id: 'F1', doc: doc('MUS:gear:mus.a'), how: 'chummerID' }])
+    expect(r.updates).toMatchObject([{ _id: 'F1', doc: doc('MUS:gear:mus.a'), how: 'chummerID' }])
     const twice = planUpsert([entry('F1', 'MUS:gear:mus.old')], [doc('MUS:gear:mus.x', ['MUS:gear:mus.old']), doc('MUS:gear:mus.y', ['MUS:gear:mus.old'])])
     expect(twice.updates.map(u => u._id)).toEqual(['F1'])
     expect(twice.creates.map(d => d.name)).toEqual(['MUS:gear:mus.y'])
@@ -76,9 +76,9 @@ describe('a journal’s pages on re-import', () => {
   })
 })
 
-describe('a runner’s item -> its compendium entry, inside one book', () => {
-  const e = (name, extra = {}) => ({ uuid: `Compendium.world.sr6-mus-gear.Item.${name}`, type: 'gear', name, chummerID: null, aliases: [], kind: 'gear', page: 10, ...extra })
-  const item = (name, f = {}) => ({ name, type: 'gear', flags: { [MODULE_ID]: { chummerID: 'MUS:gear:mus.rope', chummerAliases: [], kind: 'gear', page: 10, ...f } } })
+describe('a runner’s item -> its compendium entry in the type packs', () => {
+  const e = (name, extra = {}) => ({ uuid: `Compendium.world.chummer-sr6-gear.Item.${name}`, type: 'gear', name, chummerID: null, aliases: [], kind: 'gear', page: 10, source: 'MUS', pack: 'gear', ...extra })
+  const item = (name, f = {}) => ({ name, type: 'gear', flags: { [MODULE_ID]: { chummerID: 'MUS:gear:mus.rope', chummerAliases: [], kind: 'gear', page: 10, source: 'MUS', ...f } } })
   test('by chummerID first, whatever the name', () => {
     expect(resolveEntry(item('Renamed Rope'), [e('Rope', { chummerID: 'MUS:gear:mus.rope', uuid: 'U1' }), e('Renamed Rope')]))
       .toEqual({ uuid: 'U1', how: 'chummerID' })
@@ -100,7 +100,20 @@ describe('a runner’s item -> its compendium entry, inside one book', () => {
   test('still tied: no link, the candidates for the report', () => {
     const r = resolveEntry(item('Rope'), [e('Rope', { uuid: 'A' }), e('Rope', { uuid: 'B' })])
     expect(r.candidates.map(c => c.uuid)).toEqual(['A', 'B'])
-    expect(tieLine(item('Rope'), r.candidates)).toBe('Rope: 2 compendium entries match (Rope [gear] p.10, Rope [gear] p.10) → not linked')
+    expect(tieLine(item('Rope'), r.candidates)).toBe('Rope: 2 compendium entries match (Rope [gear] MUS p.10, Rope [gear] MUS p.10) → not linked')
   })
-  test('nothing in the book: null', () => expect(resolveEntry(item('Rope'), [e('Other')])).toBe(null))
+  test('nothing by that name: null', () => expect(resolveEntry(item('Rope'), [e('Other')])).toBe(null))
+  test('by name: the item’s type pack first, then its book; another book still links when its own has none', () => {
+    const fs = e('Rope', { source: 'FS', uuid: 'FS' }), crb = e('Rope', { source: 'CRB', uuid: 'CRB' }), mods = e('Rope', { pack: 'mods', uuid: 'MOD' })
+    expect(resolveEntry(item('Rope'), [mods, e('Rope', { uuid: 'G' })], 'gear')).toEqual({ uuid: 'G', how: 'name' })
+    expect(resolveEntry(item('Rope', { source: 'FS' }), [crb, fs], 'gear')).toEqual({ uuid: 'FS', how: 'name' })
+    expect(resolveEntry(item('Rope', { source: 'SWC' }), [crb], 'gear')).toEqual({ uuid: 'CRB', how: 'name' })
+    // the type pack wins over the book: the item's book's entry filed in another pack loses to one in the item's pack
+    expect(resolveEntry(item('Rope', { source: 'FS' }), [{ ...fs, pack: 'mods' }, crb], 'gear')).toEqual({ uuid: 'CRB', how: 'name' })
+  })
+  test('tied across books, none of them the item’s: no link, the report names each candidate’s book', () => {
+    const r = resolveEntry(item('Rope', { source: 'SWC' }), [e('Rope', { source: 'CRB', uuid: 'A' }), e('Rope', { source: 'FS', uuid: 'B' })], 'gear')
+    expect(r.candidates.map(c => c.uuid)).toEqual(['A', 'B'])
+    expect(tieLine(item('Rope'), r.candidates)).toBe('Rope: 2 compendium entries match (Rope [gear] CRB p.10, Rope [gear] FS p.10) → not linked')
+  })
 })

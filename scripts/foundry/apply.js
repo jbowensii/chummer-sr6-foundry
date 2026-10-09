@@ -3,6 +3,7 @@ import { MODULE_ID } from '../lib/constants.js'
 import { missingTargets, normKey } from '../lib/eden.js'
 import { INDEX_FIELDS, resolveEntry, tieLine } from '../lib/chummer-id.js'
 import { LINE_KINDS, matchThing, npcThings, overrideStats, thingTie } from '../lib/npc-lines.js'
+import { typeKey, typeOfPack } from '../lib/books.js'
 import { fitUpdates, isOurEffect, keepItemArt, newVersionName, planItems, replaceUpdate, tokenUpdate } from '../lib/plan.js'
 
 export const FOLDER = 'Chummer SR6'
@@ -103,36 +104,35 @@ export function addIndexFields() {
   }
 }
 
-// One book's world compendiums (lib/books.js: sr6-<source>-<key>, in any of its kinds' packs) as index entries for
-// lib/chummer-id.js resolveEntry, loaded once per import.
-const slug = s => String(s).toLowerCase().replace(/[^a-z0-9_-]/g, '-')
-async function bookEntries(source, prefix) {
-  const start = `world.${slug(`${prefix}sr6-${source}`)}-`, out = []
-  for (const pack of game.packs.filter(p => p.documentName === 'Item' && p.collection.startsWith(start))) {
-    const index = await pack.getIndex({ fields: INDEX_FIELDS })
+// This module's type packs in the world (lib/books.js typeOfPack: world.<prefix>chummer-sr6-…, every book merged), as
+// index entries for lib/chummer-id.js resolveEntry and lib/npc-lines.js matchThing, loaded once per import. 0.3's
+// per-book packs (world.sr6-<book>-<topic>) are never read.
+async function typeEntries(prefix) {
+  const out = []
+  for (const pack of game.packs.filter(p => p.documentName === 'Item' && typeOfPack(p.collection, prefix))) {
+    const key = typeOfPack(pack.collection, prefix).key, index = await pack.getIndex({ fields: INDEX_FIELDS })
     for (const i of index.values()) {
       const f = i.flags?.[MODULE_ID] ?? {}
       out.push({ uuid: i.uuid ?? pack.getUuid(i._id), type: i.type, name: i.name, chummerID: f.chummerID ?? null,
-        aliases: f.chummerAliases ?? [], kind: f.kind ?? null, page: f.page ?? null })
+        aliases: f.chummerAliases ?? [], kind: f.kind ?? null, page: f.page ?? null, source: f.source ?? null, pack: key })
     }
   }
   return out
 }
 
 /**
- * _stats.compendiumSource for a runner's items: the real UUID of the entry each came from in that world's compendiums
- * for its book, found by chummerID, then its aliases, then type and name inside that one book's compendiums (ties: the
- * same kind, then the same page). Still tied: no link, and a report line lists the candidates. Never a search by name
- * across every compendium; a custom item (no book) is never linked. Returns { items, notes }.
+ * _stats.compendiumSource for a runner's items: the real UUID of the entry each came from in this world's type packs,
+ * found by chummerID, then its aliases, then type and name, preferring the item's own type pack, then its book (same
+ * kind, then same page, break what is left). Still tied: no link, and a report line lists the candidates. A custom item
+ * (no book) is never linked. Returns { items, notes }.
  */
 export async function linkCompendium(items, prefix = '') {
-  const books = new Map(), notes = []
-  const out = []
+  const notes = [], out = []
+  let entries = null
   for (const i of items) {
-    const source = flagOf(i)?.source
-    if (!source || !flagOf(i)?.catalogId) { out.push(i); continue }
-    if (!books.has(source)) books.set(source, await bookEntries(source, prefix))
-    const r = resolveEntry(i, books.get(source))
+    if (!flagOf(i)?.source || !flagOf(i)?.catalogId) { out.push(i); continue }
+    entries ??= await typeEntries(prefix)
+    const r = resolveEntry(i, entries, typeKey(i))
     if (r?.uuid) out.push({ ...i, _stats: { ...i._stats, compendiumSource: r.uuid } })
     else { if (r?.candidates) notes.push(tieLine(i, r.candidates)); out.push(i) }
   }
@@ -140,15 +140,15 @@ export async function linkCompendium(items, prefix = '') {
 }
 
 /**
- * An NPC's gear, weapon and augmentation lines (from a runners file) as the real items from its book's compendiums in
- * this world (lib/npc-lines.js): matched by name in that book only, the stat block's own values kept over the entry's,
- * its "w/" accessories fitted to it; linked to the entry (_stats.compendiumSource). Unmatched: the line stays text (the
+ * An NPC's gear, weapon and augmentation lines (from a runners file) as the real items from this world's type packs
+ * (lib/npc-lines.js): matched by name, its own book preferred, the stat block's own values kept over the entry's, its
+ * "w/" accessories fitted to it; linked to the entry (_stats.compendiumSource). Unmatched: the line stays text (the
  * notes); tied: text and a report line. t.npc: { lines, from } (translateNpc). Returns { items, notes }.
  */
 export async function npcLineItems(t, prefix = '') {
   const things = npcThings(t.npc ?? {}), src = t.npc?.from?.source, page = t.npc?.from?.page ?? null
   if (!things.length || !src) return { items: [], notes: [] }
-  const entries = await bookEntries(src, prefix), items = [], notes = []
+  const entries = await typeEntries(prefix), items = [], notes = []
   const doc = async (entry, flags) => {
     const data = (await fromUuid(entry.uuid))?.toObject()
     if (!data) return null
@@ -158,7 +158,7 @@ export async function npcLineItems(t, prefix = '') {
     return data
   }
   for (const th of things) {
-    const r = matchThing(th.name, entries, LINE_KINDS[th.part], page)
+    const r = matchThing(th.name, entries, LINE_KINDS[th.part], page, src)
     if (r?.candidates) notes.push(thingTie(th, r.candidates))
     if (!r?.entry) continue
     const id = `line:${th.part}:${th.printed}`, d = await doc(r.entry, { id, npcLine: th.printed })
@@ -166,7 +166,7 @@ export async function npcLineItems(t, prefix = '') {
     d.system = overrideStats(d.system, th.stats)
     items.push(d)
     for (const acc of th.accessories) {
-      const a = matchThing(acc, entries, null, page)
+      const a = matchThing(acc, entries, null, page, src)
       if (a?.candidates) notes.push(thingTie({ printed: acc }, a.candidates))
       const m = a?.entry && await doc(a.entry, { id: `${id}:w/${acc}`, host: id, npcLine: th.printed })
       if (m) items.push(m)
