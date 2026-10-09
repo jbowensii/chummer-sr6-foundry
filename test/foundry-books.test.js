@@ -190,3 +190,13 @@ test('a pack item’s effects go in in Foundry 14’s shape (system.changes)', a
     system: { changes: [{ key: 'system.attributes.agi.mod', type: 'add', value: '1' }, { key: 'system.defenserating.physical.mod', type: 'add', value: '1' }] } })
   expect(q.effects[0]).not.toHaveProperty('changes')
 })
+
+test('re-import keeps a user’s effect on an entry and swaps only ours', async () => {
+  await importBook(tr(mus))
+  const q = packs.get('world.sr6-mus-qualities'), [entry] = q.docs.values()
+  entry.effects.push({ _id: 'userfx', name: 'GM house rule', flags: {} })
+  await importBook(tr(mus))
+  const after = q.docs.get(entry._id)
+  expect(after.effects.map(e => e.name)).toEqual(['Lucky Break', 'Lucky Break (conditional)', 'GM house rule'])
+  expect(after.effects.filter(e => e.flags?.[MODULE_ID]?.chummer)).toHaveLength(2)
+})

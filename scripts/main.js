@@ -1,6 +1,6 @@
 // Entry point: the import window is built at init; GMs get an "Import from Chummer" button in the Actors and Compendium sidebars.
 import { createImportApp } from './foundry/app.js'
-import { addIndexFields } from './foundry/apply.js'
+import { addIndexFields, registerEffectTargets } from './foundry/apply.js'
 import { createIconsApp, loadIconIndex } from './foundry/icons.js'
 import { MODULE_ID } from './lib/constants.js'
 import { registerQuench } from './foundry/quench.js'
@@ -44,5 +44,6 @@ Hooks.once('init', () => {
 Hooks.on('renderActorDirectory', (app, html) => addButton(html, 'actors'))
 Hooks.on('renderCompendiumDirectory', (app, html) => addButton(html, 'compendium'))
 Hooks.on('changeSidebarTab', app => { if (app.tabName === 'actors' || app.tabName === 'compendium') addButton(null, app.tabName) })
-Hooks.once('ready', () => { addButton(null, 'actors'); addButton(null, 'compendium') })
+// after Eden's own ready, which rebuilds CONFIG.SR6 (the system's hooks are registered before a module's)
+Hooks.once('ready', () => { registerEffectTargets(); addButton(null, 'actors'); addButton(null, 'compendium') })
 Hooks.on('quenchReady', quench => registerQuench(quench))

@@ -87,10 +87,11 @@ describe('items', () => {
     expect(byName(run(r), 'Lucky Break').system.product).toBe('core')
     expect(byName(t, 'Lucky Break').system.description).toMatch(/Chummer: MUS p\.10/)
   })
-  test('qualities: no Active Effects from the book text on a runner (Chummer applies none yet)', () => {
+  test('qualities: a runner’s item carries the book text’s Active Effects too, marked as ours; its test as text', () => {
     const t = run()
-    expect(byName(t, 'Lucky Break').effects).toBeUndefined()
-    expect(byName(t, 'Lucky Break').system.description).not.toMatch(/Test:/)
+    expect(byName(t, 'Lucky Break').effects.map(e => [e.name, e.disabled, e.flags['chummer-sr6-importer'].chummer]))
+      .toEqual([['Lucky Break', false, true], ['Lucky Break (conditional)', true, true]])
+    expect(byName(t, 'Lucky Break').system.description).toMatch(/Test: Perception \+ Intuition \(3\)\./)
     expect(byName(t, 'Lucky Break').system).toMatchObject({ category: 'ADVANTAGE', level: false, value: 1, explain: '' })
     expect(byName(t, 'Made-up Debt').system).toMatchObject({ category: 'DISADVANTAGE', level: true, value: 2, explain: 'Owes a made-up fixer.' })
     expect(byName(t, 'Night Eyes').system.description).toMatch(/Metatype trait\./)
@@ -138,7 +139,7 @@ describe('items', () => {
     expect(ware.system.description).toMatch(/Grade: used/)
     expect(ware.effects).toEqual([{ name: 'Made-up Reflex Booster', transfer: true, disabled: false,
       changes: [{ key: 'system.attributes.rea.mod', value: '1', mode: 2 }, { key: 'system.initiative.physical.diceMod', value: '1', mode: 2 },
-        { key: 'system.defenserating.physical.mod', value: '1', mode: 2 }] }])
+        { key: 'system.defenserating.physical.mod', value: '1', mode: 2 }], flags: { 'chummer-sr6-importer': { chummer: true } } }])
     const port = byName(t, 'Booster Port')
     expect(port.system).toMatchObject({ type: 'CYBERWARE', capacity: 1 })
     expect(port.system.description).toMatch(/Fitted to Made-up Reflex Booster\./)
@@ -164,7 +165,9 @@ describe('items', () => {
     expect(sight).toMatchObject({ type: 'mod', system: { type: 'accessory_weapon', price: 200, availDef: '2', rating: 0, page: 10 },
       flags: { 'chummer-sr6-importer': { id: 'w1a', host: 'w1', catalogId: 'mus.made-up-sight' } } })
     expect(sight.system).not.toHaveProperty('product')  // a data-model item: only Eden's book codes
-    expect(sight.effects).toBeUndefined()
+    // its item:ar effect, on its host (not transferred): Chummer's book effect, as a book entry's
+    expect(sight.effects).toEqual([{ name: 'Made-up Sight', transfer: false, disabled: false, flags: { 'chummer-sr6-importer': { chummer: true } },
+      changes: [{ key: 'system.attackRating.1', value: '1', mode: 2 }, { key: 'system.attackRating.2', value: '1', mode: 2 }] }])
     expect(zapper.system.accessories).toBe('Made-up Sight')
   })
   test('a cyberdeck: Eden’s matrix fields; its program as software installed in it', () => {
@@ -210,4 +213,10 @@ test('bonusChanges: attributes, edge, initiative dice, Defense Rating; unknown t
     .toEqual([{ key: 'system.attributes.agi.mod', value: '2', mode: 2 }, { key: 'system.edge.max', value: '1', mode: 2 },
       { key: 'system.initiative.physical.diceMod', value: '1', mode: 2 }, { key: 'system.defenserating.physical.mod', value: '1', mode: 2 }])
   expect(bonusChanges(undefined)).toEqual([])
+})
+
+test('bonusChanges: a skill bonus by the skill’s name (an Eden skill), else none', () => {
+  expect(bonusChanges([{ target: 'skill', id: 'mur.firearms', name: 'Firearms', value: 2 }, { target: 'skill', id: 'mus.basket-weaving', name: 'Underwater Basket Weaving', value: 1 },
+    { target: 'skill', id: 'crb.close-combat', value: 1 }]))
+    .toEqual([{ key: 'system.skills.firearms.modifier', value: '2', mode: 2 }, { key: 'system.skills.close_combat.modifier', value: '1', mode: 2 }])
 })

@@ -6,17 +6,23 @@ import { applyRunner, dedupeUnarmed, effectData } from '../scripts/foundry/apply
 
 let log, world, n, failCreateItems
 const flags = f => ({ [MODULE_ID]: { exportedAt: '2026-10-04T09:00:00.000Z', ...f } })
+// an owned item with its effects, as the replace path touches them
+const fakeItem = i => Object.assign(i, { effects: (i.effects ?? []).map(e => ({ id: e.id ?? `e${++n}`, ...e })),
+  async deleteEmbeddedDocuments(_, ids) { log.push(['deleteEffects', i.id, ids]); i.effects = i.effects.filter(e => !ids.includes(e.id)) },
+  async createEmbeddedDocuments(_, arr) { log.push(['createEffects', i.id, arr.map(e => e.name)]); i.effects.push(...arr.map(e => ({ id: `e${++n}`, ...e }))) } })
 class FakeActor {
   constructor(data, failDelete = false) {
     Object.assign(this, { id: `a${++n}`, system: {}, ...data, failDelete })
-    this.items = (data.items ?? []).map(i => ({ ...i, id: `i${++n}` }))
+    this.items = (data.items ?? []).map(i => fakeItem({ ...i, id: `i${++n}` }))
     world.push(this)
   }
+  set items(v) { this._items = Object.assign(v, { get: id => v.find(i => i.id === id) }) }
+  get items() { return this._items }
   async update(u) { log.push(['update', u]); Object.assign(this.system, u.system ?? {}) }
   async createEmbeddedDocuments(_, arr) {
     log.push(['items', arr])
     if (failCreateItems) throw new Error('items failed')
-    const made = arr.map(i => ({ ...i, id: `i${++n}` })); this.items.push(...made); return made
+    const made = arr.map(i => fakeItem({ ...i, id: `i${++n}` })); this.items.push(...made); return made
   }
   async updateEmbeddedDocuments(_, ups) { log.push(['updateItems', ups]); for (const u of ups) Object.assign(this.items.find(i => i.id === u._id) ?? {}, u) }
   async deleteEmbeddedDocuments(_, ids) {
@@ -176,4 +182,20 @@ test('create: two book entries tie for a runner’s item: no link, the report li
   const res = await applyRunner(t, 'create')
   expect(res.notes).toEqual(['Rope: 2 compendium entries match (Rope [gear] p.12, Rope [gear] p.12) → not linked'])
   expect(log.find(([k]) => k === 'items')[1][0]).not.toHaveProperty('_stats')
+})
+
+test('replace: our item kept in place (same id, play state and other flags kept), only our effects swapped, a user’s effect kept', async () => {
+  const ours = { name: 'Booster', flags: { [MODULE_ID]: { chummer: true } } }, user = { name: 'GM buff', flags: {} }
+  const old = { name: 'Booster', type: 'gear', flags: { ...flags({ id: 'w' }), other: { kept: 1 } }, system: { ammocount: 3 }, effects: [ours, user] }
+  const doc = new FakeActor({ name: 'Mara', type: 'Player', flags: flags({ id: 'r1' }), items: [old] })
+  const id = doc.items[0].id
+  const fresh = { name: 'Booster II', type: 'gear', flags: flags({ id: 'w' }), system: { rating: 2 },
+    effects: [{ name: 'Booster II', transfer: true, flags: { [MODULE_ID]: { chummer: true } } }] }
+  const res = await applyRunner({ actor: player().actor, items: [fresh] }, 'replace')
+  expect(res.action).toBe('replace')
+  const item = doc.items.get(id)
+  expect(item).toMatchObject({ name: 'Booster II', flags: { other: { kept: 1 } } })
+  expect(log.find(([k]) => k === 'updateItems')[1][0]).toMatchObject({ _id: id, system: { rating: 2 } })  // merged: play state stays
+  expect(item.effects.map(e => e.name)).toEqual(['GM buff', 'Booster II'])
+  expect(log.filter(([k]) => k === 'deleteItems')).toEqual([])  // nothing of ours dropped, nothing re-created
 })

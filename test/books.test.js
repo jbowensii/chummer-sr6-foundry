@@ -159,8 +159,8 @@ describe('what Eden takes from the book text', () => {
     const q = byName(t, 'Lucky Break')
     expect(q.effects).toEqual([
       { name: 'Lucky Break', transfer: true, disabled: false, changes: [{ key: 'system.attributes.agi.mod', value: '1', mode: 2 },
-        { key: 'system.defenserating.physical.mod', value: '1', mode: 2 }] },
-      { name: 'Lucky Break (conditional)', transfer: true, disabled: true, changes: [{ key: 'system.skills.firearms.modifier', value: '2', mode: 2 }] }])
+        { key: 'system.defenserating.physical.mod', value: '1', mode: 2 }], flags: { 'chummer-sr6-importer': { chummer: true } } },
+      { name: 'Lucky Break (conditional)', transfer: true, disabled: true, changes: [{ key: 'system.skills.firearms.modifier', value: '2', mode: 2 }], flags: { 'chummer-sr6-importer': { chummer: true } } }])
     expect(q.system.description).toContain('<p>Test: Perception + Intuition (3).</p>')
   })
   test('a weapon accessory -> Eden mod in its kind’s pack, its item:ar effect on the host (not transferred)', () => {
@@ -168,7 +168,7 @@ describe('what Eden takes from the book text', () => {
     expect(t.packs.gear).toContain(sight)
     expect(sight).toMatchObject({ flags: { [M]: { chummerID: 'MUS:gear:mus.made-up-sight' } }, type: 'mod', system: { type: 'accessory_weapon', price: 200, availDef: '2' } })
     expect(sight.effects).toEqual([{ name: 'Made-up Sight', transfer: false, disabled: false,
-      changes: [{ key: 'system.attackRating.1', value: '1', mode: 2 }, { key: 'system.attackRating.2', value: '1', mode: 2 }] }])
+      changes: [{ key: 'system.attackRating.1', value: '1', mode: 2 }, { key: 'system.attackRating.2', value: '1', mode: 2 }], flags: { 'chummer-sr6-importer': { chummer: true } } }])
   })
   test('a cyberdeck carries Eden’s matrix fields; a vehicle its vtype; a weapon its spec through Eden’s labels', () => {
     expect(byName(t, 'Test Deck').system).toMatchObject({ subtype: 'CYBERDECK', a: 5, s: 4, progSlots: 2, matrix: { deviceRating: 2 } })

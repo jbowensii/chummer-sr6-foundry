@@ -1,7 +1,7 @@
 // shadowrun6-eden vocabulary (scripts/lib/eden.js): invented category strings, Eden's keys only.
 import { describe, expect, test } from 'vitest'
 import {
-  ACCESS_DEVICES, ATTRS, MOR, SKILLS, activationKey, armorSubtype, augmentType, deviceFields, durationKey, edenBook, effectKey,
+  ACCESS_DEVICES, ATTRS, effectOptionKey, missingTargets, OUR_TARGETS, MOR, SKILLS, activationKey, armorSubtype, augmentType, deviceFields, durationKey, edenBook, effectKey,
   electronicsSubtype, gearType, hostChanges, lifestyleKey, martialCategories, modType, normKey, sinQuality, skillKey, softwareType, specKey,
   spellFields, spiritKey, spriteKey, vehicleType, vehicleVtype, weaponType,
 } from '../scripts/lib/eden.js'
@@ -216,4 +216,10 @@ describe('books, effects', () => {
     expect(hostChanges({ target: 'item:ar', op: 'add', value: '-2,0,1' })).toEqual([{ key: 'system.attackRating.0', value: '-2' }, { key: 'system.attackRating.2', value: '1' }])
     expect(hostChanges({ target: 'attr:agi', op: 'add', value: '1' })).toEqual([])
   })
+})
+
+test('effect targets: Eden’s option key for a path, and the ones Eden lacks', () => {
+  expect(effectOptionKey('system.derived.judge_intentions.mod')).toBe('system_derived_judge__intentions_mod')
+  const eden = Object.fromEntries(OUR_TARGETS.filter(p => !p.includes('social')).map(p => [effectOptionKey(p), 'x']))
+  expect(missingTargets(eden)).toEqual({ system_defenserating_social_mod: 'system.defenserating.social.mod' })
 })

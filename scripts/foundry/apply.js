@@ -1,8 +1,8 @@
 // Apply one translated runner or NPC to the world. Foundry globals are only touched inside functions (node --check clean).
 import { MODULE_ID } from '../lib/constants.js'
-import { normKey } from '../lib/eden.js'
+import { missingTargets, normKey } from '../lib/eden.js'
 import { INDEX_FIELDS, resolveEntry, tieLine } from '../lib/chummer-id.js'
-import { fitUpdates, keepItemArt, newVersionName, replaceUpdate, tokenUpdate } from '../lib/plan.js'
+import { fitUpdates, isOurEffect, keepItemArt, newVersionName, planItems, replaceUpdate, tokenUpdate } from '../lib/plan.js'
 
 export const FOLDER = 'Chummer SR6'
 export const NPC_FOLDER = 'Chummer SR6 NPCs'  // NPCs from a runners file (flags npc)
@@ -84,6 +84,14 @@ export function edenComplexForms() {
   return out
 }
 
+/** Eden's effect editor lists the change keys it knows (CONFIG.SR6.ACTIVE_EFFECT_OPTIONS, rebuilt at its own ready); the
+ *  ones this module writes that it lacks (the social Defense Rating, …) are added, labelled "Chummer: <path>". */
+export function registerEffectTargets() {
+  const options = CONFIG.SR6?.ACTIVE_EFFECT_OPTIONS
+  if (!options) return
+  for (const [key, path] of Object.entries(missingTargets(options))) options[key] = `Chummer: ${path}`
+}
+
 /** Our identity fields in every compendium's index (lib/chummer-id.js INDEX_FIELDS), so a pack finds an entry by
  *  chummerID without loading its documents. Called at init (main.js). */
 export function addIndexFields() {
@@ -140,19 +148,32 @@ async function createItems(doc, items) {
   return made
 }
 
-// Replace in place: rebuild the translated fields and every flagged embedded item; unflagged items and play state stay,
-// and so does art the user chose, on the actor and its rebuilt items (lib/plan.js replaceUpdate, keepItemArt).
-// One actor update (translated fields and token together), then new items, old items deleted last: three writes. If deleting the old ones fails, the new items are removed again,
-// so a failure never leaves the actor without its Chummer items or with them twice. Throws on failure.
+// Replace in place (lib/plan.js planItems): the actor's translated fields, then each of our items matched by its uid updated
+// in place (same _id; Chummer's fields refreshed, play state the system keeps in other fields left alone, other
+// modules' flags kept) with only its effects of ours swapped, so effects a user added stay; new items created; our
+// items the file no longer has deleted; the user's own items never touched. Art the user chose stays (keepItemArt).
+// Then every fitted mod and program is pointed at its host again. If deleting the dropped items fails, the items this
+// call created are removed again. Throws on failure.
 async function replaceDoc(doc, actor, items, token) {
-  const old = doc.items.filter(i => flagOf(i)).map(i => i.id)
   const fresh = keepItemArt(doc.items, items)
+  const { update, create, remove } = planItems([...doc.items], fresh)
   await doc.update({ ...replaceUpdate(actor, doc.name, doc.img), ...tokenUpdate(doc, token ?? actor.img) })
-  const made = await createItems(doc, fresh)
-  try { if (old.length) await doc.deleteEmbeddedDocuments('Item', old) } catch (e) {
-    try { await doc.deleteEmbeddedDocuments('Item', made.map(i => i.id)) } catch {}
+  if (update.length) await doc.updateEmbeddedDocuments('Item', update.map(({ old, item }) => ({ _id: old.id, name: item.name,
+    ...item.img ? { img: item.img } : {}, system: item.system, flags: { ...old.flags, [MODULE_ID]: item.flags[MODULE_ID] },
+    ...item._stats?.compendiumSource ? { '_stats.compendiumSource': item._stats.compendiumSource } : {} })))
+  for (const { old, item } of update) {
+    const live = doc.items.get(old.id) ?? old
+    const ourOld = [...live.effects ?? []].filter(isOurEffect).map(e => e.id ?? e._id)
+    if (ourOld.length) await live.deleteEmbeddedDocuments('ActiveEffect', ourOld)
+    if (item.effects?.length) await live.createEmbeddedDocuments('ActiveEffect', item.effects)
+  }
+  const made = create.length ? await doc.createEmbeddedDocuments('Item', create) : []
+  try { if (remove.length) await doc.deleteEmbeddedDocuments('Item', remove) } catch (e) {
+    try { if (made.length) await doc.deleteEmbeddedDocuments('Item', made.map(i => i.id)) } catch {}
     throw e
   }
+  const fits = fitUpdates([...update.map(({ old, item }) => ({ id: old.id, flags: item.flags })), ...made], doc.id)
+  if (fits.length) await doc.updateEmbeddedDocuments('Item', fits)
 }
 
 /**

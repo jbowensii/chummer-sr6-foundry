@@ -214,3 +214,13 @@ export function softwareType(type) {
 // Eden martialartstyle system.category flags, from Chummer's printed categories ("Grappling, Weapon")
 const MARTIAL = ['grappling', 'mobility', 'ranged', 'striking', 'weapon']
 export const martialCategories = printed => { const w = words(printed).map(x => x.replace(/s$/, '')); return Object.fromEntries(MARTIAL.map(c => [c, w.includes(c)])) }
+
+/** Eden's ACTIVE_EFFECT_OPTIONS key for a change path (its datalistOptions turns `_` into `.` and `__` into `_`). */
+export const effectOptionKey = path => String(path).replaceAll('_', '__').replaceAll('.', '_')
+/** Every change path this module writes (bonusChanges, effectKey, hostChanges): Eden's effect editor should offer them. */
+export const OUR_TARGETS = [...ATTRS.map(a => `system.attributes.${a}.mod`), 'system.edge.max', 'system.initiative.physical.diceMod',
+  'system.initiative.physical.mod', 'system.defenserating.physical.mod', 'system.defenserating.social.mod',
+  'system.derived.composure.mod', 'system.derived.judge_intentions.mod', 'system.derived.memory.mod',
+  ...SKILLS.map(k => `system.skills.${k}.modifier`), ...[0, 1, 2, 3, 4].map(i => `system.attackRating.${i}`)]
+/** The ones Eden's options lack (options: CONFIG.SR6.ACTIVE_EFFECT_OPTIONS): { [optionKey]: path }. */
+export const missingTargets = options => Object.fromEntries(OUR_TARGETS.map(p => [effectOptionKey(p), p]).filter(([k]) => !Object.hasOwn(options ?? {}, k)))

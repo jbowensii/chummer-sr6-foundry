@@ -60,9 +60,9 @@ export function translateBook(book, { exportedAt, appVersion, descriptions = fal
   const src = book.source, textOnly = [], packs = {}, portraits = {}, tokens = {}, iconSet = icons ? new Set(icons) : null
   const comp = src.compendium === true ? { compendium: true } : {}
   const see = x => `See ${x.source ?? src.id}${x.page ? ` p.${x.page}` : ''}`
-  // bookEffects: the catalog's effects as Active Effects (translate.js catalogEffects); specs, complexForms: Eden's own
+  // specs, complexForms: Eden's own
   // tables as Foundry loaded them (foundry/apply.js)
-  const ctx = { exportedAt, appVersion, sanitize, icons: iconSet, ref: see, say: l => textOnly.push(l), bookEffects: true, specs, complexForms, ...newGenesisId ? { newGenesisId } : {} }
+  const ctx = { exportedAt, appVersion, sanitize, icons: iconSet, ref: see, say: l => textOnly.push(l), specs, complexForms, ...newGenesisId ? { newGenesisId } : {} }
   const add = (pack, doc) => (packs[pack] ??= []).push(doc)
   // the book's flags, with our identity (lib/chummer-id.js): chummerID <source>:<kind>:<id> and its earlier keys. No
   // _id anywhere: Foundry picks it, and a re-import finds the entry by chummerID (foundry/books.js).
