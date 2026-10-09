@@ -109,6 +109,17 @@ export function registerQuench(quench) {
       it('has its mortype', () => assert.equal(mara.system.mortype, 'mysticadept'))
       it('has every item, per type', () => assert.deepEqual(count(ours(mara)), count(t.items)))
       it('has at most one of Eden’s Unarmed items', () => assert.isAtMost(mara.items.filter(edenUnarmed).length, 1))
+      it('its items carry our Active Effects (the book text’s, its bonuses), flagged as ours', () => {
+        const fx = ours(mara).flatMap(i => [...i.effects])
+        assert.isNotEmpty(fx)
+        for (const e of fx) assert.isTrue(e.flags?.['chummer-sr6-importer']?.chummer, e.name)
+      })
+      it('its vehicle is an Eden Vehicle actor that belongs to it, in "<runner> vehicles"', () => {
+        const bike = game.actors.find(x => x.type === 'Vehicle' && flagOf(x)?.runner === runner.id)
+        assert.ok(bike, 'vehicle actor')
+        assert.equal(bike.system.vehicle.belongs, mara.id)
+        assert.equal(bike.folder?.name, `${mara.name} vehicles`)
+      })
       it('keeps the genesisID of knowledge and language skills only', () => {
         assert.sameMembers(itemsOf(mara, 'skill').map(i => i.system.genesisID), ['knowledge', 'language', 'language'])
         for (const i of ours(mara).filter(i => i.type !== 'skill')) assert.equal(i.system.genesisID ?? '', '', i.name)
@@ -155,7 +166,7 @@ export function registerQuench(quench) {
     describe('Replace keeps play state, art and the GM’s items', function () {
       this.timeout(30000)
       const IMG = 'user/art.webp', TOKEN = 'user/token.webp'
-      let tag, folder, file, runner, first, noteId, oldFlagged, unarmedId, a
+      let tag, folder, file, runner, first, noteId, oldFlagged, unarmedId, a, userFxItem
       before(async function () {
         const s = await loadSample(); tag = s.tag; file = s.file; runner = file.runners[0]
         folder = await makeFolder()
@@ -164,6 +175,8 @@ export function registerQuench(quench) {
           'system.reputation': 2, img: IMG, 'prototypeToken.texture.src': TOKEN })
         noteId = (await first.createEmbeddedDocuments('Item', [{ name: 'GM note item', type: 'gear', system: { type: 'TOOLS', subtype: 'TOOLS' } }]))[0].id
         oldFlagged = first.items.filter(i => flagOf(i)).map(i => i.id)
+        userFxItem = first.items.find(i => flagOf(i) && i.type === 'quality')
+        await userFxItem.createEmbeddedDocuments('ActiveEffect', [{ name: 'Quench user effect', transfer: true, disabled: false }])
         unarmedId = first.items.find(edenUnarmed)?.id
         const newer = structuredClone(runner)
         newer.exportedAt = '2026-12-01T12:00:00.000Z'
@@ -185,11 +198,17 @@ export function registerQuench(quench) {
         assert.equal(a.img, IMG)
         assert.equal(a.prototypeToken.texture.src, TOKEN)
       })
-      it('keeps the GM’s item and rebuilds the flagged ones', () => {
+      it('keeps the GM’s item and updates ours in place (same ids)', () => {
         assert.ok(a.items.get(noteId), 'unflagged item kept')
         const flagged = a.items.filter(i => flagOf(i))
         assert.isNotEmpty(flagged)
-        assert.isEmpty(flagged.filter(i => oldFlagged.includes(i.id)))
+        assert.isNotEmpty(flagged.filter(i => oldFlagged.includes(i.id)))
+      })
+      it('keeps the effect a user added to one of our items; ours are swapped', () => {
+        const item = a.items.get(userFxItem.id)
+        assert.ok(item, 'same item')
+        assert.ok(item.effects.find(e => e.name === 'Quench user effect'), 'user effect kept')
+        for (const e of item.effects.filter(e => e.name !== 'Quench user effect')) assert.isTrue(e.flags?.['chummer-sr6-importer']?.chummer, e.name)
       })
       // Eden adds it after create without waiting, so it may not be there yet; never deleted, never twice.
       it('leaves Eden’s own Unarmed item alone', () => {
@@ -365,10 +384,9 @@ export function registerQuench(quench) {
           assert.equal(c.index.size, p.docs.length, p.name)
         }
       })
-      it('a book of only unused kinds makes no pack and no folder', () => {
-        assert.isEmpty(Object.keys(muxRes.counts))
-        assert.isEmpty(game.packs.filter(p => p.collection.startsWith(`world.${PREFIX}sr6-mux-`)))
-        assert.notOk(game.folders.find(f => f.type === 'Compendium' && f.name === 'Made-Up Extras (MUX)'), 'empty book folder')
+      it('a book of only kinds Eden has no document for gets just its Reference compendium', () => {
+        assert.sameMembers(game.packs.filter(p => p.collection.startsWith(`world.${PREFIX}sr6-mux-`)).map(p => p.collection),
+          [`world.${PREFIX}sr6-mux-reference`])
       })
       it('a weapon is gear with its Eden weapon type, flags and page', async () => {
         const zap = await byKey(pack('weapons'), 'MUS:weapons:mus.pocket-zapper')
