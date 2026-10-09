@@ -27,7 +27,7 @@ export function createImportApp(getIcons = () => null) {
     static DEFAULT_OPTIONS = {
       id: 'chummer-sr6-import',
       classes: ['sr6i-app'],
-      window: { title: 'SR6I.Title', icon: 'fas fa-file-import' },
+      window: { title: 'SR6I.Title', icon: 'fas fa-file-import', resizable: true },
       position: { width: 560, height: 'auto' },
       actions: { import: ChummerSr6ImportApp.#onImport, openActor: ChummerSr6ImportApp.#onOpen, done: ChummerSr6ImportApp.#onDone,
         openCompendiums: ChummerSr6ImportApp.#onOpenCompendiums },
