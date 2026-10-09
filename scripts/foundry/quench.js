@@ -472,9 +472,10 @@ export function registerQuench(quench) {
       })
       it('migration: an entry 0.2.x wrote under its computed id, without chummerID, is updated in place and gets chummerID', async () => {
         const { legacyId } = await import('../lib/chummer-id.js')
-        const weapons = pack('weapons'), key = 'MUS:weapons:mus.odd-blade', old = await byKey(weapons, key)
-        if (old) await Item.deleteDocuments([old.id], { pack: weapons.collection })
+        const weapons = pack('weapons'), key = 'MUS:weapons:mus.glitter-cannon', old = await byKey(weapons, key)
+        assert.ok(old, `the sample book has ${key}`)
         const data = old.toObject()
+        await Item.deleteDocuments([old.id], { pack: weapons.collection })
         delete data.flags['chummer-sr6-importer'].chummerID
         data._id = legacyId(key)
         await Item.createDocuments([data], { pack: weapons.collection, keepId: true })
