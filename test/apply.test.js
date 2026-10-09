@@ -6,18 +6,25 @@ import { applyRunner, dedupeUnarmed, effectData } from '../scripts/foundry/apply
 
 let log, world, n, failCreateItems
 const flags = f => ({ [MODULE_ID]: { exportedAt: '2026-10-04T09:00:00.000Z', ...f } })
+// an owned item with its effects, as the replace path touches them
+const fakeItem = i => Object.assign(i, { effects: (i.effects ?? []).map(e => ({ id: e.id ?? `e${++n}`, ...e })),
+  async deleteEmbeddedDocuments(_, ids) { log.push(['deleteEffects', i.id, ids]); i.effects = i.effects.filter(e => !ids.includes(e.id)) },
+  async createEmbeddedDocuments(_, arr) { log.push(['createEffects', i.id, arr.map(e => e.name)]); i.effects.push(...arr.map(e => ({ id: `e${++n}`, ...e }))) } })
 class FakeActor {
   constructor(data, failDelete = false) {
     Object.assign(this, { id: `a${++n}`, system: {}, ...data, failDelete })
-    this.items = (data.items ?? []).map(i => ({ ...i, id: `i${++n}` }))
+    this.items = (data.items ?? []).map(i => fakeItem({ ...i, id: `i${++n}` }))
     world.push(this)
   }
+  set items(v) { this._items = Object.assign(v, { get: id => v.find(i => i.id === id) }) }
+  get items() { return this._items }
   async update(u) { log.push(['update', u]); Object.assign(this.system, u.system ?? {}) }
   async createEmbeddedDocuments(_, arr) {
     log.push(['items', arr])
     if (failCreateItems) throw new Error('items failed')
-    const made = arr.map(i => ({ ...i, id: `i${++n}` })); this.items.push(...made); return made
+    const made = arr.map(i => fakeItem({ ...i, id: `i${++n}` })); this.items.push(...made); return made
   }
+  async updateEmbeddedDocuments(_, ups) { log.push(['updateItems', ups]); for (const u of ups) Object.assign(this.items.find(i => i.id === u._id) ?? {}, u) }
   async deleteEmbeddedDocuments(_, ids) {
     log.push(['deleteItems', ids])
     if (this.failDelete && ids.some(id => this.items.find(i => i.id === id)?.old)) throw new Error('delete failed')
@@ -145,4 +152,69 @@ test('create: a duplicate Unarmed that landed during the import is removed', asy
   const res = await applyRunner(player(), 'create')
   expect(res.actor.items.filter(i => i.system?.genesisID === 'unarmed')).toHaveLength(1)
   expect(res.actor.items.map(i => i.name)).toEqual(['Unarmed', 'Made-up Booster'])
+})
+
+test('create: items get Foundry’s ids, then a fitted mod is pointed at its host’s; a catalog item links its entry by chummerID', async () => {
+  const M = MODULE_ID, entry = (id, name, key, extra = {}) => ({ _id: id, uuid: `Compendium.world.sr6-mus-weapons.Item.${id}`, type: 'gear', name,
+    flags: { [M]: { chummerID: key, chummerAliases: [], kind: 'weapons', page: 10 } }, ...extra })
+  const index = new Map([['F7', entry('F7', 'Zapper', 'MUS:weapons:mus.pocket-zapper')]])
+  game.packs = { filter: f => [{ documentName: 'Item', collection: 'world.sr6-mus-weapons', getIndex: async () => index, getUuid: id => id }].filter(f) }
+  const gun = { name: 'Zapper', type: 'gear', flags: flags({ id: 'w1', catalogId: 'mus.pocket-zapper', chummerID: 'MUS:weapons:mus.pocket-zapper', kind: 'weapons', source: 'MUS' }), system: {} }
+  const sight = { name: 'Sight', type: 'mod', flags: flags({ id: 'w1a', host: 'w1', catalogId: 'mus.made-up-sight', chummerID: 'MUS:gear:mus.made-up-sight', kind: 'gear', source: 'MUS' }), system: {} }
+  const t = player(); t.items = [gun, sight]
+  const res = await applyRunner(t, 'create')
+  expect(res.action).toBe('create')
+  const [, items] = log.find(([k]) => k === 'items')
+  for (const i of items) expect(i).not.toHaveProperty('_id')  // Foundry picks the ids
+  expect(items[0]._stats).toEqual({ compendiumSource: 'Compendium.world.sr6-mus-weapons.Item.F7' })
+  expect(items[1]).not.toHaveProperty('_stats')  // nothing in the book's packs for it: no link
+  const [, fits] = log.find(([k]) => k === 'updateItems')
+  const made = res.actor.items
+  expect(fits).toEqual([{ _id: made.find(i => i.name === 'Sight').id, 'system.embeddedInUuid': `Actor.${res.actor.id}.Item.${made.find(i => i.name === 'Zapper').id}` }])
+})
+
+test('create: two book entries tie for a runner’s item: no link, the report lists them', async () => {
+  const M = MODULE_ID, e = (id, page) => [id, { _id: id, uuid: `U-${id}`, type: 'gear', name: 'Rope', flags: { [M]: { kind: 'gear', page } } }]
+  const index = new Map([e('A', 12), e('B', 12)])
+  game.packs = { filter: f => [{ documentName: 'Item', collection: 'world.sr6-mus-gear', getIndex: async () => index }].filter(f) }
+  const rope = { name: 'Rope', type: 'gear', flags: flags({ id: 'g1', catalogId: 'mus.rope', chummerID: 'MUS:gear:mus.rope', kind: 'gear', page: 10, source: 'MUS' }), system: {} }
+  const t = player(); t.items = [rope]
+  const res = await applyRunner(t, 'create')
+  expect(res.notes).toEqual(['Rope: 2 compendium entries match (Rope [gear] p.12, Rope [gear] p.12) → not linked'])
+  expect(log.find(([k]) => k === 'items')[1][0]).not.toHaveProperty('_stats')
+})
+
+test('replace: our item kept in place (same id, play state and other flags kept), only our effects swapped, a user’s effect kept', async () => {
+  const ours = { name: 'Booster', flags: { [MODULE_ID]: { chummer: true } } }, user = { name: 'GM buff', flags: {} }
+  const old = { name: 'Booster', type: 'gear', flags: { ...flags({ id: 'w' }), other: { kept: 1 } }, system: { ammocount: 3 }, effects: [ours, user] }
+  const doc = new FakeActor({ name: 'Mara', type: 'Player', flags: flags({ id: 'r1' }), items: [old] })
+  const id = doc.items[0].id
+  const fresh = { name: 'Booster II', type: 'gear', flags: flags({ id: 'w' }), system: { rating: 2 },
+    effects: [{ name: 'Booster II', transfer: true, flags: { [MODULE_ID]: { chummer: true } } }] }
+  const res = await applyRunner({ actor: player().actor, items: [fresh] }, 'replace')
+  expect(res.action).toBe('replace')
+  const item = doc.items.get(id)
+  expect(item).toMatchObject({ name: 'Booster II', flags: { other: { kept: 1 } } })
+  expect(log.find(([k]) => k === 'updateItems')[1][0]).toMatchObject({ _id: id, system: { rating: 2 } })  // merged: play state stays
+  expect(item.effects.map(e => e.name)).toEqual(['GM buff', 'Booster II'])
+  expect(log.filter(([k]) => k === 'deleteItems')).toEqual([])  // nothing of ours dropped, nothing re-created
+})
+
+test('create: a runner’s vehicle becomes a Vehicle actor that belongs to it, in "<runner> vehicles"; replace updates it in place', async () => {
+  const folders = []
+  globalThis.Folder = { create: async d => { const f = { id: `f${folders.length + 1}`, ...d }; folders.push(f); return f } }
+  game.folders = folders
+  const t = player()
+  t.vehicles = [{ actor: { name: 'Bike', type: 'Vehicle', flags: flags({ id: 'v1', runner: 'r1' }), system: { bod: 5, vehicle: { opMode: 'manual' } } },
+    items: [{ name: 'Spoiler', type: 'gear', flags: flags({ id: 'v1a' }), system: {} }] }]
+  const res = await applyRunner(t, 'create')
+  const bike = world.find(a => a.type === 'Vehicle')
+  expect(bike.system.vehicle).toEqual({ opMode: 'manual', belongs: res.actor.id })
+  expect(bike.items.map(i => i.name)).toEqual(['Spoiler'])
+  expect(folders.find(f => f.id === bike.folder).name).toBe('Mara vehicles')
+  t.vehicles[0].actor.system.bod = 6
+  const again = await applyRunner(t, 'replace')
+  expect(again.action).toBe('replace')
+  expect(world.filter(a => a.type === 'Vehicle')).toHaveLength(1)  // the same actor, updated
+  expect(log.filter(([k, u]) => k === 'update' && u.system?.bod === 6)).toHaveLength(1)
 })

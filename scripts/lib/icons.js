@@ -45,8 +45,8 @@ export function itemIconKey(it) {
     case 'gear':
       if (t.startsWith('WEAPON')) return s.subtype ? `weapon/${lower(s.subtype)}` : 'weapon'
       if (t === 'ARMOR') return 'armor'
-      if (t === 'CYBERWARE') return 'augmentation/cyberware'
-      if (t === 'BIOWARE') return 'augmentation/bioware'
+      if (t === 'CYBERWARE' || t === 'NANOWARE') return 'augmentation/cyberware'
+      if (t === 'BIOWARE' || t === 'GENETICS') return 'augmentation/bioware'
       if (t === 'ELECTRONICS') return ELECTRONICS[s.subtype] ?? 'electronics'
       if (t === 'VEHICLES') return s.subtype ? `vehicle/${lower(s.subtype)}` : 'vehicle'
       if (DRONE[t]) return `drone/${DRONE[t]}`
@@ -55,6 +55,8 @@ export function itemIconKey(it) {
     case 'spell': return s.category ? `spell/${s.category}` : 'spell'
     case 'quality': return `quality/${s.category === 'DISADVANTAGE' ? 'negative' : 'positive'}`
     case 'skill': return `skill/${s.genesisID === 'language' ? 'language' : 'knowledge'}`
+    // a fitted accessory: its host's look
+    case 'mod': return /weapon/.test(t) ? 'weapon' : t === 'armor_mod' ? 'armor' : 'electronics'
     default: return it.type  // focus, ritual, adeptpower, complexform, metamagic, echo, critterpower, spritepower, contact, lifestyle, sin
   }
 }

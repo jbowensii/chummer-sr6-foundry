@@ -34,7 +34,7 @@ You get a file ending in `.sr6foundry.json` (`runners-…`, `books-…` or `comp
 
 Runners go in the Actors folder "Chummer SR6" as Player actors with linked tokens. The report at the end lists anything that was turned into notes.
 
-The module writes raw inputs only (attribute bases, skill points, specializations, magic or resonance type, Edge, items with their fields) and lets shadowrun6-eden work out dice pools, condition monitors, initiative and essence itself. Augmentation bonuses go in as effects on their items, which shadowrun6-eden applies. Every skill shadowrun6-eden knows is written, at 0 when the runner doesn't have it.
+The module writes raw inputs only (attribute bases, skill points, specializations, magic or resonance type, Edge, items with their fields) and lets shadowrun6-eden work out dice pools, condition monitors, initiative and essence itself. Augmentation bonuses (attributes, Edge, initiative dice, Defense Rating) go in as effects on their items, which shadowrun6-eden applies; an accessory's bonuses are its host's, never the runner's. Built Tough's extra Physical boxes go in as the monitor's modifier. Worn armor counts toward the Defense Rating. A commlink's or cyberdeck's device rating, attribute array and program slots go in Eden's matrix fields, and the first device of each kind is switched on. Weapon, armor and electronics accessories are shadowrun6-eden mods fitted to their host, and a program bought into a deck is installed in it. A runner's items link to their entries in the imported book compendiums (Foundry's compendium source) when those books are in the world. Every skill shadowrun6-eden knows is written, at 0 when the runner doesn't have it.
 
 ### A runner that's already in the world
 
@@ -53,14 +53,26 @@ The module writes raw inputs only (attribute bases, skill points, specialization
 
 ## Book data
 
-In the Compendium sidebar, click **Import from Chummer**, choose the book-data file, untick any book you don't want, and click **Import**. Each book gets its own folder, "<book name> (<book id>)", inside the Compendium folder "Chummer SR6", with one compendium per topic the book has entries for: Qualities, Weapons, Armor, Augmentations, Electronics, Gear, Vehicles & drones, Spells, Rituals, Adept powers, Complex forms, Metamagics, Echoes, Critter powers, Lifestyles, Contacts, NPCs, Critters, Spirits, Sprites, and Rules (one journal per chapter, one page per rule). Without descriptions an entry says where to read it ("See MUS p.50").
+In the Compendium sidebar, click **Import from Chummer**, choose the book-data file, untick any book you don't want, and click **Import**. Each book gets its own folder, "<book name> (<book id>)", inside the Compendium folder "Chummer SR6", with one compendium per topic the book has entries for: Qualities, Weapons, Armor, Augmentations, Electronics, Programs, Gear, Vehicles & drones, Spells, Rituals, Adept powers, Complex forms, Metamagics, Echoes, Martial arts, Martial art techniques, Critter powers, Lifestyles, Contacts, NPCs, Critters, Spirits, Sprites, Rules (one journal per chapter, one page per rule) and Reference (one journal per kind Eden has no type for). Without descriptions an entry says where to read it ("See MUS p.50").
 
-- Priorities, metatypes, attributes, skills and life modules are not used by shadowrun6-eden (it has fixed skills and no metatype item); the report says how many were left out.
+- Matrix programs become shadowrun6-eden software items (Hacking, Basic and the other Eden software types; an unknown type is Basic, with a report line). Martial art styles and techniques become Eden's martial art style and technique items; a style's categories are its Eden checkboxes, and its signature technique is tied to it, so the two show together when both are dropped on a runner. shadowrun6-eden lists a technique on a runner only under its style, so a technique that is no style's signature does not show there; add it with the + on the style instead.
+- Every kind shadowrun6-eden has no item or actor for (metatypes, implant grades, traditions, priorities, attributes, skills, life modules, actions, mentor spirits, gear packs, ammunition types, optional rules and the rest) goes in the book's **Reference** compendium: one journal per kind, one page per entry with its printed stats and lines, its text, source and page. (A world that imported traditions as one journal each keeps those; nothing is deleted.)
+- Text shadowrun6-eden has no field for goes in the item's description: a quality's karma (a range when the book prints several), a vehicle mod's slots, a critter power the book lists as a weakness.
 - A compendium is never created empty: a book with nothing shadowrun6-eden uses gets no compendium and no folder, and the window says so.
 
 ### Importing a book again
 
-A re-import replaces the entries that came from the file by id, so links to them keep working. Entries you made yourself, pages you added to a rules journal, items you added to a pack actor and images you picked are kept. Entries missing from the file are never deleted. A locked compendium is unlocked for the write and locked again after.
+Foundry gives every document its own id; the module never sets one. Each entry it imports carries Chummer's key for it in the module's flags: `chummerID` (`<book>:<kind>:<id>`, for example `MUS:weapons:mus.pocket-zapper`) and `chummerAliases` (the keys it had in earlier Chummer imports, when Chummer renamed or re-filed it). Both are in every compendium's index.
+
+A re-import finds each entry by its `chummerID`, then by an alias, and updates it in place: it keeps its id, so links to it keep working. Anything new is added. Nothing is ever deleted: entries missing from the file, entries you made yourself, pages you added to a rules journal and items you added to a pack actor stay, and so do images you picked, the entry's folder and its ownership. A rules journal's imported pages keep their ids too. A martial art style keeps the genesisID it already has, so techniques on runners stay tied to it. A locked compendium is unlocked for the write and locked again after.
+
+**Worlds that imported books with 0.2.x or earlier.** Those versions gave each entry an id computed from its key. A re-import with this version finds such an entry by that id, updates it in place and writes `chummerID` onto it, so nothing is duplicated and links keep working. The import report counts them as migrated. After that, the entry is found by `chummerID`.
+
+### A runner's items and the book compendiums
+
+When a runner or NPC is imported, each of its items from a book is linked to its entry in that book's compendiums in this world (Foundry's compendium source, shown on the item): by `chummerID`, then by an alias, then by the same item type and name inside that one book's compendiums. Several entries with that name: the one of the same kind, then the one on the same page. Still more than one: no link, and the import report lists them. The module never matches by name across all compendiums.
+
+`genesisID` (shadowrun6-eden's own key for its translations and its Import Data) stays empty, except on martial art styles, which get a random one as Eden's own "create" button gives them, so Eden can tie techniques to their style.
 
 ## GM compendiums
 
@@ -75,10 +87,11 @@ A compendium a GM made in Chummer imports like a book, into its own folder "<com
 
 ## Not imported yet, or imported differently
 
-- Vehicles and drones are items on the runner and in "Vehicles & drones", not Vehicle actors.
-- An NPC's gear and weapon lines go in its notes as text.
+- Vehicles and drones are Eden Vehicle actors too: a book's in its "Vehicles & drones (actors)" compendium, and a runner's own in "<runner> vehicles", linked to the runner (Eden's vehicle owner) with their mods and mounted weapons as their items. The runner keeps them as Eden's vehicle items as well. Replace updates them in place; Add as new version leaves the vehicles to the original.
+- An NPC's or critter's gear, weapon and augmentation lines become the real items from its book (in a book import, the book's own entries; for a runners file's NPC, that book's compendiums in this world): matched by name inside that book, the stat block's own values (DV, AR, modes, ammunition, rating) kept over the entry's, its "w/" accessories with it. A line that matches nothing stays text in the notes; several matches leave it as text and the report lists them.
 - A skill, specialization, weapon category, spirit or sprite type shadowrun6-eden doesn't know imports as a generic one, with a report line and a note.
-- A cyberdeck's or commlink's array and programs are kept as text.
+- A device array printed another way than a row of numbers is kept as text.
+- Effects Chummer read from a book's text are on the compendium entries only, not yet on a runner's own items (Chummer doesn't apply them yet). An item's source shows as Eden's book only for the books Eden lists; `genesisID` stays empty.
 
 ## Sharing
 

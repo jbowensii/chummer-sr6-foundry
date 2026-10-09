@@ -2,9 +2,10 @@
 import { MODULE_ID, TESTED_EDEN } from '../lib/constants.js'
 import { readExport } from '../lib/read.js'
 import { escapeText, npcHeadline, translateRunner } from '../lib/translate.js'
-import { defaultChoice, planPack } from '../lib/plan.js'
+import { defaultChoice } from '../lib/plan.js'
+import { planUpsert } from '../lib/chummer-id.js'
 import { PACKS, PORTRAIT, translateBook } from '../lib/books.js'
-import { applyRunner, COMPENDIUM_FOLDER, edenSpecLabels, findExisting, NPC_FOLDER } from './apply.js'
+import { applyRunner, COMPENDIUM_FOLDER, edenComplexForms, edenSpecLabels, findExisting, NPC_FOLDER } from './apply.js'
 import { importBook } from './books.js'
 
 const flagOf = d => d?.flags?.[MODULE_ID]
@@ -57,9 +58,9 @@ export function createImportApp(getIcons = () => null) {
         name: book.source.name, id: book.source.id, error: error && F('SR6I.Failed', { reason: error }),
         canon: book.source.compendium ? F('SR6I.Compendium', { folder: COMPENDIUM_FOLDER }) : L(book.source.canon ? 'SR6I.Canon' : 'SR6I.NonCanon'),
         descriptions: L(this.file.descriptions === true ? 'SR6I.DescriptionsIn' : 'SR6I.DescriptionsOut'),
-        // after de-duplicating ids, as the write does (planPack); rules count their pages, not the chapter journals
-        counts: t && Object.keys(PACKS).filter(k => t.packs[k]?.length).map(k => { const { docs } = planPack(new Set(), t.packs[k])
-          const n = k === 'rules' ? docs.reduce((n, j) => n + j.pages.length, 0) : docs.length
+        // after de-duplicating chummerIDs, as the write does (planUpsert); rules and reference count their pages, not the journals
+        counts: t && Object.keys(PACKS).filter(k => t.packs[k]?.length).map(k => { const docs = planUpsert([], t.packs[k]).creates
+          const n = k === 'rules' || k === 'reference' ? docs.reduce((n, j) => n + j.pages.length, 0) : docs.length
           return `${PACKS[k][0]} ${n}` }).join(' · ') || L('SR6I.NothingInBook'),
       }))
       const nNpc = this.rows?.filter(r => r.runner.npc).length ?? 0
@@ -94,7 +95,7 @@ export function createImportApp(getIcons = () => null) {
       this.books = books ? res.file.books.map(book => {
         try {
           return { book, t: translateBook(book, { exportedAt: book.exportedAt ?? res.file.exportedAt, appVersion: res.file.app?.version ?? '',
-            descriptions: res.file.descriptions === true, sanitize, icons: getIcons() }) }
+            descriptions: res.file.descriptions === true, sanitize, icons: getIcons(), specs: edenSpecLabels(), complexForms: edenComplexForms() }) }
         } catch (e) { return { book, error: e?.message ?? String(e) } }
       }) : null
       const image = s => (PORTRAIT.test(s ?? '') ? s : null)
@@ -117,7 +118,7 @@ export function createImportApp(getIcons = () => null) {
       this.busy = true
       for (const b of el.querySelectorAll('button[data-action=import], input')) b.disabled = true
       const progress = el.querySelector('.sr6i-progress')
-      const specs = edenSpecLabels(), report = []
+      const specs = edenSpecLabels(), complexForms = edenComplexForms(), report = []
       let n = 0
       for (const { row, tick, choice } of jobs) {
         const name = row.runner.streetName
@@ -125,12 +126,12 @@ export function createImportApp(getIcons = () => null) {
         if (progress) progress.textContent = F('SR6I.Progress', { n: ++n, total })
         let res, textOnly = []
         try {
-          const t = translateRunner(row.runner, { exportedAt: row.exportedAt, appVersion: this.file.app?.version ?? '', sanitize, icons: getIcons(), specs })
+          const t = translateRunner(row.runner, { exportedAt: row.exportedAt, appVersion: this.file.app?.version ?? '', sanitize, icons: getIcons(), specs, complexForms })
           textOnly = t.textOnly
           res = await applyRunner(t, choice, { portrait: row.portrait, token: row.token, exportedAt: row.exportedAt })
         } catch (error) { res = { action: 'failed', error } }  // translate threw: nothing in the world changed
         const failed = res.action === 'failed'
-        report.push({ name, failed, textOnly: failed ? [] : textOnly,
+        report.push({ name, failed, textOnly: failed ? [] : [...textOnly, ...(res.notes ?? []).map(l => `${name}: ${l}`)],
           outcome: failed ? F('SR6I.Failed', { reason: res.error?.message ?? String(res.error) }) : L(OUTCOME[res.action]),
           actorId: failed || res.action === 'skip' ? null : res.actor?.id,
           openLabel: F('SR6I.Open', { name: res.actor?.name ?? name }) })

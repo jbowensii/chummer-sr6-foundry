@@ -61,6 +61,31 @@
      "values": {}
     },
     {
+     "effects": [
+      {
+       "target": "attr:agi",
+       "op": "add",
+       "value": "1"
+      },
+      {
+       "target": "skill:firearms",
+       "op": "add",
+       "value": "2",
+       "low": true
+      },
+      {
+       "target": "derived:defense",
+       "op": "add",
+       "value": "1"
+      }
+     ],
+     "tests": [
+      {
+       "skill": "skill:perception",
+       "attr": "attr:int",
+       "threshold": 3
+      }
+     ],
      "id": "mus.lucky-break",
      "kind": "qualities",
      "name": "Lucky Break",
@@ -69,9 +94,27 @@
      "canon": true,
      "attrs": {
       "kind": "positive",
-      "karma": "4"
+      "karma": "4",
+      "karmaMax": "8"
      },
-     "parts": [],
+     "parts": [
+      {
+       "tag": "effect",
+       "text": ""
+      },
+      {
+       "tag": "effect",
+       "text": ""
+      },
+      {
+       "tag": "effect",
+       "text": ""
+      },
+      {
+       "tag": "test",
+       "text": ""
+      }
+     ],
      "values": {
       "karma": 4
      },
@@ -139,12 +182,14 @@
      "attrs": {
       "category": "Body armor",
       "defense": "3",
+      "social": "+2",
       "cost": "500"
      },
      "parts": [],
      "values": {
       "cost": 500,
-      "defense": 3
+      "defense": 3,
+      "social": 2
      }
     },
     {
@@ -172,6 +217,25 @@
      }
     },
     {
+     "id": "mus.made-up-grade",
+     "kind": "grades",
+     "name": "Made-up Grade",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "essence": "0.9",
+      "cost": "1.5",
+      "avail": "1"
+     },
+     "parts": [],
+     "values": {
+      "cost": 1.5,
+      "avail": 1,
+      "essence": 0.9
+     }
+    },
+    {
      "id": "mus.test-link",
      "kind": "electronics",
      "name": "Test Link",
@@ -193,6 +257,107 @@
      }
     },
     {
+     "id": "mus.test-deck",
+     "kind": "electronics",
+     "name": "Test Deck",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "category": "Cyberdecks",
+      "rating": "2",
+      "array": "5 4",
+      "programs": "2",
+      "avail": "4",
+      "cost": "5000"
+     },
+     "parts": [],
+     "values": {
+      "rating": 2,
+      "cost": 5000,
+      "avail": 4
+     }
+    },
+    {
+     "id": "mus.made-up-sniffer",
+     "kind": "programs",
+     "name": "Made-up Sniffer",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "type": "hacking",
+      "avail": "4(I)",
+      "cost": "250"
+     },
+     "parts": [],
+     "values": {
+      "cost": 250,
+      "avail": 4,
+      "legality": "I"
+     },
+     "description": "An invented program."
+    },
+    {
+     "id": "mus.made-up-spoiler",
+     "kind": "gear",
+     "name": "Made-up Spoiler",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "category": "Vehicle mods",
+      "slots": "2",
+      "cost": "300"
+     },
+     "parts": [],
+     "values": {
+      "cost": 300
+     }
+    },
+    {
+     "effects": [
+      {
+       "target": "item:ar",
+       "op": "add",
+       "value": "0,1,1,0,0"
+      }
+     ],
+     "aliases": [
+      {
+       "id": "mus.old-sight",
+       "kind": "weapons"
+      }
+     ],
+     "id": "mus.made-up-sight",
+     "kind": "gear",
+     "name": "Made-up Sight",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "category": "Weapon accessories",
+      "accessoryOf": "mus.pocket-zapper",
+      "avail": "2",
+      "cost": "200"
+     },
+     "parts": [
+      {
+       "tag": "effect",
+       "text": ""
+      }
+     ],
+     "values": {
+      "cost": 200,
+      "avail": 2
+     }
+    },
+    {
+     "aliases": [
+      {
+       "id": "mus.glitter-line"
+      }
+     ],
      "id": "mus.rope",
      "kind": "gear",
      "name": "Glitter Rope",
@@ -249,7 +414,8 @@
       "type": "M",
       "duration": "I",
       "dv": "3",
-      "damage": "P"
+      "damage": "P",
+      "opposed": "true"
      },
      "parts": [],
      "values": {
@@ -312,7 +478,9 @@
      "source": "MUS",
      "page": 10,
      "canon": true,
-     "attrs": {},
+     "attrs": {
+      "user": "adept"
+     },
      "parts": [],
      "values": {}
     },
@@ -324,6 +492,61 @@
      "page": 10,
      "canon": true,
      "attrs": {},
+     "parts": [],
+     "values": {}
+    },
+    {
+     "id": "mus.made-up-fist",
+     "kind": "martialarts",
+     "name": "Made-up Fist",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "categories": "Striking, Grappling",
+      "signature": "Made-up Sweep"
+     },
+     "parts": [],
+     "values": {},
+     "description": "An invented style."
+    },
+    {
+     "id": "mus.made-up-sweep",
+     "kind": "martialtechniques",
+     "name": "Made-up Sweep",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "category": "Striking"
+     },
+     "parts": [],
+     "values": {},
+     "description": "An invented technique."
+    },
+    {
+     "id": "mus.made-up-path",
+     "kind": "traditions",
+     "name": "Made-up Path",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {},
+     "parts": [],
+     "values": {},
+     "description": "An invented tradition."
+    },
+    {
+     "id": "mus.made-up-allergy",
+     "kind": "critterpowers",
+     "name": "Made-up Allergy",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "type": "P",
+      "weakness": "true"
+     },
      "parts": [],
      "values": {}
     },
@@ -532,7 +755,7 @@
         "key": "str",
         "label": "STR",
         "printed": "F-1",
-        "value": "0",
+        "value": "1",
         "ok": true
        }
       ],
@@ -549,6 +772,7 @@
      "id": "mus.ganger",
      "kind": "npcs",
      "name": "Made-up Ganger",
+     "label": "Made-up Crew: Made-up Ganger",
      "source": "MUS",
      "page": 10,
      "canon": true,
@@ -819,6 +1043,34 @@
      "canon": true,
      "attrs": {
       "stage": "opening"
+     },
+     "parts": [],
+     "values": {}
+    },
+    {
+     "id": "mus.made-up-shove",
+     "kind": "actions",
+     "name": "Made-up Shove",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "type": "Major",
+      "category": "Combat"
+     },
+     "parts": [],
+     "values": {},
+     "description": "An invented action."
+    },
+    {
+     "id": "mus.made-up-crow",
+     "kind": "mentorspirits",
+     "name": "Made-up Crow",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "category": "Mentor spirit"
      },
      "parts": [],
      "values": {}

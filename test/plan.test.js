@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, test } from 'vitest'
 import { MODULE_ID } from '../scripts/lib/constants.js'
 import { translateRunner } from '../scripts/lib/translate.js'
-import { defaultChoice, keepArt, keepItemArt, mergeActorItems, mergeJournalPages, newVersionName, planPack, replaceUpdate, tokenUpdate } from '../scripts/lib/plan.js'
+import { defaultChoice, fitUpdates, isOurEffect, keepArt, keepItemArt, keepUserEffects, mergeActorItems, newVersionName, planItems, replaceUpdate, tokenUpdate } from '../scripts/lib/plan.js'
 
 const file = JSON.parse(readFileSync('samples/test-runners.json', 'utf8'))
 const OPTS = { exportedAt: file.exportedAt, appVersion: file.app.version }
@@ -36,18 +36,21 @@ describe('planning an import', () => {
     expect(keys).toContain('system.karma')
     expect(keys).toContain('img')
     expect(u.flags[MODULE_ID].id).toBe('run-mara-1')
-    for (const bad of ['system.edge.value', 'system.physical', 'system.stun', 'system.overflow', 'system.heat', 'system.reputation',
+    expect(keys).toContain('system.physical.mod')  // the extra boxes are Chummer's; damage is play state
+    for (const bad of ['system.edge.value', 'system.physical.dmg', 'system.physical.value', 'system.stun.dmg', 'system.stun.value', 'system.overflow', 'system.heat', 'system.reputation',
       'system.matrixIni', 'system.persona', 'prototypeToken', 'ownership', 'items', 'type'])
       expect(keys.some(k => k.startsWith(bad)), bad).toBe(false)
   })
 
   test('play state is dropped even if a translation carried it', () => {
     const a = structuredClone(t.actor)
-    Object.assign(a.system, { physical: { value: 3 }, stun: { value: 1 }, heat: 2, reputation: 1, matrixIni: 'vrhot', persona: {} })
+    Object.assign(a.system, { physical: { mod: 1, value: 3, dmg: 2 }, stun: { mod: 0, value: 1 }, heat: 2, reputation: 1, matrixIni: 'vrhot', persona: {} })
     a.system.edge.value = 1
     const u = replaceUpdate(a)
     expect(u.system.edge).toEqual({ max: 3 })
-    for (const k of ['physical', 'stun', 'heat', 'reputation', 'matrixIni', 'persona']) expect(u.system).not.toHaveProperty(k)
+    expect(u.system.physical).toEqual({ mod: 1 })
+    expect(u.system.stun).toEqual({ mod: 0 })
+    for (const k of ['heat', 'reputation', 'matrixIni', 'persona']) expect(u.system).not.toHaveProperty(k)
   })
 
   test('an NPC replace update: rating and GM notes in, token settings out', () => {
@@ -87,28 +90,38 @@ describe('planning an import', () => {
   })
 })
 
-describe('planning a pack write', () => {
-  test('entries already in the pack are replaced, the rest created; pack-only entries are left alone', () => {
-    expect(planPack(new Set(['a', 'b', 'gm']), [{ _id: 'a' }, { _id: 'c' }, { _id: 'b' }])).toMatchObject({ replace: ['a', 'b'], create: ['c'], duplicates: [] })
-    expect(planPack(new Set(), [{ _id: 'x' }])).toMatchObject({ replace: [], create: ['x'] })
-  })
-  test('an id the file has twice: the last entry is written once and the earlier one reported', () => {
-    const first = { _id: 'a', name: 'Old' }, last = { _id: 'a', name: 'New' }
-    const p = planPack(new Set(['a']), [first, { _id: 'b' }, last])
-    expect(p.docs).toEqual([last, { _id: 'b' }])
-    expect(p).toMatchObject({ replace: ['a'], create: ['b'], duplicates: [first] })
-  })
-  test('mergeJournalPages rebuilds imported pages and keeps the GM’s own after them', () => {
-    const gm = { _id: 'gm', name: 'My note' }, oldA = { _id: 'a', flags: { [MODULE_ID]: {} } }, stale = { _id: 's', flags: { [MODULE_ID]: {} } }
-    const newA = { _id: 'a', name: 'New A' }, newB = { _id: 'b', name: 'B' }
-    expect(mergeJournalPages([oldA, stale, gm], [newA, newB])).toEqual([newA, newB, gm])
-    expect(mergeJournalPages(undefined, [newA])).toEqual([newA])
-  })
-  test('mergeActorItems rebuilds flagged items and keeps the GM’s unflagged ones after them', () => {
-    const gm = { _id: 'gm', name: 'GM item', flags: {} }, old = { _id: 'o', flags: { [MODULE_ID]: { id: 'x' } } }
-    const fresh = { name: 'New', flags: { [MODULE_ID]: { id: 'x' } } }
-    expect(mergeActorItems([old, gm], [fresh])).toEqual([fresh, gm])
+describe('merging a pack actor', () => {
+  test('mergeActorItems: our items keep the old _id, other modules’ flags and a user’s effects; the GM’s items after; a dropped one goes', () => {
+    const userFx = { _id: 'u1', name: 'GM buff', flags: {} }, ourFx = { _id: 'o1', name: 'Ours', flags: { [MODULE_ID]: { chummer: true } } }
+    const gm = { _id: 'gm', name: 'GM item', flags: {} }, old = { _id: 'o', flags: { [MODULE_ID]: { id: 'x' }, other: { y: 1 } }, effects: [ourFx, userFx] }
+    const gone = { _id: 'g', flags: { [MODULE_ID]: { id: 'dropped' } } }
+    const fresh = { name: 'New', flags: { [MODULE_ID]: { id: 'x' } }, effects: [{ name: 'New ours', flags: { [MODULE_ID]: { chummer: true } } }] }
+    expect(mergeActorItems([old, gm, gone], [fresh])).toEqual([{ ...fresh, _id: 'o', flags: { [MODULE_ID]: { id: 'x' }, other: { y: 1 } },
+      effects: [fresh.effects[0], userFx] }, gm])
     expect(mergeActorItems(undefined, [fresh])).toEqual([fresh])
+  })
+  test('keepUserEffects and isOurEffect: ours swapped, the user’s kept', () => {
+    const user = { _id: 'u', flags: {} }, ours = { _id: 'o', flags: { [MODULE_ID]: { chummer: true } } }, nu = { name: 'n' }
+    expect(keepUserEffects([ours, user], [nu])).toEqual([nu, user])
+    expect([ours, user].map(isOurEffect)).toEqual([true, false])
+  })
+  test('planItems: our items by uid updated in place, new ones created, dropped ones removed, the user’s untouched', () => {
+    const it = (id, uid, type = 'gear') => ({ id, type, flags: uid ? { [MODULE_ID]: { id: uid } } : {} })
+    const r = planItems([it('A', 'w1'), it('B', 'w2'), it('U', null), it('C', 'q1', 'quality')],
+      [{ type: 'gear', flags: { [MODULE_ID]: { id: 'w1' } } }, { type: 'gear', flags: { [MODULE_ID]: { id: 'w9' } } }, { type: 'gear', flags: { [MODULE_ID]: { id: 'q1' } } }])
+    expect(r.update.map(u => u.old.id)).toEqual(['A'])
+    expect(r.create.map(i => i.flags[MODULE_ID].id)).toEqual(['w9', 'q1'])  // another type is a new item
+    expect(r.remove).toEqual(['B', 'C'])
+  })
+  test('planItems: a martial art style keeps the genesisID it has on the actor, and our techniques follow it', () => {
+    const f = uid => ({ [MODULE_ID]: { id: uid } })
+    const r = planItems([{ id: 'S', type: 'martialartstyle', flags: f('m1'), system: { genesisID: 'oldgen' } }],
+      [{ type: 'martialartstyle', flags: f('m1'), system: { genesisID: 'newgen' } },
+        { type: 'martialarttech', flags: f('m1t1'), system: { style: 'newgen' } },
+        { type: 'martialartstyle', flags: f('m2'), system: { genesisID: 'other' } },
+        { type: 'martialarttech', flags: f('m2t1'), system: { style: 'other' } }])
+    expect(r.update[0].item.system.genesisID).toBe('oldgen')
+    expect(r.create.map(i => i.system.style ?? i.system.genesisID)).toEqual(['oldgen', 'other', 'other'])
   })
 })
 
@@ -130,5 +143,14 @@ describe('re-import never overwrites art the user chose', () => {
     expect(k.items[0].img).toBe('worlds/test/a.webp')
     expect(keepArt({ img: 'icons/svg/item-bag.svg' }, { img: 'new.webp' }).img).toBe('new.webp')
     expect(keepArt({ pages: [] }, { name: 'J', pages: [] })).toEqual({ name: 'J', pages: [] })
+  })
+})
+
+describe('fitting items to their hosts', () => {
+  const made = (id, uid, host) => ({ id, flags: { [MODULE_ID]: { id: uid, ...host ? { host } : {} } } })
+  test('once Foundry has given the items ids: a fitted item gets its host’s, the rest nothing', () => {
+    const items = [made('F1', 'w1'), made('F2', 'w1a', 'w1'), made('F3', 'w1b', 'w1'), made('F4', 'g1'), made('F5', 'x', 'gone')]
+    expect(fitUpdates(items, 'ACTOR')).toEqual([{ _id: 'F2', 'system.embeddedInUuid': 'Actor.ACTOR.Item.F1' },
+      { _id: 'F3', 'system.embeddedInUuid': 'Actor.ACTOR.Item.F1' }])  // a host not on the actor: the item stays loose
   })
 })

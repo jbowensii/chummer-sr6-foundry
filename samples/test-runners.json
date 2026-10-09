@@ -15,6 +15,7 @@
    "exportedAt": "2026-10-04T09:00:00.000Z",
    "streetName": "Made-Up Mara",
    "realName": "Mara Testcase",
+   "gender": "Made-up gender",
    "finalized": true,
    "metatype": {
     "id": "mus.elf",
@@ -128,6 +129,31 @@
    ],
    "qualities": [
     {
+     "effects": [
+      {
+       "target": "attr:agi",
+       "op": "add",
+       "value": "1"
+      },
+      {
+       "target": "skill:firearms",
+       "op": "add",
+       "value": "2",
+       "low": true
+      },
+      {
+       "target": "derived:defense",
+       "op": "add",
+       "value": "1"
+      }
+     ],
+     "tests": [
+      {
+       "skill": "skill:perception",
+       "attr": "attr:int",
+       "threshold": 3
+      }
+     ],
      "id": "mus.lucky-break",
      "kind": "qualities",
      "name": "Lucky Break",
@@ -136,9 +162,27 @@
      "canon": true,
      "attrs": {
       "kind": "positive",
-      "karma": "4"
+      "karma": "4",
+      "karmaMax": "8"
      },
-     "parts": [],
+     "parts": [
+      {
+       "tag": "effect",
+       "text": ""
+      },
+      {
+       "tag": "effect",
+       "text": ""
+      },
+      {
+       "tag": "effect",
+       "text": ""
+      },
+      {
+       "tag": "test",
+       "text": ""
+      }
+     ],
      "values": {
       "karma": 4
      },
@@ -190,6 +234,28 @@
      "level": 2,
      "free": false,
      "note": "Owes a made-up fixer."
+    },
+    {
+     "id": "mur.made-up-tough",
+     "kind": "qualities",
+     "name": "Made-up Tough",
+     "source": "MUR",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "kind": "positive",
+      "karma": "4",
+      "perLevel": "true",
+      "maxLevel": "3"
+     },
+     "parts": [],
+     "values": {
+      "karma": 4
+     },
+     "uid": "q4",
+     "positive": true,
+     "level": 1,
+     "free": false
     }
    ],
    "picks": [
@@ -207,7 +273,8 @@
       "type": "M",
       "duration": "I",
       "dv": "3",
-      "damage": "P"
+      "damage": "P",
+      "opposed": "true"
      },
      "parts": [],
      "values": {
@@ -288,12 +355,49 @@
      "source": "MUS",
      "page": 10,
      "canon": true,
-     "attrs": {},
+     "attrs": {
+      "user": "adept"
+     },
      "parts": [],
      "values": {},
      "uid": "p5",
      "pick": "metamagics",
      "bonuses": []
+    }
+   ],
+   "martialArts": [
+    {
+     "id": "mus.made-up-fist",
+     "kind": "martialarts",
+     "name": "Made-up Fist",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "categories": "Striking, Grappling",
+      "signature": "Made-up Sweep"
+     },
+     "parts": [],
+     "values": {},
+     "description": "An invented style.",
+     "uid": "m1",
+     "techniques": [
+      {
+       "id": "mus.made-up-sweep",
+       "kind": "martialtechniques",
+       "name": "Made-up Sweep",
+       "source": "MUS",
+       "page": 10,
+       "canon": true,
+       "attrs": {
+        "category": "Striking"
+       },
+       "parts": [],
+       "values": {},
+       "description": "An invented technique.",
+       "uid": "m1t1"
+      }
+     ]
     }
    ],
    "purchases": [
@@ -337,7 +441,50 @@
      "qty": 1,
      "worn": false,
      "bonuses": [],
-     "accessories": []
+     "accessories": [
+      {
+       "effects": [
+        {
+         "target": "item:ar",
+         "op": "add",
+         "value": "0,1,1,0,0"
+        }
+       ],
+       "aliases": [
+        {
+         "id": "mus.old-sight",
+         "kind": "weapons"
+        }
+       ],
+       "id": "mus.made-up-sight",
+       "kind": "gear",
+       "name": "Made-up Sight",
+       "source": "MUS",
+       "page": 10,
+       "canon": true,
+       "attrs": {
+        "category": "Weapon accessories",
+        "accessoryOf": "mus.pocket-zapper",
+        "avail": "2",
+        "cost": "200"
+       },
+       "parts": [
+        {
+         "tag": "effect",
+         "text": ""
+        }
+       ],
+       "values": {
+        "cost": 200,
+        "avail": 2
+       },
+       "uid": "w1a",
+       "qty": 1,
+       "worn": false,
+       "bonuses": [],
+       "accessories": []
+      }
+     ]
     },
     {
      "id": "mur.odd-blade",
@@ -382,12 +529,14 @@
      "attrs": {
       "category": "Body armor",
       "defense": "3",
+      "social": "+2",
       "cost": "500"
      },
      "parts": [],
      "values": {
       "cost": 500,
-      "defense": 3
+      "defense": 3,
+      "social": 2
      },
      "uid": "a1",
      "qty": 1,
@@ -429,6 +578,16 @@
       },
       {
        "target": "initDice",
+       "value": 1
+      },
+      {
+       "target": "defense",
+       "value": 1
+      },
+      {
+       "target": "skill",
+       "id": "mur.firearms",
+       "name": "Firearms",
        "value": 1
       }
      ],
@@ -486,6 +645,59 @@
      "accessories": []
     },
     {
+     "id": "mus.test-deck",
+     "kind": "electronics",
+     "name": "Test Deck",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "category": "Cyberdecks",
+      "rating": "2",
+      "array": "5 4",
+      "programs": "2",
+      "avail": "4",
+      "cost": "5000"
+     },
+     "parts": [],
+     "values": {
+      "rating": 2,
+      "cost": 5000,
+      "avail": 4
+     },
+     "uid": "e2",
+     "qty": 1,
+     "worn": false,
+     "bonuses": [],
+     "accessories": [
+      {
+       "id": "mus.made-up-sniffer",
+       "kind": "programs",
+       "name": "Made-up Sniffer",
+       "source": "MUS",
+       "page": 10,
+       "canon": true,
+       "attrs": {
+        "type": "hacking",
+        "avail": "4(I)",
+        "cost": "250"
+       },
+       "parts": [],
+       "values": {
+        "cost": 250,
+        "avail": 4,
+        "legality": "I"
+       },
+       "description": "An invented program.",
+       "uid": "e2a",
+       "qty": 1,
+       "worn": false,
+       "bonuses": [],
+       "accessories": []
+      }
+     ]
+    },
+    {
      "id": "mur.power-focus",
      "kind": "gear",
      "name": "Made-up Power Focus",
@@ -509,6 +721,11 @@
      "accessories": []
     },
     {
+     "aliases": [
+      {
+       "id": "mus.glitter-line"
+      }
+     ],
      "id": "mus.rope",
      "kind": "gear",
      "name": "Glitter Rope",
@@ -601,7 +818,10 @@
      "name": "Fake Fixer",
      "archetype": "Fixer",
      "connection": 4,
-     "loyalty": 2
+     "loyalty": 2,
+     "types": [
+      "street"
+     ]
     }
    ],
    "lifestyle": {
@@ -616,10 +836,20 @@
      "name": "Mara Testcase",
      "kind": "fake",
      "rating": 3,
+     "gender": "Made-up cover gender",
      "licences": [
       {
        "name": "Made-up Permit",
        "rating": 3
+      }
+     ],
+     "lifestyles": [
+      {
+       "uid": "ls1",
+       "id": "mus.made-up-squat",
+       "name": "Made-up Hideout",
+       "months": 2,
+       "cost": 450
       }
      ]
     },
@@ -627,7 +857,8 @@
      "uid": "s2",
      "name": "Birth Record",
      "kind": "real",
-     "licences": []
+     "licences": [],
+     "lifestyles": []
     }
    ],
    "karma": 7,
@@ -638,15 +869,20 @@
      "dice": 3
     },
     "astralInit": {
-     "base": 8,
+     "base": 9,
      "dice": 2
     },
     "monitors": {
-     "physical": 10,
+     "physical": 11,
      "stun": 10,
      "overflow": 3
     },
-    "defenseRating": 6,
+    "monitorBonus": {
+     "physical": 1,
+     "stun": 0
+    },
+    "defenseRating": 7,
+    "socialRating": 5,
     "composure": 6,
     "judgeIntentions": 7,
     "memory": 9,
@@ -665,9 +901,9 @@
       "label": "Firearms",
       "rank": 4,
       "attr": "agi",
-      "dp": 9,
+      "dp": 10,
       "spec": "Pistols (Light)",
-      "specDp": 13
+      "specDp": 14
      },
      {
       "skill": "crb.gab",
@@ -792,6 +1028,7 @@
    "knowledge": [],
    "qualities": [],
    "picks": [],
+   "martialArts": [],
    "purchases": [],
    "contacts": [],
    "lifestyle": null,

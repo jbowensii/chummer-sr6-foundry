@@ -1,6 +1,9 @@
 // Apply one translated runner or NPC to the world. Foundry globals are only touched inside functions (node --check clean).
 import { MODULE_ID } from '../lib/constants.js'
-import { keepItemArt, newVersionName, replaceUpdate, tokenUpdate } from '../lib/plan.js'
+import { missingTargets, normKey } from '../lib/eden.js'
+import { INDEX_FIELDS, resolveEntry, tieLine } from '../lib/chummer-id.js'
+import { LINE_KINDS, matchThing, npcThings, overrideStats, thingTie } from '../lib/npc-lines.js'
+import { fitUpdates, isOurEffect, keepItemArt, newVersionName, planItems, replaceUpdate, tokenUpdate } from '../lib/plan.js'
 
 export const FOLDER = 'Chummer SR6'
 export const NPC_FOLDER = 'Chummer SR6 NPCs'  // NPCs from a runners file (flags npc)
@@ -66,19 +69,176 @@ export async function dedupeUnarmed(actor) {
 /** Eden's specialization labels as Foundry loaded them: { [skill]: { [specKey]: label } } (never shipped: Eden is GPL-3). */
 export const edenSpecLabels = () => game.i18n.translations.shadowrun6?.special ?? game.i18n._fallback?.shadowrun6?.special ?? {}
 
-// Replace in place: rebuild the translated fields and every flagged embedded item; unflagged items and play state stay,
-// and so does art the user chose, on the actor and its rebuilt items (lib/plan.js replaceUpdate, keepItemArt).
-// One actor update (translated fields and token together), then new items, old items deleted last: three writes. If deleting the old ones fails, the new items are removed again,
-// so a failure never leaves the actor without its Chummer items or with them twice. Throws on failure.
+/**
+ * Eden's own complex form table (CONFIG.SR6.COMPLEX_FORMS.list: the test each form calls for), keyed by normKey of its key
+ * and of its translated name, as lib/translate.js pickItem reads it. Read at import time, never shipped.
+ */
+export function edenComplexForms() {
+  const out = {}
+  for (const [key, cf] of Object.entries(CONFIG.SR6?.COMPLEX_FORMS?.list ?? {})) {
+    const row = { skill: cf?.skill ?? '', oppAttr1: cf?.opposedAttr1 ?? '', oppAttr2: cf?.opposedAttr2 ?? '', threshold: cf?.threshold ?? 0 }
+    if (!row.skill) continue
+    out[normKey(key)] = row
+    const label = game.i18n.localize(`shadowrun6.compendium.complexform.${key}`)
+    if (label && !label.startsWith('shadowrun6.')) out[normKey(label)] = row
+  }
+  return out
+}
+
+/** Eden's effect editor lists the change keys it knows (CONFIG.SR6.ACTIVE_EFFECT_OPTIONS, rebuilt at its own ready); the
+ *  ones this module writes that it lacks (the social Defense Rating, …) are added, labelled "Chummer: <path>". */
+export function registerEffectTargets() {
+  const options = CONFIG.SR6?.ACTIVE_EFFECT_OPTIONS
+  if (!options) return
+  for (const [key, path] of Object.entries(missingTargets(options))) options[key] = `Chummer: ${path}`
+}
+
+/** Our identity fields in every compendium's index (lib/chummer-id.js INDEX_FIELDS), so a pack finds an entry by
+ *  chummerID without loading its documents. Called at init (main.js). */
+export function addIndexFields() {
+  for (const doc of ['Item', 'Actor', 'JournalEntry']) {
+    const c = CONFIG[doc]
+    if (!c) continue
+    c.compendiumIndexFields = [...new Set([...c.compendiumIndexFields ?? [], ...INDEX_FIELDS])]
+  }
+}
+
+// One book's world compendiums (lib/books.js: sr6-<source>-<key>, in any of its kinds' packs) as index entries for
+// lib/chummer-id.js resolveEntry, loaded once per import.
+const slug = s => String(s).toLowerCase().replace(/[^a-z0-9_-]/g, '-')
+async function bookEntries(source, prefix) {
+  const start = `world.${slug(`${prefix}sr6-${source}`)}-`, out = []
+  for (const pack of game.packs.filter(p => p.documentName === 'Item' && p.collection.startsWith(start))) {
+    const index = await pack.getIndex({ fields: INDEX_FIELDS })
+    for (const i of index.values()) {
+      const f = i.flags?.[MODULE_ID] ?? {}
+      out.push({ uuid: i.uuid ?? pack.getUuid(i._id), type: i.type, name: i.name, chummerID: f.chummerID ?? null,
+        aliases: f.chummerAliases ?? [], kind: f.kind ?? null, page: f.page ?? null })
+    }
+  }
+  return out
+}
+
+/**
+ * _stats.compendiumSource for a runner's items: the real UUID of the entry each came from in that world's compendiums
+ * for its book, found by chummerID, then its aliases, then type and name inside that one book's compendiums (ties: the
+ * same kind, then the same page). Still tied: no link, and a report line lists the candidates. Never a search by name
+ * across every compendium; a custom item (no book) is never linked. Returns { items, notes }.
+ */
+export async function linkCompendium(items, prefix = '') {
+  const books = new Map(), notes = []
+  const out = []
+  for (const i of items) {
+    const source = flagOf(i)?.source
+    if (!source || !flagOf(i)?.catalogId) { out.push(i); continue }
+    if (!books.has(source)) books.set(source, await bookEntries(source, prefix))
+    const r = resolveEntry(i, books.get(source))
+    if (r?.uuid) out.push({ ...i, _stats: { ...i._stats, compendiumSource: r.uuid } })
+    else { if (r?.candidates) notes.push(tieLine(i, r.candidates)); out.push(i) }
+  }
+  return { items: out, notes }
+}
+
+/**
+ * An NPC's gear, weapon and augmentation lines (from a runners file) as the real items from its book's compendiums in
+ * this world (lib/npc-lines.js): matched by name in that book only, the stat block's own values kept over the entry's,
+ * its "w/" accessories fitted to it; linked to the entry (_stats.compendiumSource). Unmatched: the line stays text (the
+ * notes); tied: text and a report line. t.npc: { lines, from } (translateNpc). Returns { items, notes }.
+ */
+export async function npcLineItems(t, prefix = '') {
+  const things = npcThings(t.npc ?? {}), src = t.npc?.from?.source, page = t.npc?.from?.page ?? null
+  if (!things.length || !src) return { items: [], notes: [] }
+  const entries = await bookEntries(src, prefix), items = [], notes = []
+  const doc = async (entry, flags) => {
+    const data = (await fromUuid(entry.uuid))?.toObject()
+    if (!data) return null
+    for (const k of ['_id', 'folder', 'sort', 'ownership']) delete data[k]
+    data._stats = { compendiumSource: entry.uuid }
+    data.flags = { ...data.flags, [MODULE_ID]: { ...data.flags?.[MODULE_ID], ...flags } }
+    return data
+  }
+  for (const th of things) {
+    const r = matchThing(th.name, entries, LINE_KINDS[th.part], page)
+    if (r?.candidates) notes.push(thingTie(th, r.candidates))
+    if (!r?.entry) continue
+    const id = `line:${th.part}:${th.printed}`, d = await doc(r.entry, { id, npcLine: th.printed })
+    if (!d) continue
+    d.system = overrideStats(d.system, th.stats)
+    items.push(d)
+    for (const acc of th.accessories) {
+      const a = matchThing(acc, entries, null, page)
+      if (a?.candidates) notes.push(thingTie({ printed: acc }, a.candidates))
+      const m = a?.entry && await doc(a.entry, { id: `${id}:w/${acc}`, host: id, npcLine: th.printed })
+      if (m) items.push(m)
+    }
+  }
+  return { items, notes }
+}
+
+// Create an actor's items (Foundry picks their ids), then fit the mods and software to their hosts by the ids they got
+// (lib/plan.js fitUpdates). Returns the created items.
+async function createItems(doc, items) {
+  if (!items.length) return []
+  const made = await doc.createEmbeddedDocuments('Item', items)
+  const fits = fitUpdates(made, doc.id)
+  if (fits.length) await doc.updateEmbeddedDocuments('Item', fits)
+  return made
+}
+
+// Replace in place (lib/plan.js planItems): the actor's translated fields, then each of our items matched by its uid updated
+// in place (same _id; Chummer's fields refreshed, play state the system keeps in other fields left alone, other
+// modules' flags kept) with only its effects of ours swapped, so effects a user added stay; new items created; our
+// items the file no longer has deleted; the user's own items never touched. Art the user chose stays (keepItemArt).
+// Then every fitted mod and program is pointed at its host again. If deleting the dropped items fails, the items this
+// call created are removed again. Throws on failure.
 async function replaceDoc(doc, actor, items, token) {
-  const old = doc.items.filter(i => flagOf(i)).map(i => i.id)
   const fresh = keepItemArt(doc.items, items)
+  const { update, create, remove } = planItems([...doc.items], fresh)
   await doc.update({ ...replaceUpdate(actor, doc.name, doc.img), ...tokenUpdate(doc, token ?? actor.img) })
-  const made = fresh.length ? await doc.createEmbeddedDocuments('Item', fresh) : []
-  try { if (old.length) await doc.deleteEmbeddedDocuments('Item', old) } catch (e) {
-    try { await doc.deleteEmbeddedDocuments('Item', made.map(i => i.id)) } catch {}
+  if (update.length) await doc.updateEmbeddedDocuments('Item', update.map(({ old, item }) => ({ _id: old.id, name: item.name,
+    ...item.img ? { img: item.img } : {}, system: item.system, flags: { ...old.flags, [MODULE_ID]: item.flags[MODULE_ID] },
+    ...item._stats?.compendiumSource ? { '_stats.compendiumSource': item._stats.compendiumSource } : {} })))
+  for (const { old, item } of update) {
+    const live = doc.items.get(old.id) ?? old
+    const ourOld = [...live.effects ?? []].filter(isOurEffect).map(e => e.id ?? e._id)
+    if (ourOld.length) await live.deleteEmbeddedDocuments('ActiveEffect', ourOld)
+    if (item.effects?.length) await live.createEmbeddedDocuments('ActiveEffect', item.effects)
+  }
+  const made = create.length ? await doc.createEmbeddedDocuments('Item', create) : []
+  try { if (remove.length) await doc.deleteEmbeddedDocuments('Item', remove) } catch (e) {
+    try { if (made.length) await doc.deleteEmbeddedDocuments('Item', made.map(i => i.id)) } catch {}
     throw e
   }
+  const fits = fitUpdates([...update.map(({ old, item }) => ({ id: old.id, flags: item.flags })), ...made], doc.id)
+  if (fits.length) await doc.updateEmbeddedDocuments('Item', fits)
+}
+
+/**
+ * A runner's vehicles and drones as Eden Vehicle actors (translate.js vehicleActor) linked to it (system.vehicle.belongs:
+ * the owner's actor id), in "<runner> vehicles" inside its folder: the world copy of each (flags runner + id, the
+ * purchase's uid) replaced in place as a runner is (its mods and weapons by uid, a user's effects and items kept), a
+ * missing one created. A vehicle the GM made is never touched. Never throws: a failure is a report line.
+ */
+export async function applyVehicles(t, owner, root) {
+  const runnerId = flagOf(t.actor).id, notes = []
+  let vf = null
+  const vFolder = async () => (vf ??= await ensureFolder(`${owner.name} vehicles`, root ?? null))
+  for (const v of t.vehicles ?? []) {
+    try {
+      const uid = flagOf(v.actor).id, actor = structuredClone(v.actor), items = v.items.map(itemData)
+      actor.system.vehicle = { ...actor.system.vehicle, belongs: owner.id }
+      const existing = game.actors.find(a => a.type === 'Vehicle' && flagOf(a)?.runner === runnerId && flagOf(a)?.id === uid)
+      if (existing) await replaceDoc(existing, actor, items, null)
+      else {
+        const made = await Actor.create({ ...actor, folder: (await vFolder())?.id ?? null, prototypeToken: { actorLink: true, ...actor.img ? { texture: { src: actor.img } } : {} } })
+        await createItems(made, items)
+      }
+    } catch (e) {
+      console.error(`${MODULE_ID} | ${v.actor.name}`, e)
+      notes.push(`${v.actor.name}: vehicle actor not written (${e?.message ?? e})`)
+    }
+  }
+  return notes
 }
 
 /**
@@ -86,14 +246,17 @@ async function replaceDoc(doc, actor, items, token) {
  * image; without a token the token shows the img). folder: the root Actors folder, by name or a Folder (the Quench tests
  * pass their own); by default FOLDER for a runner, NPC_FOLDER for an NPC. Items go in after the actor (Eden's
  * preCreateItem runs per item), their effects inside each item's data. Never throws: a failure deletes the actor this
- * call created and returns { actor: null, action: 'failed', error } so the caller reports it and carries on.
+ * call created and returns { actor: null, action: 'failed', error } so the caller reports it and carries on. notes: the
+ * compendium link lines for the report (linkCompendium).
  */
 export async function applyRunner(t, choice, { portrait, token, exportedAt, folder = flagOf(t.actor)?.npc ? NPC_FOLDER : FOLDER } = {}) {
   const runnerId = flagOf(t.actor).id
   if (choice === 'skip') return { actor: findExisting(runnerId), action: 'skip' }
   let created = null
   try {
-    const actor = structuredClone(t.actor), items = t.items.map(itemData)
+    const linked = await linkCompendium(t.items.map(itemData)), lines = await npcLineItems(t)
+    const items = [...linked.items, ...lines.items], notes = [...linked.notes, ...lines.notes]
+    const actor = structuredClone(t.actor)
     const at = exportedAt ?? flagOf(t.actor).exportedAt
     if (portrait) actor.img = await uploadPortrait(portrait, runnerId, at)
     const tokenImg = token ? await uploadPortrait(token, runnerId, at, 'tokens') : null
@@ -103,7 +266,8 @@ export async function applyRunner(t, choice, { portrait, token, exportedAt, fold
       if (!doc) throw new Error(`${t.actor.name}: nothing to replace`)
       await replaceDoc(doc, actor, items, tokenImg)
       await dedupeUnarmed(doc)
-      return { actor: doc, action: 'replace' }
+      notes.push(...await applyVehicles(t, doc, doc.folder ?? null))
+      return { actor: doc, action: 'replace', notes }
     }
 
     const root = typeof folder === 'string' ? await ensureFolder(folder) : folder
@@ -112,9 +276,10 @@ export async function applyRunner(t, choice, { portrait, token, exportedAt, fold
     const src = tokenImg ?? actor.img
     created = await Actor.create({ ...actor, name, folder: root?.id ?? null,
       prototypeToken: { ...actor.prototypeToken, ...src ? { texture: { src } } : {} } })
-    if (items.length) await created.createEmbeddedDocuments('Item', items)
+    await createItems(created, items)
     await dedupeUnarmed(created)
-    return { actor: created, action: choice === 'new' ? 'new' : 'create' }
+    if (choice === 'create') notes.push(...await applyVehicles(t, created, root))
+    return { actor: created, action: choice === 'new' ? 'new' : 'create', notes }
   } catch (error) {
     // A replaced actor cleans up its own new items (replaceDoc); ponytail: its update already applied stays, and
     // re-running the import finishes the job.

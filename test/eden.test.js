@@ -1,8 +1,9 @@
 // shadowrun6-eden vocabulary (scripts/lib/eden.js): invented category strings, Eden's keys only.
 import { describe, expect, test } from 'vitest'
 import {
-  ATTRS, MOR, SKILLS, activationKey, armorSubtype, augmentType, durationKey, electronicsSubtype, gearType, lifestyleKey, normKey,
-  sinQuality, skillKey, specKey, spellFields, spiritKey, spriteKey, vehicleType, weaponType,
+  ACCESS_DEVICES, ATTRS, effectOptionKey, missingTargets, OUR_TARGETS, MOR, SKILLS, activationKey, armorSubtype, augmentType, deviceFields, durationKey, edenBook, effectKey,
+  electronicsSubtype, gearType, hostChanges, lifestyleKey, martialCategories, modType, normKey, sinQuality, skillKey, softwareType, specKey,
+  spellFields, spiritKey, spriteKey, vehicleType, vehicleVtype, weaponType,
 } from '../scripts/lib/eden.js'
 
 describe('keys', () => {
@@ -67,17 +68,49 @@ describe('armor, augmentations, electronics, gear, vehicles', () => {
     ['cyberware', 'Cyberlimbs', 'CYBERWARE', 'CYBER_LIMBS'], ['cyberware', 'Implant weapons', 'CYBERWARE', 'CYBER_IMPLANT_WEAPON'],
     ['cyberware', 'Bodyware', 'CYBERWARE', 'CYBER_BODYWARE'], ['bioware', 'Cultured bioware', 'BIOWARE', 'BIOWARE_CULTURED'],
     ['bioware', 'Bio-weapons', 'BIOWARE', 'BIOWARE_IMPLANT_WEAPON'], ['bioware', 'Dermal mods', 'BIOWARE', 'BIOWARE_DERMAL'],
-    ['bioware', 'Made-up', 'BIOWARE', 'BIOWARE_STANDARD'],
+    ['bioware', 'Made-up', 'BIOWARE', 'BIOWARE_STANDARD'], ['cyberware', 'Cyberdecks (implanted)', 'CYBERWARE', 'CYBERDECK'],
+    ['cyberware', 'Commlinks (implanted)', 'CYBERWARE', 'COMMLINK'],
   ])('augmentation %s %s', (t, c, type, subtype) => expect(augmentType(t, c)).toEqual({ type, subtype }))
+  test.each([
+    ['cyberware', 'nanoware', 'Made-up nanites', 'NANOWARE', 'NANO_CYBERWARE'], ['cyberware', 'nanoware', 'Cosmetic nanites', 'NANOWARE', 'NANITES_COSMETIC'],
+    ['bioware', 'geneware', 'Made-up', 'GENETICS', 'AUGMENTICS'], ['bioware', 'geneware', 'Gene therapy', 'GENETICS', 'THERAPEUTIC'],
+    ['bioware', 'transgenics', 'Made-up', 'GENETICS', 'TRANSGENICS'], ['bioware', 'symbionts', 'Made-up', 'BIOWARE', 'SYMBIONTS'],
+  ])('augmentation the export folded: %s (%s) %s', (t, ware, c, type, subtype) => expect(augmentType(t, c, ware)).toEqual({ type, subtype }))
   test.each([['Commlinks', 'COMMLINK'], ['Cyberdecks', 'CYBERDECK'], ['Rigger consoles', 'RIGGER_CONSOLE'], ['RFID tags', 'RFID'],
     ['Vision enhancements', 'OPTICAL'], ['Audio enhancements', 'AUDIO'], ['Sensors', 'SENSOR_HOUSING'], ['Security devices', 'SECURITY'],
     ['Breaking and entering', 'BREAKING'], ['Tac nets', 'TAC_NET'], ['Credsticks', 'ID_CREDIT'], ['Communication', 'COMMUNICATION'],
-    ['Glitter gadgets', 'ELECTRONIC_ACCESSORIES']])('electronics %s', (c, s) => expect(electronicsSubtype(c)).toBe(s))
+    ['Glitter gadgets', 'ELECTRONIC_ACCESSORIES'], ['Cyberterms', 'CYBERTERM'], ['Dataterms', 'DATATERM']])('electronics %s', (c, s) => expect(electronicsSubtype(c)).toBe(s))
+  test('a Matrix access device: device rating, its array on the attributes Eden reads, program slots', () => {
+    expect(deviceFields('COMMLINK', { rating: 3, array: '1/1' })).toEqual({ matrix: { deviceRating: 3 }, d: 1, f: 1 })
+    expect(deviceFields('CYBERDECK', { rating: 2, array: '5 4', programs: '2' })).toEqual({ matrix: { deviceRating: 2 }, a: 5, s: 4, progSlots: 2 })
+    expect(deviceFields('CYBERTERM', { rating: 4, array: '6 5 4 3' })).toEqual({ matrix: { deviceRating: 4 }, a: 6, s: 5, d: 4, f: 3 })
+    expect(deviceFields('CYBERDECK', { rating: 2, array: 'see text', programs: 'Rating' })).toEqual({ matrix: { deviceRating: 2 } })
+    expect(deviceFields('OPTICAL', { rating: 2, array: '1/1' })).toEqual({})
+    expect(ACCESS_DEVICES).toEqual(['COMMLINK', 'RIGGER_CONSOLE', 'DATATERM', 'CYBERJACK', 'CYBERDECK', 'CYBERTERM'])
+  })
+  test.each([['Small drones (air)', 'AIR'], ['Rotorcraft', 'AIR'], ['Boats', 'WATER'], ['Made-up submarines', 'WATER'], ['Bikes', 'GROUND'],
+    ['Medium drones, aquatic', 'WATER'], [undefined, 'GROUND']])('vtype %s', (c, v) => expect(vehicleVtype(c)).toBe(v))
+  test.each([['weapons', 'Weapon accessories', 'accessory_weapon'], ['weapons', 'Made-up firearm mods', 'weapon_mod'],
+    ['armor', 'Armor modifications', 'armor_mod'], ['electronics', 'Vision enhancements', 'visual_enhancement'],
+    ['electronics', 'Audio enhancements', 'audio_enhancement'], ['electronics', 'Made-up', 'accessory_electronics'],
+    ['augmentations', 'Cyberlimb accessories', null], ['gear', 'Made-up', null]])('mod type on %s: %s', (h, c, t) => expect(modType(h, c)).toBe(t))
   test.each([
     ['Foci', { item: 'focus', known: true }],
     ['Autosofts', { item: 'gear', type: 'SOFTWARE', subtype: 'OTHER_PROGRAMS', known: true }],
     ['Magical supplies', { item: 'gear', type: 'MAGICAL', subtype: 'MAGIC_SUPPLIES', known: true }],
-    ['Toxins', { item: 'gear', type: 'CHEMICALS', subtype: 'INDUSTRIAL_CHEMICALS', known: true }],
+    ['Toxins', { item: 'gear', type: 'CHEMICALS', subtype: 'TOXINS', known: true }],
+    ['Industrial chemicals', { item: 'gear', type: 'CHEMICALS', subtype: 'INDUSTRIAL_CHEMICALS', known: true }],
+    ['Made-up drugs', { item: 'gear', type: 'CHEMICALS', subtype: 'DRUGS', known: true }],
+    ['BTLs', { item: 'gear', type: 'CHEMICALS', subtype: 'BTL', known: true }],
+    ['Slap patches', { item: 'gear', type: 'BIOLOGY', subtype: 'SLAP_PATCHES', known: true }],
+    ['Grenades', { item: 'gear', type: 'AMMUNITION', subtype: 'GRENADES', known: true }],
+    ['Rockets', { item: 'gear', type: 'AMMUNITION', subtype: 'ROCKETS', known: true }],
+    ['Missiles', { item: 'gear', type: 'AMMUNITION', subtype: 'MISSILES', known: true }],
+    ['Explosives', { item: 'gear', type: 'AMMUNITION', subtype: 'EXPLOSIVES', known: true }],
+    ['Ammunition', { item: 'gear', type: 'AMMUNITION', subtype: 'AMMUNITION', known: true }],
+    ['Magical formulae', { item: 'gear', type: 'MAGICAL', subtype: 'MAGICAL_FORMULA', known: true }],
+    ['Magical lodge materials', { item: 'gear', type: 'MAGICAL', subtype: 'MAGIC_LODGE', known: true }],
+    ['Maglocks', { item: 'gear', type: 'ELECTRONICS', subtype: 'SECURITY', known: true }],
     ['Medkits', { item: 'gear', type: 'BIOLOGY', subtype: 'BIOTECH', known: true }],
     ['Survival gear', { item: 'gear', type: 'SURVIVAL', subtype: 'SURVIVAL_GEAR', known: true }],
     ['Glitter', { item: 'gear', type: 'TOOLS', subtype: 'TOOLS', known: false }],
@@ -96,12 +129,13 @@ describe('armor, augmentations, electronics, gear, vehicles', () => {
 
 describe('spells, powers, forms', () => {
   test('spellFields', () => {
-    expect(spellFields({ range: 'LOS(A)', type: 'M', duration: 'S', damage: 'S', tags: 'Direct', category: 'combat' }, { drain: 5 }))
+    expect(spellFields({ range: 'LOS(A)', type: 'M', duration: 'S', damage: 'S', tags: 'Direct', category: 'combat', opposed: 'true' }, { drain: 5 }))
       .toEqual({ category: 'combat', range: 'line_of_sight_area', type: 'mana', duration: 'sustained', damage: 'stun', drain: 5,
-        combatSpellType: 'spells_direct', isSustained: true })
-    expect(spellFields({ range: 'T', type: 'P', duration: 'I', damage: 'P', tags: 'Indirect, Area', category: 'Manipulation' }, {}))
+        combatSpellType: 'spells_direct', isSustained: true, multiSense: false, isOpposed: true, withEssence: false })
+    expect(spellFields({ range: 'T', type: 'P', duration: 'I', damage: 'P', tags: 'Indirect, Area, Multi-Sense', category: 'Manipulation' }, {}))
       .toEqual({ category: 'manipulation', range: 'touch', type: 'physical', duration: 'instantaneous', damage: 'physical', drain: 0,
-        combatSpellType: 'spells_indirect', isSustained: false })
+        combatSpellType: 'spells_indirect', isSustained: false, multiSense: true, isOpposed: false, withEssence: false })
+    expect(spellFields({ essence: 'true' }, {})).toMatchObject({ isOpposed: false, withEssence: true })
     expect(spellFields({ range: 'S', category: 'glitter' }, {})).toMatchObject({ category: 'health', range: 'self', duration: 'special', combatSpellType: 'spells_indirect' })
     expect(spellFields({ range: 'S(A)' }, {}).range).toBe('self_area')
     expect(spellFields({ range: 'LOS' }, {}).range).toBe('line_of_sight')
@@ -142,4 +176,51 @@ describe('lifestyles, SINs, spirits, sprites', () => {
     expect(spriteKey('Data Sprite')).toBe('data')
     expect(spriteKey('Glitter Sprite')).toBe(null)
   })
+})
+
+describe('programs and martial arts', () => {
+  test('softwareType: Eden software types from the printed program type; unknown -> STANDARD, not known', () => {
+    expect(softwareType('Hacking')).toEqual({ type: 'HACKING', known: true })
+    expect(softwareType('basic')).toEqual({ type: 'STANDARD', known: true })
+    expect(softwareType('Autosoft')).toEqual({ type: 'AUTOSOFT', known: true })
+    expect(softwareType('Made-up Datasoft')).toEqual({ type: 'DATASOFT', known: true })
+    expect(softwareType('IC')).toEqual({ type: 'IC', known: true })
+    expect(softwareType('Glitterware')).toEqual({ type: 'STANDARD', known: false })
+    expect(softwareType(undefined)).toEqual({ type: 'STANDARD', known: false })
+  })
+  test('martialCategories: printed categories -> Eden flags, plurals too', () => {
+    expect(martialCategories('Striking, Grappling')).toEqual({ grappling: true, mobility: false, ranged: false, striking: true, weapon: false })
+    expect(martialCategories('Weapons / Ranged')).toMatchObject({ weapon: true, ranged: true, striking: false })
+    expect(Object.values(martialCategories(undefined)).some(Boolean)).toBe(false)
+  })
+})
+
+describe('books, effects', () => {
+  test('Eden book codes for the sources Eden has, none for the rest', () => {
+    expect(['CRB', 'crb', 'CRB-SEA', 'SWC', 'FS', 'SIF-NO', 'MUS', '', undefined].map(edenBook))
+      .toEqual(['core', 'core', 'core_seattle', 'companion', 'firing_squad', 'sif_new_orleans', null, null, null])
+  })
+  test('a catalog effect -> Eden effect key; what Eden has no field for: null', () => {
+    expect(effectKey({ target: 'attr:agi', op: 'add', value: '1' })).toBe('system.attributes.agi.mod')
+    expect(effectKey({ target: 'attr:edg', op: 'add' })).toBe('system.edge.max')
+    expect(effectKey({ target: 'skill:close-combat', op: 'add' })).toBe('system.skills.close_combat.modifier')
+    expect(effectKey({ target: 'derived:defense', op: 'add' })).toBe('system.defenserating.physical.mod')
+    expect(effectKey({ target: 'derived:judge-intentions', op: 'add' })).toBe('system.derived.judge_intentions.mod')
+    expect(effectKey({ target: 'derived:social', op: 'add' })).toBe('system.defenserating.social.mod')
+    expect(effectKey({ target: 'skill:basket-weaving', op: 'add' })).toBe(null)
+    expect(effectKey({ target: 'skill:firearms', op: 'edge-cost', value: '-1' })).toBe(null)
+    expect(effectKey({ target: 'item:ar', op: 'add' })).toBe(null)
+  })
+  test('an accessory item:ar effect -> its host attack rating bands', () => {
+    expect(hostChanges({ target: 'item:ar', op: 'add', value: '0,1,1,0,0' }))
+      .toEqual([{ key: 'system.attackRating.1', value: '1' }, { key: 'system.attackRating.2', value: '1' }])
+    expect(hostChanges({ target: 'item:ar', op: 'add', value: '-2,0,1' })).toEqual([{ key: 'system.attackRating.0', value: '-2' }, { key: 'system.attackRating.2', value: '1' }])
+    expect(hostChanges({ target: 'attr:agi', op: 'add', value: '1' })).toEqual([])
+  })
+})
+
+test('effect targets: Eden’s option key for a path, and the ones Eden lacks', () => {
+  expect(effectOptionKey('system.derived.judge_intentions.mod')).toBe('system_derived_judge__intentions_mod')
+  const eden = Object.fromEntries(OUR_TARGETS.filter(p => !p.includes('social')).map(p => [effectOptionKey(p), 'x']))
+  expect(missingTargets(eden)).toEqual({ system_defenserating_social_mod: 'system.defenserating.social.mod' })
 })
