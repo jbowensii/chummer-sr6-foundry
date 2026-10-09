@@ -180,6 +180,8 @@ export function spellFields(attrs = {}, values = {}) {
     combatSpellType: /indirect/.test(tags) ? 'spells_indirect' : /direct/.test(tags) ? 'spells_direct' : 'spells_indirect',
     isSustained: duration === 'sustained',
     multiSense: /multi.?sense/.test(tags),
+    // the catalog's flags: its test is opposed; its threshold counts the target's Essence
+    isOpposed: attrs.opposed === 'true', withEssence: attrs.essence === 'true',
   }
 }
 export const activationKey = s => (/major/i.test(s ?? '') ? 'major_action' : /minor/i.test(s ?? '') ? 'minor_action' : 'passive')

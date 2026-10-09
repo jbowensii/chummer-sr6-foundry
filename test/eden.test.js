@@ -129,12 +129,13 @@ describe('armor, augmentations, electronics, gear, vehicles', () => {
 
 describe('spells, powers, forms', () => {
   test('spellFields', () => {
-    expect(spellFields({ range: 'LOS(A)', type: 'M', duration: 'S', damage: 'S', tags: 'Direct', category: 'combat' }, { drain: 5 }))
+    expect(spellFields({ range: 'LOS(A)', type: 'M', duration: 'S', damage: 'S', tags: 'Direct', category: 'combat', opposed: 'true' }, { drain: 5 }))
       .toEqual({ category: 'combat', range: 'line_of_sight_area', type: 'mana', duration: 'sustained', damage: 'stun', drain: 5,
-        combatSpellType: 'spells_direct', isSustained: true, multiSense: false })
+        combatSpellType: 'spells_direct', isSustained: true, multiSense: false, isOpposed: true, withEssence: false })
     expect(spellFields({ range: 'T', type: 'P', duration: 'I', damage: 'P', tags: 'Indirect, Area, Multi-Sense', category: 'Manipulation' }, {}))
       .toEqual({ category: 'manipulation', range: 'touch', type: 'physical', duration: 'instantaneous', damage: 'physical', drain: 0,
-        combatSpellType: 'spells_indirect', isSustained: false, multiSense: true })
+        combatSpellType: 'spells_indirect', isSustained: false, multiSense: true, isOpposed: false, withEssence: false })
+    expect(spellFields({ essence: 'true' }, {})).toMatchObject({ isOpposed: false, withEssence: true })
     expect(spellFields({ range: 'S', category: 'glitter' }, {})).toMatchObject({ category: 'health', range: 'self', duration: 'special', combatSpellType: 'spells_indirect' })
     expect(spellFields({ range: 'S(A)' }, {}).range).toBe('self_area')
     expect(spellFields({ range: 'LOS' }, {}).range).toBe('line_of_sight')

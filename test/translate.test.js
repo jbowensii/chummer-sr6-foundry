@@ -99,13 +99,17 @@ describe('items', () => {
   test('spells, rituals, adept powers, metamagics', () => {
     const t = run()
     expect(byName(t, 'Zap Bolt')).toMatchObject({ type: 'spell', system: { category: 'combat', range: 'line_of_sight', type: 'mana', duration: 'instantaneous',
-      damage: 'physical', drain: 3, combatSpellType: 'spells_direct', isSustained: false } })
+      damage: 'physical', drain: 3, combatSpellType: 'spells_direct', isSustained: false, isOpposed: true, withEssence: false } })
     expect(byName(t, 'Glimmer').system).toMatchObject({ category: 'illusion', range: 'line_of_sight_area', type: 'physical', duration: 'sustained', drain: 0, isSustained: true })
     expect(byName(t, 'Test Ward')).toMatchObject({ type: 'ritual', system: { threshold: 4,
       features: { anchored: true, material_link: false, minion: false, spell: true, spotter: false } } })
     expect(byName(t, 'Quick Step')).toMatchObject({ type: 'adeptpower', system: { hasLevel: true, level: 2, cost: 0.5, activation: 'minor_action' } })
     expect(byName(t, 'Quick Step').effects[0].changes).toEqual([{ key: 'system.initiative.physical.diceMod', value: '1', mode: 2 }])
-    expect(byName(t, 'Made-up Centering').type).toBe('metamagic')
+    expect(byName(t, 'Made-up Centering')).toMatchObject({ type: 'metamagic', system: { adepts: true, mages: false, hasLevel: false, level: 1 } })
+    const r = mara(), mm = r.picks.find(p => p.name === 'Made-up Centering')
+    mm.attrs = { perLevel: 'true' }
+    mm.level = 2
+    expect(byName(run(r), 'Made-up Centering').system).toMatchObject({ adepts: true, mages: true, hasLevel: true, level: 2 })
   })
   test('a complex form and an echo', () => {
     const r = mara()
@@ -133,13 +137,13 @@ describe('items', () => {
   })
   test('armor, a graded ware with its bonuses, its accessory as its own item', () => {
     const t = run()
-    expect(byName(t, 'Test Jacket').system).toMatchObject({ type: 'ARMOR', subtype: 'ARMOR_BODY', defense: 3 })
+    expect(byName(t, 'Test Jacket').system).toMatchObject({ type: 'ARMOR', subtype: 'ARMOR_BODY', defense: 3, social: 2 })
     const ware = byName(t, 'Made-up Reflex Booster')
     expect(ware.system).toMatchObject({ type: 'CYBERWARE', subtype: 'CYBER_BODYWARE', essence: 0.12, rating: 1, needsRating: true, price: 1200 })
     expect(ware.system.description).toMatch(/Grade: used/)
     expect(ware.effects).toEqual([{ name: 'Made-up Reflex Booster', transfer: true, disabled: false,
       changes: [{ key: 'system.attributes.rea.mod', value: '1', mode: 2 }, { key: 'system.initiative.physical.diceMod', value: '1', mode: 2 },
-        { key: 'system.defenserating.physical.mod', value: '1', mode: 2 }], flags: { 'chummer-sr6-importer': { chummer: true } } }])
+        { key: 'system.defenserating.physical.mod', value: '1', mode: 2 }, { key: 'system.skills.firearms.modifier', value: '1', mode: 2 }], flags: { 'chummer-sr6-importer': { chummer: true } } }])
     const port = byName(t, 'Booster Port')
     expect(port.system).toMatchObject({ type: 'CYBERWARE', capacity: 1 })
     expect(port.system.description).toMatch(/Fitted to Made-up Reflex Booster\./)

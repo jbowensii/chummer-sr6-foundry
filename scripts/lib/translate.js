@@ -116,7 +116,7 @@ export function lineItem(p, ctx) {
       break
     }
     // worn armor counts toward Eden's Defense Rating (usedForPool)
-    case 'armor': gear = { type: 'ARMOR', subtype: armorSubtype(a.category), defense: num(v.defense), usedForPool: !!p.worn }; break
+    case 'armor': gear = { type: 'ARMOR', subtype: armorSubtype(a.category), defense: num(v.defense), social: num(v.social), usedForPool: !!p.worn }; break
     case 'augmentations': {
       const t = augmentType(a.type, a.category, a.ware)
       gear = { ...t, essence: num(v.essence), capacity: num(v.capacity), ...deviceFields(t.subtype, { rating, array: a.array, programs: a.programs }) }
@@ -198,6 +198,9 @@ export function pickItem(x, ctx) {
     Object.assign(doc.system, { threshold: num(v.threshold), features: Object.fromEntries(RITUAL_FEATURES.map(f => [f, kw.includes(f)])) })
   } else if (type === 'adeptpower') {
     Object.assign(doc.system, { hasLevel: yes(a.perLevel), level: num(x.level), cost: num(v.powerCost), activation: activationKey(a.activation) })
+  } else if (type === 'metamagic') {
+    // the catalog's user: who may take it (absent: any initiate); perLevel: it can be taken again (x.level: times taken)
+    Object.assign(doc.system, { hasLevel: yes(a.perLevel), level: num(x.level) || 1, adepts: a.user !== 'magician', mages: a.user !== 'adept' })
   } else if (type === 'complexform') {
     Object.assign(doc.system, { duration: durationKey(a.duration), fading: num(v.fade) })
     const cf = ctx.complexForms?.[normKey(x.name)]

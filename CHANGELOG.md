@@ -9,6 +9,7 @@
 - Vehicles and drones are Eden Vehicle actors: a per-book actor compendium, and a runner's own linked to it with their mods and weapons.
 - A runner's gender, its SINs (with each SIN's gender in its description) and each SIN's lifestyles, Eden's lifestyle naming its SIN. An older file's one lifestyle goes under the first SIN.
 - A runner's martial art styles and the techniques learned under them; a style keeps its genesisID on Replace, so techniques stay tied to it.
+- The catalog's flags reach Eden: a spell's opposed test and Essence threshold (`isOpposed`, `withEssence`), a metamagic's adepts/magicians and taken-again level (`adepts`, `mages`, `hasLevel`, `level`), and armor's Social (`social`). A runner's skill bonuses become the skill's modifier.
 
 - Identity: Foundry picks every document's id; the module no longer computes ids or keeps them. Each imported entry carries `chummerID` (`<book>:<kind>:<id>`) and `chummerAliases` (its keys from earlier Chummer imports) in the module's flags, and both are in every compendium's index.
 - Re-importing a book updates each entry in place, found by `chummerID` or an alias; new entries are added; nothing is deleted. A rules journal's pages keep their ids; a martial art style keeps its genesisID.

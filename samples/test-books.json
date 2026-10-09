@@ -182,12 +182,14 @@
      "attrs": {
       "category": "Body armor",
       "defense": "3",
+      "social": "+2",
       "cost": "500"
      },
      "parts": [],
      "values": {
       "cost": 500,
-      "defense": 3
+      "defense": 3,
+      "social": 2
      }
     },
     {
@@ -412,7 +414,8 @@
       "type": "M",
       "duration": "I",
       "dv": "3",
-      "damage": "P"
+      "damage": "P",
+      "opposed": "true"
      },
      "parts": [],
      "values": {
@@ -475,7 +478,9 @@
      "source": "MUS",
      "page": 10,
      "canon": true,
-     "attrs": {},
+     "attrs": {
+      "user": "adept"
+     },
      "parts": [],
      "values": {}
     },

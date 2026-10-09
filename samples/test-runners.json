@@ -273,7 +273,8 @@
       "type": "M",
       "duration": "I",
       "dv": "3",
-      "damage": "P"
+      "damage": "P",
+      "opposed": "true"
      },
      "parts": [],
      "values": {
@@ -354,7 +355,9 @@
      "source": "MUS",
      "page": 10,
      "canon": true,
-     "attrs": {},
+     "attrs": {
+      "user": "adept"
+     },
      "parts": [],
      "values": {},
      "uid": "p5",
@@ -526,12 +529,14 @@
      "attrs": {
       "category": "Body armor",
       "defense": "3",
+      "social": "+2",
       "cost": "500"
      },
      "parts": [],
      "values": {
       "cost": 500,
-      "defense": 3
+      "defense": 3,
+      "social": 2
      },
      "uid": "a1",
      "qty": 1,
@@ -577,6 +582,12 @@
       },
       {
        "target": "defense",
+       "value": 1
+      },
+      {
+       "target": "skill",
+       "id": "mur.firearms",
+       "name": "Firearms",
        "value": 1
       }
      ],
@@ -889,9 +900,9 @@
       "label": "Firearms",
       "rank": 4,
       "attr": "agi",
-      "dp": 9,
+      "dp": 10,
       "spec": "Pistols (Light)",
-      "specDp": 13
+      "specDp": 14
      },
      {
       "skill": "crb.gab",
