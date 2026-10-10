@@ -1,9 +1,9 @@
 // shadowrun6-eden vocabulary (scripts/lib/eden.js): invented category strings, Eden's keys only.
 import { describe, expect, test } from 'vitest'
 import {
-  ACCESS_DEVICES, ATTRS, effectOptionKey, missingTargets, OUR_TARGETS, MOR, SKILLS, activationKey, armorSubtype, augmentType, deviceFields, durationKey, edenBook, effectKey,
+  ACCESS_DEVICES, ATTRS, effectOptionKey, missingTargets, OUR_TARGETS, MOR, SKILLS, activationKey, armorSubtype, augmentType, deviceFields, durationKey, edenBook, effectKeys, effectValue,
   electronicsSubtype, gearType, hostChanges, lifestyleKey, martialCategories, modType, normKey, sinQuality, skillKey, softwareType, specKey,
-  spellFields, spiritKey, spriteKey, vehicleType, vehicleVtype, weaponType,
+  spellFields, spiritKey, spriteKey, testSkills, vehicleType, vehicleVtype, weaponType,
 } from '../scripts/lib/eden.js'
 
 describe('keys', () => {
@@ -200,16 +200,40 @@ describe('books, effects', () => {
     expect(['CRB', 'crb', 'CRB-SEA', 'SWC', 'FS', 'SIF-NO', 'MUS', '', undefined].map(edenBook))
       .toEqual(['core', 'core', 'core_seattle', 'companion', 'firing_squad', 'sif_new_orleans', null, null, null])
   })
-  test('a catalog effect -> Eden effect key; what Eden has no field for: null', () => {
-    expect(effectKey({ target: 'attr:agi', op: 'add', value: '1' })).toBe('system.attributes.agi.mod')
-    expect(effectKey({ target: 'attr:edg', op: 'add' })).toBe('system.edge.max')
-    expect(effectKey({ target: 'skill:close-combat', op: 'add' })).toBe('system.skills.close_combat.modifier')
-    expect(effectKey({ target: 'derived:defense', op: 'add' })).toBe('system.defenserating.physical.mod')
-    expect(effectKey({ target: 'derived:judge-intentions', op: 'add' })).toBe('system.derived.judge_intentions.mod')
-    expect(effectKey({ target: 'derived:social', op: 'add' })).toBe('system.defenserating.social.mod')
-    expect(effectKey({ target: 'skill:basket-weaving', op: 'add' })).toBe(null)
-    expect(effectKey({ target: 'skill:firearms', op: 'edge-cost', value: '-1' })).toBe(null)
-    expect(effectKey({ target: 'item:ar', op: 'add' })).toBe(null)
+  test('a catalog effect -> Eden effect keys; what Eden has no field for: none', () => {
+    const keys = target => effectKeys({ target, op: 'add' })
+    expect(Object.fromEntries(['attr:agi', 'attr:edg', 'attr:ess', 'skill:close-combat', 'derived:defense', 'derived:defense-astral',
+      'derived:social', 'derived:initiative', 'derived:initiative-dice', 'derived:matrix-initiative', 'derived:matrix-initiative-dice',
+      'derived:physical-monitor', 'derived:stun-monitor', 'derived:overflow', 'derived:composure', 'derived:judge-intentions',
+      'derived:memory', 'derived:lift', 'matrix:attack', 'matrix:sleaze', 'matrix:data-processing', 'matrix:firewall', 'test:defense',
+      'test:damage-resistance', 'test:drain-resistance', 'test:toxin-resistance'].map(t => [t, keys(t)]))).toEqual({
+      'attr:agi': ['system.attributes.agi.mod'], 'attr:edg': ['system.edge.max'], 'attr:ess': ['system.attributes.essence.mod'],
+      'skill:close-combat': ['system.skills.close_combat.modifier'], 'derived:defense': ['system.defenserating.physical.mod'],
+      'derived:defense-astral': ['system.defenserating.astral.mod'], 'derived:social': ['system.defenserating.social.mod'],
+      'derived:initiative': ['system.initiative.physical.mod'], 'derived:initiative-dice': ['system.initiative.physical.diceMod'],
+      'derived:matrix-initiative': ['system.initiative.matrix.mod'], 'derived:matrix-initiative-dice': ['system.initiative.matrix.diceMod'],
+      'derived:physical-monitor': ['system.physical.mod'], 'derived:stun-monitor': ['system.stun.mod'], 'derived:overflow': ['system.overflow.mod'],
+      'derived:composure': ['system.derived.composure.mod'], 'derived:judge-intentions': ['system.derived.judge_intentions.mod'],
+      'derived:memory': ['system.derived.memory.mod'], 'derived:lift': ['system.derived.lift_carry.mod'],
+      'matrix:attack': ['system.persona.device.mod.a'], 'matrix:sleaze': ['system.persona.device.mod.s'],
+      'matrix:data-processing': ['system.persona.device.mod.d'], 'matrix:firewall': ['system.persona.device.mod.f'],
+      'test:defense': ['system.defensepool.physical.mod'], 'test:damage-resistance': ['system.defensepool.damage_physical.mod'],
+      'test:drain-resistance': ['system.defensepool.drain.mod'], 'test:toxin-resistance': ['system.defensepool.toxin.mod'] })
+    // a test type: each skill it covers
+    expect(keys('test:social')).toEqual(['system.skills.con.modifier', 'system.skills.influence.modifier'])
+    expect(keys('test:combat')).toEqual(['system.skills.close_combat.modifier', 'system.skills.exotic_weapons.modifier', 'system.skills.firearms.modifier'])
+    expect(testSkills('physical')).toEqual(['athletics', 'close_combat', 'exotic_weapons', 'firearms', 'piloting', 'stealth'])
+    expect(testSkills('attr-cha')).toEqual(['con', 'influence'])
+    expect(testSkills('magic')).toEqual(['astral', 'conjuring', 'enchanting', 'sorcery'])
+    // no Eden field: none
+    for (const t of ['skill:basket-weaving', 'skill:choice', 'attr:choice', 'attr-max:agi', 'derived:matrix-monitor', 'derived:movement',
+      'derived:minor-actions', 'derived:major-actions', 'derived:hardened-armor', 'matrix:overwatch', 'test:surprise', 'test:all',
+      'test:spell-combat', 'test:magic-resistance', 'item:ar', 'action:wrest', 'resource:karma', 'lifestyle:comforts']) expect(keys(t), t).toEqual([])
+    for (const op of ['set', 'edge', 'edge-cost', 'edge-cost-set', 'no-edge', 'no-edge-gain', 'wild-die', 'hits', 'threshold'])
+      expect(effectKeys({ target: 'skill:firearms', op, value: '1' }), op).toEqual([])
+  })
+  test('an effect value: a number, or so much per rating; a formula or a list: null', () => {
+    expect(['2', '-1', '–1', 'R', '-R', 'R*2', '2*R', 'edg/2', '0,1,1,0,0'].map(v => effectValue(v, 3))).toEqual([2, -1, -1, 3, -3, 6, 6, null, null])
   })
   test('an accessory item:ar effect -> its host attack rating bands', () => {
     expect(hostChanges({ target: 'item:ar', op: 'add', value: '0,1,1,0,0' }))

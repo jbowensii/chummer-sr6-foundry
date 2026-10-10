@@ -159,7 +159,7 @@ async function writePack(pack, updates, creates, { after, progress } = {}) {
   }
 }
 
-// effects in Foundry's shape: a pack item's own (the catalog's effects, lib/translate.js catalogEffects) and a pack actor's items'
+// effects in Foundry's shape: a pack item's own (the catalog's effects, lib/translate.js withEffects) and a pack actor's items'
 const withItemData = d => (d.items ? { ...d, items: d.items.map(itemData) } : itemData(d))
 const fail = (pack, name, error) => { console.error(`${MODULE_ID} | ${name}`, error); return { pack, name, error } }
 

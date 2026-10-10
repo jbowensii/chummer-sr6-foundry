@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+Needs Chummer's export with effect switches and links (`schema/sr6-export.schema.json` is its copy). Import your books again and Replace your runners to get the new effects.
+
+- Effects that turn on some way (wireless, activated, sustained, a condition, a specialization) come in as switched-off Active Effects, named for what turns them on: "Wireless: Smartlink", "Conditional: Made-up Gloves (climbing)". Always-on effects stay switched on.
+- An effect Chummer is unsure of is no longer an Active Effect, only a line in the description.
+- A spell's or complex form's effect on its caster is a switched-off effect on the spell; its effect on the target is not given to the caster, for a GM to apply.
+- More effects reach shadowrun6-eden: Essence, astral Defense Rating, initiative and Matrix initiative (score and dice), Physical, Stun and Overflow boxes, Lift/Carry, Matrix attributes (the device's Attack, Sleaze, Data Processing, Firewall), the defense test and the damage, Drain and toxin resistance pools, and a test type's skills (Social: Con and Influence; Physical: the skills on Body, Agility, Reaction and Strength; and so on).
+- What shadowrun6-eden has no field for stays a line in the item's description: Edge rules, extra actions, movement, a Matrix monitor, an attribute maximum, a spell category's tests.
+- An entry that grants another or works as another gets that entry's effects, when it is in the same import (any book in the file; a runner's own items).
+- A runner's item no longer counts an effect twice: what Chummer's bonuses hold comes from the bonuses. The always-on monitor boxes stay in the actor's monitor modifier.
+- A runner's notes show Chummer's numbers with the switched-off effects on in brackets: "Defense Rating 7 (9)".
+
 ## 0.4.2
 
 - Re-importing books works with shadowrun6-eden 4.0.11: its item update hooks (`_checkPersonaChanges`, `_updatePanSheets`) read the item's actor, which a compendium entry doesn't have, and Foundry fills the fields that set them off from Eden's defaults on every full update, so 0.4.1's fix wasn't enough. The module now has those two skip an item with no actor; on an actor's item they run as Eden wrote them.

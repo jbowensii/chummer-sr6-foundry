@@ -170,13 +170,23 @@ describe('a GM compendium', () => {
 
 describe('what Eden takes from the book text', () => {
   const t = translateBook(mus, OPTS), byName = (t, n) => Object.values(t.packs).flat().find(d => d.name === n)
-  test('a quality’s effects as Active Effects (a conditional one disabled), its test and the rest as text', () => {
+  test('a quality’s effects as Active Effects; a low-confidence one, its test and the rest as text', () => {
     const q = byName(t, 'Lucky Break')
     expect(q.effects).toEqual([
       { name: 'Lucky Break', transfer: true, disabled: false, changes: [{ key: 'system.attributes.agi.mod', value: '1', mode: 2 },
-        { key: 'system.defenserating.physical.mod', value: '1', mode: 2 }], flags: { 'chummer-sr6-importer': { chummer: true } } },
-      { name: 'Lucky Break (conditional)', transfer: true, disabled: true, changes: [{ key: 'system.skills.firearms.modifier', value: '2', mode: 2 }], flags: { 'chummer-sr6-importer': { chummer: true } } }])
+        { key: 'system.defenserating.physical.mod', value: '1', mode: 2 }], flags: { 'chummer-sr6-importer': { chummer: true } } }])
+    expect(q.system.description).toContain('<p>Not applied (unsure): +2 Firearms.</p>')
     expect(q.system.description).toContain('<p>Test: Perception + Intuition (3).</p>')
+  })
+  test('a link uses the linked entry’s effects, found in any book of the file (entries)', () => {
+    const giver = { id: 'mux.made-up-giver', kind: 'qualities', name: 'Made-up Giver', canon: true, attrs: {}, parts: [], values: {},
+      links: [{ rel: 'grants', name: 'Made-up Gift', kind: 'qualities' }] }
+    const gift = { id: 'mus.made-up-gift', kind: 'qualities', name: 'Made-up Gift', canon: true, attrs: {}, parts: [], values: {},
+      effects: [{ target: 'derived:memory', op: 'add', value: '1', switch: 'activated' }] }
+    const one = translateBook({ ...mux, entries: [giver] }, { ...OPTS, entries: [giver, gift] })
+    expect(one.packs.qualities[0].effects).toMatchObject([{ name: 'Activated: Made-up Giver', disabled: true,
+      changes: [{ key: 'system.derived.memory.mod', value: '1', mode: 2 }] }])
+    expect(translateBook({ ...mux, entries: [giver] }, OPTS).packs.qualities[0].effects).toBeUndefined()  // not in this import: text only
   })
   test('a weapon accessory -> Eden mod in the Mods & accessories pack, its item:ar effect on the host (not transferred)', () => {
     const sight = byName(t, 'Made-up Sight')

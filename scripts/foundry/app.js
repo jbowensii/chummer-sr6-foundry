@@ -95,7 +95,8 @@ export function createImportApp(getIcons = () => null) {
       this.books = books ? res.file.books.map(book => {
         try {
           return { book, t: translateBook(book, { exportedAt: book.exportedAt ?? res.file.exportedAt, appVersion: res.file.app?.version ?? '',
-            descriptions: res.file.descriptions === true, sanitize, icons: getIcons(), specs: edenSpecLabels(), complexForms: edenComplexForms() }) }
+            descriptions: res.file.descriptions === true, sanitize, icons: getIcons(), specs: edenSpecLabels(), complexForms: edenComplexForms(),
+            entries: res.file.books.flatMap(b => b.entries ?? []) }) }
         } catch (e) { return { book, error: e?.message ?? String(e) } }
       }) : null
       const image = s => (PORTRAIT.test(s ?? '') ? s : null)
