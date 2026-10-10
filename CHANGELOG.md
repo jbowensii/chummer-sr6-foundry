@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.5.0
 
 Needs Chummer's export with effect switches and links (`schema/sr6-export.schema.json` is its copy). Import your books again and Replace your runners to get the new effects.
 
