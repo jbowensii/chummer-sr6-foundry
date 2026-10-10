@@ -141,19 +141,57 @@ const EDEN_BOOKS = { CRB: 'core', 'CRB-SEA': 'core_seattle', 'CRB-BER': 'core_be
   SLS: 'slip_streams', TKC: 'kechibi' }
 export const edenBook = source => EDEN_BOOKS[String(source ?? '').toUpperCase()] ?? null
 
-// A catalog effect's target (Chummer's export `effects`) -> Eden's Active Effect key (CONFIG.SR6.ACTIVE_EFFECT_OPTIONS)
-const DERIVED_KEY = { defense: 'system.defenserating.physical.mod', initiative: 'system.initiative.physical.mod',
+// A catalog effect's target (Chummer's export `effects`) -> Eden's Active Effect keys (CONFIG.SR6.ACTIVE_EFFECT_OPTIONS
+// and the Player template's own fields). Read from Eden 4.0.11's config.js, template.json and documents/actor.js.
+// Eden has no field for: derived:matrix-monitor (a Player has no Matrix monitor of its own), movement and hardened-armor
+// (Eden's traits.* keys are read by nothing), minor-actions and major-actions (Eden counts actions from initiative dice,
+// with no modifier), damage-reduction. Those stay a note on the item.
+const DERIVED_KEY = { defense: 'system.defenserating.physical.mod', 'defense-astral': 'system.defenserating.astral.mod',
+  social: 'system.defenserating.social.mod', initiative: 'system.initiative.physical.mod', 'initiative-dice': 'system.initiative.physical.diceMod',
+  'matrix-initiative': 'system.initiative.matrix.mod', 'matrix-initiative-dice': 'system.initiative.matrix.diceMod',
+  'physical-monitor': 'system.physical.mod', 'stun-monitor': 'system.stun.mod', overflow: 'system.overflow.mod',
   composure: 'system.derived.composure.mod', 'judge-intentions': 'system.derived.judge_intentions.mod',
-  memory: 'system.derived.memory.mod', social: 'system.defenserating.social.mod' }
-/** A catalog effect ({ target, op, value }) on an actor -> its change key, or null when Eden has no field for it (an
- *  edge-cost effect, an item: target, a name it doesn't know). */
-export function effectKey({ target, op } = {}) {
-  if (op !== 'add') return null
+  memory: 'system.derived.memory.mod', lift: 'system.derived.lift_carry.mod' }
+// Matrix attributes: the Player's persona.device.mod, which Eden adds to the active device's own (actor.js updatePersona).
+// Overwatch and a chosen attribute: no field.
+const MATRIX_KEY = { attack: 'a', sleaze: 's', 'data-processing': 'd', firewall: 'f' }
+// The tests Eden keeps a pool of its own for (its defense and resistance pools). Fatigue, magic resistance, surprise,
+// crash, addiction, a spell category, all tests: no pool, so a note.
+const TEST_POOL = { defense: 'system.defensepool.physical.mod', 'damage-resistance': 'system.defensepool.damage_physical.mod',
+  'drain-resistance': 'system.defensepool.drain.mod', 'toxin-resistance': 'system.defensepool.toxin.mod' }
+// The skills a test type covers (Chummer's TEST_TYPES); physical, mental and attr-<abbr>: the skills linked to those
+// attributes (Eden's ATTRIB_BY_SKILL).
+const TEST_SKILLS = { social: ['con', 'influence'], matrix: ['cracking', 'electronics'], magic: ['astral', 'conjuring', 'enchanting', 'sorcery'],
+  resonance: ['tasking'], combat: ['close_combat', 'exotic_weapons', 'firearms'], vehicle: ['piloting'] }
+const SKILL_ATTR = { astral: 'int', athletics: 'agi', biotech: 'log', close_combat: 'agi', con: 'cha', conjuring: 'mag', cracking: 'log',
+  electronics: 'log', enchanting: 'mag', engineering: 'log', exotic_weapons: 'agi', firearms: 'agi', influence: 'cha', outdoors: 'int',
+  perception: 'int', piloting: 'rea', sorcery: 'mag', stealth: 'agi', tasking: 'res' }
+const LINKED = { physical: ['bod', 'agi', 'rea', 'str'], mental: ['wil', 'log', 'int', 'cha'] }
+/** The Eden skills a test type (`social`, `physical`, `attr-cha`) covers; [] when no skill rolls it. */
+export function testSkills(type) {
+  const t = String(type ?? ''), attrs = t.startsWith('attr-') ? [t.slice(5)] : LINKED[t]
+  return attrs ? SKILLS.filter(k => attrs.includes(SKILL_ATTR[k])) : TEST_SKILLS[t] ?? []
+}
+/** A catalog effect ({ target, op }) on an actor -> its change keys; [] when Eden has no field for it (an Edge
+ *  operation, an item: target, a name it doesn't know). Only `add`: Eden has no field for the rest. */
+export function effectKeys({ target, op } = {}) {
+  if (op !== 'add') return []
   const [kind, name = ''] = String(target ?? '').split(':')
-  if (kind === 'attr') return name === 'edg' ? 'system.edge.max' : ATTRS.includes(name) ? `system.attributes.${name}.mod` : null
-  if (kind === 'skill') { const k = normKey(name); return SKILLS.includes(k) ? `system.skills.${k}.modifier` : null }
-  if (kind === 'derived') return DERIVED_KEY[name] ?? null
-  return null
+  const one = k => (k ? [k] : [])
+  if (kind === 'attr') return one(name === 'edg' ? 'system.edge.max' : name === 'ess' ? 'system.attributes.essence.mod' : ATTRS.includes(name) ? `system.attributes.${name}.mod` : null)
+  if (kind === 'skill') return one(SKILLS.includes(normKey(name)) && `system.skills.${normKey(name)}.modifier`)
+  if (kind === 'test') return TEST_POOL[name] ? [TEST_POOL[name]] : testSkills(name).map(k => `system.skills.${k}.modifier`)
+  if (kind === 'derived') return one(DERIVED_KEY[name])
+  if (kind === 'matrix') return one(MATRIX_KEY[name] && `system.persona.device.mod.${MATRIX_KEY[name]}`)
+  return []
+}
+/** A printed effect value at a rating: a number, or so much per rating (`R`, `-R`, `R*2`, `2*R`); null for a formula
+ *  or a list (shown only). */
+export function effectValue(v, rating = 1) {
+  const s = String(v ?? '').replace(/\s+/g, '').replace(/[–−]/g, '-')
+  if (/^[+-]?\d+(\.\d+)?$/.test(s)) return Number(s)
+  const m = /^(-?)R(?:\*(-?\d+(?:\.\d+)?))?$/.exec(s) ?? /^(-?)(\d+(?:\.\d+)?)\*R$/.exec(s)
+  return m ? (m[1] ? -1 : 1) * Number(m[2] ?? 1) * rating : null
 }
 /** An accessory's item:ar effect (`0,1,1,0,0`, one value a range band) -> changes on its host's system.attackRating.N. */
 export function hostChanges({ target, op, value } = {}) {
@@ -219,10 +257,9 @@ export const martialCategories = printed => { const w = words(printed).map(x => 
 
 /** Eden's ACTIVE_EFFECT_OPTIONS key for a change path (its datalistOptions turns `_` into `.` and `__` into `_`). */
 export const effectOptionKey = path => String(path).replaceAll('_', '__').replaceAll('.', '_')
-/** Every change path this module writes (bonusChanges, effectKey, hostChanges): Eden's effect editor should offer them. */
-export const OUR_TARGETS = [...ATTRS.map(a => `system.attributes.${a}.mod`), 'system.edge.max', 'system.initiative.physical.diceMod',
-  'system.initiative.physical.mod', 'system.defenserating.physical.mod', 'system.defenserating.social.mod',
-  'system.derived.composure.mod', 'system.derived.judge_intentions.mod', 'system.derived.memory.mod',
-  ...SKILLS.map(k => `system.skills.${k}.modifier`), ...[0, 1, 2, 3, 4].map(i => `system.attackRating.${i}`)]
+/** Every change path this module writes (bonusChanges, effectKeys, hostChanges): Eden's effect editor should offer them. */
+export const OUR_TARGETS = [...new Set([...ATTRS.map(a => `system.attributes.${a}.mod`), 'system.attributes.essence.mod', 'system.edge.max',
+  ...Object.values(DERIVED_KEY), ...Object.values(TEST_POOL), ...Object.values(MATRIX_KEY).map(k => `system.persona.device.mod.${k}`),
+  ...SKILLS.map(k => `system.skills.${k}.modifier`), ...[0, 1, 2, 3, 4].map(i => `system.attackRating.${i}`)])]
 /** The ones Eden's options lack (options: CONFIG.SR6.ACTIVE_EFFECT_OPTIONS): { [optionKey]: path }. */
 export const missingTargets = options => Object.fromEntries(OUR_TARGETS.map(p => [effectOptionKey(p), p]).filter(([k]) => !Object.hasOwn(options ?? {}, k)))

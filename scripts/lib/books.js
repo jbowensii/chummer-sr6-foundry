@@ -205,13 +205,14 @@ export function accessoryHostKind(e, kindOf) {
  * entry has it; otherwise the description says "See <SOURCE> p.N".
  * Returns { source, packs: { [key]: docs[] }, portraits: { [chummerID]: dataUrl }, tokens: { [chummerID]: dataUrl }, textOnly: string[] }.
  */
-export function translateBook(book, { exportedAt, appVersion, descriptions = false, sanitize = escapeText, icons = null, specs = {}, complexForms = {}, newGenesisId }) {
+export function translateBook(book, { exportedAt, appVersion, descriptions = false, sanitize = escapeText, icons = null, specs = {}, complexForms = {}, newGenesisId, entries: linked }) {
   const src = book.source, textOnly = [], packs = {}, portraits = {}, tokens = {}, iconSet = icons ? new Set(icons) : null
   const comp = src.compendium === true ? { compendium: true } : {}
   const see = x => `See ${x.source ?? src.id}${x.page ? ` p.${x.page}` : ''}`
-  // specs, complexForms: Eden's own
-  // tables as Foundry loaded them (foundry/apply.js)
-  const ctx = { exportedAt, appVersion, sanitize, icons: iconSet, ref: see, say: l => textOnly.push(l), specs, complexForms, ...newGenesisId ? { newGenesisId } : {} }
+  // specs, complexForms: Eden's own tables as Foundry loaded them (foundry/apply.js); entries: where an entry's links are
+  // found (every book in the file; default this one's)
+  const ctx = { exportedAt, appVersion, sanitize, icons: iconSet, ref: see, say: l => textOnly.push(l), specs, complexForms,
+    entries: linked ?? book.entries ?? [], ...newGenesisId ? { newGenesisId } : {} }
   // a document into its type pack (typeKey; a journal: the key given), its category folder in flags.category (categoryOf)
   const add = (e, doc, key = typeKey(doc, e?.attrs?.category)) => {
     doc.flags[MODULE_ID].category = categoryOf(e, doc, key, src.name || src.id)

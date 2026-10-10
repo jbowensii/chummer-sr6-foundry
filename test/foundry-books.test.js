@@ -313,8 +313,8 @@ test('re-import keeps a user’s effect on an entry and swaps only ours', async 
   entry.effects.push({ _id: 'userfx', name: 'GM house rule', flags: {} })
   await importBooks([tr(mus)])
   const after = q.docs.get(entry._id)
-  expect(after.effects.map(e => e.name)).toEqual(['Lucky Break', 'Lucky Break (conditional)', 'GM house rule'])
-  expect(after.effects.filter(e => e.flags?.[MODULE_ID]?.chummer)).toHaveLength(2)
+  expect(after.effects.map(e => e.name)).toEqual(['Lucky Break', 'GM house rule'])
+  expect(after.effects.filter(e => e.flags?.[MODULE_ID]?.chummer)).toHaveLength(1)
 })
 
 test('packSystem: a pack entry carries no play state (Eden 4.0.11 _onUpdate needs an actor for usedForPool, wirelessActive, matrixCM)', async () => {

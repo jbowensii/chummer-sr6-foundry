@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, test } from 'vitest'
 import { ATTRS, SKILLS } from '../scripts/lib/eden.js'
-import { bonusChanges, escapeText, lineItem, translateRunner } from '../scripts/lib/translate.js'
+import { bonusChanges, escapeText, lineItem, pickItem, qualityItem, translateRunner } from '../scripts/lib/translate.js'
 
 const file = JSON.parse(readFileSync('samples/test-runners.json', 'utf8'))
 const mara = () => structuredClone(file.runners[0])
@@ -42,6 +42,14 @@ describe('the Player actor', () => {
     expect(n).toMatch(/Initiative 9 \+ 3D6, astral 9 \+ 2D6/)
     expect(n).toMatch(/physical 11, stun 10, overflow 3/)
     expect(n).toMatch(/Defense Rating 7/)
+  })
+  test('derivedOn: the numbers with switchable effects on, in brackets where they differ', () => {
+    const r = mara()
+    r.derivedOn = { ...structuredClone(r.derived), defenseRating: 9, initiative: { base: 10, dice: 3 } }
+    const n = run(r).actor.system.notes
+    expect(n).toMatch(/Initiative 9 \+ 3D6 \(10 \+ 3D6\), astral 9 \+ 2D6</)
+    expect(n).toMatch(/Defense Rating 7 \(9\)/)
+    expect(n).toMatch(/physical 11, stun 10, overflow 3/)
   })
 })
 
@@ -87,10 +95,11 @@ describe('items', () => {
     expect(byName(run(r), 'Lucky Break').system.product).toBe('core')
     expect(byName(t, 'Lucky Break').system.description).toMatch(/Chummer: MUS p\.10/)
   })
-  test('qualities: a runner’s item carries the book text’s Active Effects too, marked as ours; its test as text', () => {
+  test('qualities: a runner’s item carries the book text’s Active Effects too, marked as ours; a low-confidence one and its test as text', () => {
     const t = run()
     expect(byName(t, 'Lucky Break').effects.map(e => [e.name, e.disabled, e.flags['chummer-sr6-importer'].chummer]))
-      .toEqual([['Lucky Break', false, true], ['Lucky Break (conditional)', true, true]])
+      .toEqual([['Lucky Break', false, true]])
+    expect(byName(t, 'Lucky Break').system.description).toContain('<p>Not applied (unsure): +2 Firearms.</p>')
     expect(byName(t, 'Lucky Break').system.description).toMatch(/Test: Perception \+ Intuition \(3\)\./)
     expect(byName(t, 'Lucky Break').system).toMatchObject({ category: 'ADVANTAGE', level: false, value: 1, explain: '' })
     expect(byName(t, 'Made-up Debt').system).toMatchObject({ category: 'DISADVANTAGE', level: true, value: 2, explain: 'Owes a made-up fixer.' })
@@ -284,4 +293,69 @@ test('a runner’s vehicle is also an Eden Vehicle actor: its stats, Eden’s pi
   expect(v.items.map(i => i.name)).toEqual(['Made-up Spoiler'])
   expect(v.items[0].system.description).toMatch(/Fitted to Test Bike\./)
   expect(byName(t, 'Test Bike').type).toBe('gear')  // and the runner keeps it as Eden's vehicle item
+})
+
+describe('effects v2', () => {
+  const M = 'chummer-sr6-importer'
+  const thing = (o = {}) => ({ uid: 'x1', kind: 'gear', name: 'Made-up Thing', canon: true, attrs: {}, parts: [], values: {}, qty: 1, accessories: [], ...o })
+  const fx = d => (d.effects ?? []).map(e => ({ name: e.name, transfer: e.transfer, disabled: e.disabled, changes: e.changes.map(c => `${c.key}=${c.value}`) }))
+  test('always on: an enabled effect; switchable: a disabled one named for what turns it on', () => {
+    const d = lineItem(thing({ effects: [{ target: 'attr:rea', op: 'add', value: '1' }, { target: 'derived:initiative-dice', op: 'add', value: '1', switch: 'wireless' },
+      { target: 'skill:con', op: 'add', value: '2', when: 'made-up crowds' }, { target: 'skill:firearms', op: 'add', value: '1', spec: 'Pistols' },
+      { target: 'test:social', op: 'add', value: '1', switch: 'activated' }] }), ctx())
+    expect(fx(d)).toEqual([
+      { name: 'Made-up Thing', transfer: true, disabled: false, changes: ['system.attributes.rea.mod=1'] },
+      { name: 'Wireless: Made-up Thing', transfer: true, disabled: true, changes: ['system.initiative.physical.diceMod=1'] },
+      { name: 'Conditional: Made-up Thing (made-up crowds)', transfer: true, disabled: true, changes: ['system.skills.con.modifier=2'] },
+      { name: 'Conditional: Made-up Thing (Pistols)', transfer: true, disabled: true, changes: ['system.skills.firearms.modifier=1'] },
+      { name: 'Activated: Made-up Thing', transfer: true, disabled: true, changes: ['system.skills.con.modifier=1', 'system.skills.influence.modifier=1'] }])
+    for (const e of d.effects) expect(e.flags[M].chummer).toBe(true)
+  })
+  test('low confidence: never an effect, only a note; no Eden field: a note', () => {
+    const d = lineItem(thing({ effects: [{ target: 'attr:agi', op: 'add', value: '1', low: true }, { target: 'skill:stealth', op: 'edge', value: '1' },
+      { target: 'derived:minor-actions', op: 'add', value: '1', switch: 'wireless' }, { target: 'attr:str', op: 'add', value: 'edg/2' }] }), ctx())
+    expect(d.effects).toBeUndefined()
+    expect(d.system.description).toContain('<p>Not applied (unsure): +1 Agility.</p><p>+1 Edge on Stealth tests.</p>' +
+      '<p>Wireless: +1 Minor Actions.</p><p>+edg/2 Strength.</p>')
+  })
+  test('R: times the rating; a quality: once per level', () => {
+    const d = lineItem(thing({ values: { rating: 3 }, effects: [{ target: 'derived:composure', op: 'add', value: 'R' }] }), ctx())
+    expect(fx(d)[0].changes).toEqual(['system.derived.composure.mod=3'])
+    const q = qualityItem({ uid: 'q1', kind: 'qualities', name: 'Made-up Grit', canon: true, attrs: {}, parts: [], values: {}, positive: true, level: 2,
+      effects: [{ target: 'derived:physical-monitor', op: 'add', value: '1' }] }, ctx())
+    expect(fx(q)[0].changes).toEqual(['system.physical.mod=2'])
+  })
+  test('a spell: on the caster a disabled effect that transfers; on the target one that does not transfer', () => {
+    const d = pickItem({ uid: 's1', kind: 'spells', pick: 'spells', name: 'Made-up Boost', canon: true, attrs: { category: 'health', duration: 'S' }, parts: [], values: {},
+      effects: [{ target: 'attr:agi', op: 'add', value: '2', affects: 'caster' }, { target: 'attr:rea', op: 'add', value: '-1', affects: 'target' }] }, ctx())
+    expect(fx(d)).toEqual([
+      { name: 'Sustained: Made-up Boost', transfer: true, disabled: true, changes: ['system.attributes.agi.mod=2'] },
+      { name: 'On the target: Made-up Boost', transfer: false, disabled: false, changes: ['system.attributes.rea.mod=-1'] }])
+  })
+  test('a runner purchase: its bonuses carry what they hold (no double count); its switchable bonus is a disabled effect', () => {
+    const d = lineItem(thing({ effects: [{ target: 'attr:rea', op: 'add', value: '1' }, { target: 'derived:composure', op: 'add', value: '1' }],
+      bonuses: [{ target: 'rea', value: 1 }, { target: 'physical', value: 1, switch: 'activated' }] }), ctx())
+    expect(fx(d)).toEqual([
+      { name: 'Made-up Thing', transfer: true, disabled: false, changes: ['system.attributes.rea.mod=1', 'system.derived.composure.mod=1'] },
+      { name: 'Activated: Made-up Thing', transfer: true, disabled: true, changes: ['system.physical.mod=1'] }])
+  })
+  test('the always-on monitor boxes the actor already holds are not an effect too', () => {
+    const r = mara()
+    r.purchases.push(thing({ uid: 'x9', bonuses: [{ target: 'physical', value: 1 }, { target: 'stun', value: 1, switch: 'wireless' }, { target: 'overflow', value: 2 }] }))
+    expect(fx(byName(run(r), 'Made-up Thing'))).toEqual([
+      { name: 'Made-up Thing', transfer: true, disabled: false, changes: ['system.overflow.mod=2'] },
+      { name: 'Wireless: Made-up Thing', transfer: true, disabled: true, changes: ['system.stun.mod=1'] }])
+  })
+  test('a link uses the linked item’s effects (by id, else kind and name), with the link’s condition', () => {
+    const r = mara()
+    r.picks.push({ uid: 'p9', kind: 'adeptpowers', pick: 'adeptpowers', id: 'mus.made-up-reflexes', name: 'Made-up Reflexes', canon: true, attrs: {}, parts: [], values: {}, bonuses: [],
+      effects: [{ target: 'derived:initiative', op: 'add', value: '2' }] })
+    r.qualities.push({ uid: 'q9', kind: 'qualities', name: 'Made-up Gift', canon: true, attrs: {}, parts: [], values: {}, positive: true, level: 1,
+      links: [{ rel: 'grants', name: 'Made-up Reflexes', kind: 'adeptpowers' }, { rel: 'as', name: 'Nothing Here', when: 'made-up moon' }] })
+    const q = byName(run(r), 'Made-up Gift')
+    expect(fx(q)).toEqual([{ name: 'Made-up Gift', transfer: true, disabled: false, changes: ['system.initiative.physical.mod=2'] }])
+    expect(q.system.description).toContain('<p>Grants Made-up Reflexes.</p><p>Works as Nothing Here (made-up moon).</p>')
+    r.qualities.at(-1).links = [{ rel: 'grants', name: 'Renamed', id: 'mus.made-up-reflexes', when: 'made-up moon' }]
+    expect(fx(byName(run(r), 'Made-up Gift'))).toEqual([{ name: 'Conditional: Made-up Gift (made-up moon)', transfer: true, disabled: true, changes: ['system.initiative.physical.mod=2'] }])
+  })
 })
