@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.1
+
+Needs Chummer's export with the third-round effect kinds (`schema/sr6-export.schema.json` is its copy). Import your books again and Replace your runners to get them.
+
+- Every effect target Chummer's importer produces has a route: an Active Effect on the actor, a change on the host item, or a described line (`effectRoute`; the test lists none unknown).
+- A fitted add-on's item effects change its host's own fields: damage, ammunition capacity (a belt feed pack's 1,000 rounds, as an override), a vehicle's handling, acceleration and speed interval on- and off-road (`R/-R`: a point moved between them per rating), top speed, body, armor, pilot, sensor, seats, a device's Attack, Sleaze, Data Processing and Firewall. An Attack Rating modifier limited to fire modes (shock pads: Semi-Auto and Burst Fire) goes on shadowrun6-eden's per-mode AR modifier.
+- Hardened Armor goes on `traits.hardenedArmor`, which shadowrun6-eden's Defense Rating and damage resistance read. A bonus on Magic Resistance tests goes on the spell defense pools (direct and indirect).
+- The described lines word the new kinds: a sense (`Low Light Vision.`), a skill's maximum, prices in percent (`+10% Armor prices`), the chase pool's Edge, a complex form's bonus, a native language.
+
 ## 0.5.0
 
 Needs Chummer's export with effect switches and links (`schema/sr6-export.schema.json` is its copy). Import your books again and Replace your runners to get the new effects.
