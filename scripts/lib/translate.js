@@ -72,9 +72,9 @@ function readEffects(x, ctx = {}) {
   const rating = quality ? 1 : num(x.values?.rating) || num(x.level) || 1, times = quality ? num(x.level) || 1 : 1
   for (const e of [...x.effects ?? [], ...linkedEffects(x, ctx)]) {
     if ((Array.isArray(x.bonuses) && inBonuses(e) && !e.low) || (x.kind === 'armor' && e.target === 'derived:defense')) continue
-    const value = effectValue(e.value, rating), keys = ctx.host || ctx.mod || e.low || value == null ? [] : effectKeys(e)
+    const value = effectValue(e.value, rating), keys = ctx.host || ctx.mod || e.low || value == null || e.affects === 'others' ? [] : effectKeys(e)  // (others': a note, never the actor's)
     if (keys.length) rows.push(...keys.map(key => ({ key, value: value * times, ...howOf(e) })))
-    else if (!(ctx.mod && e.target === 'item:ar')) notes.push(effectText(e))
+    else if (!(ctx.mod && hostChanges(e).length)) notes.push(effectText(e))  // (a fitted mod's host changes are its effects, not notes)
   }
   return { rows, notes }
 }
@@ -94,7 +94,7 @@ function groupEffects(rows, name, ctx = {}) {
     const label = target ? `On the target: ${name}` : on ? name
       : `${SWITCH[r.switch] ?? (r.affects === 'caster' ? 'Sustained' : 'Conditional')}: ${name}${r.spec ? ` (${r.spec})` : ''}${r.when ? ` (${r.when})` : ''}`
     if (!out.has(label)) out.set(label, ours({ name: label, transfer: !target, disabled: !on && !target, changes: [] }))
-    out.get(label).changes.push({ key: r.key, value: String(r.value), mode: 2 })
+    out.get(label).changes.push({ key: r.key, value: String(r.value), mode: r.mode ?? 2 })
   }
   return [...out.values()].sort((a, b) => (b.name === name) - (a.name === name))  // the always-on one first
 }
@@ -102,18 +102,28 @@ function groupEffects(rows, name, ctx = {}) {
 const ATTR_NAME = { bod: 'Body', agi: 'Agility', rea: 'Reaction', str: 'Strength', wil: 'Willpower', log: 'Logic', int: 'Intuition',
   cha: 'Charisma', edg: 'Edge', mag: 'Magic', res: 'Resonance', ess: 'Essence' }
 const words = t => String(t ?? '').replace(/^[a-z-]+:/, '').replace(/-/g, ' ')
-const named = t => ATTR_NAME[String(t ?? '').replace(/^attr:/, '')] ?? words(t).replace(/\b\w/g, c => c.toUpperCase())
+const title = t => words(t).replace(/\b\w/g, c => c.toUpperCase())
+// the target kinds whose words need more than their name (the rest: `Firewall`, `Defense Rating`, a skill's name)
+const KIND_WORDS = { 'attr-max': t => `maximum ${ATTR_NAME[words(t)] ?? title(t)}`, 'skill-max': t => `${words(t) === 'choice' ? 'a chosen skill' : title(t)}’s maximum`,
+  pricemod: t => `${title(t)} prices`, pool: t => `the ${title(t)} pool’s Edge`, 'complex-form': t => `the ${title(t)} complex form`, action: t => `the ${title(t)} action`,
+  'action-max': t => `the ${title(t)} action’s maximum bonus` }
+const named = t => { const k = String(t ?? '').split(':')[0]; return KIND_WORDS[k]?.(t) ?? ATTR_NAME[String(t ?? '').replace(/^attr:/, '')] ?? (words(t) === 'choice' ? `a chosen ${k === 'matrix' ? 'Matrix attribute' : k === 'skill' ? 'skill' : 'attribute'}` : title(t)) }
 const minus = v => /^[-–−]/.test(v)
-const signed = v => (minus(v) || v.includes(',') ? v : `+${v}`)
-/** One effect as words: "Wireless: +1 Reaction.", "Edge boosts and actions on Firearms tests cost 1 less." */
+const value = v => (v === 'N' ? 'native' : /^0\.\d+$/.test(v) ? `${Math.round(Number(v) * 100)}%`
+  : /^R(?:\*\d+)?-\d+$/.test(v) ? v.replace(/^R(?:\*(\d+))?-(\d+)$/, (_, n, k) => `${n ? `${n} × ` : ''}(rating − ${k})`)
+  : /^R\[.*\]$/.test(v) ? `${v.slice(2, -1).split(',').join('/')} by rating` : v.includes(',') ? v.split(',').map(x => (x === 'x' ? '— (removed)' : x)).join('/')
+  : /^-?[a-z][a-z-]*\/\d+(?: R[DU])?$/.test(v) ? v.replace(/^(-?)([a-z][a-z-]*)\/(\d+)(?: (R[DU]))?$/, (_, m, a, n, r) => `${m}${ATTR_NAME[a] ?? a.replace(/-/g, ' ')} ÷ ${n}${r ? ` (round ${r === 'RD' ? 'down' : 'up'})` : ''}`) : v)
+const signed = v => (minus(v) || v.includes(',') || /%$/.test(value(v)) ? value(v) : `+${value(v)}`)
+/** One effect as words: "Wireless: +1 Reaction.", "Edge boosts and actions on Firearms tests cost 1 less.", "Low Light Vision." */
 export function effectText(e) {
   const v = String(e.value ?? ''), t = `${named(e.target)}${e.spec ? ` (${e.spec})` : ''}`, tests = `${t} tests`
-  const text = { set: `${t} ${v}`, edge: `${signed(v)} Edge on ${tests}`,
+  if (String(e.target).startsWith('sense:')) return `${e.low ? 'Not applied (unsure): ' : ''}${t}${e.when ? ` (${e.when})` : ''}.`
+  const text = { set: `${t} ${value(v)}`, edge: `${signed(v)} Edge on ${tests}`,
     'edge-cost': `Edge boosts and actions on ${tests} cost ${v.replace(/^[-–−]/, '')} ${minus(v) ? 'less' : 'more'}`,
     'edge-cost-set': `${tests} cost ${v} Edge`, 'no-edge': `No Edge spent on ${tests}`, 'no-edge-gain': `No Edge gained on ${tests}`,
     'wild-die': `A wild die on ${tests}`, hits: `${signed(v)} hits on ${tests}`, threshold: `Threshold ${signed(v)} on ${tests}` }[e.op]
     ?? `${signed(v)} ${String(e.target).startsWith('test:') ? tests : t}`
-  const how = e.affects === 'target' ? 'On the target: ' : SWITCH[e.switch] && e.switch !== 'conditional' ? `${SWITCH[e.switch]}: ` : ''
+  const how = e.affects === 'target' ? 'On the target: ' : e.affects === 'others' ? 'Others get: ' : SWITCH[e.switch] && e.switch !== 'conditional' ? `${SWITCH[e.switch]}: ` : ''
   return `${e.low ? 'Not applied (unsure): ' : ''}${how}${text}${e.when ? ` (${e.when})` : ''}.`
 }
 const linkText = l => `${l.rel === 'as' ? 'Works as' : 'Grants'} ${l.name}${l.level ? ` ${l.level}` : ''}${l.when ? ` (${l.when})` : ''}.`
@@ -230,7 +240,7 @@ export function modItem(x, ctx, type) {
   const doc = dataModelSource(base(x, 'mod', ctx, [a.slots && `Mod slots: ${a.slots}`, x.note,
     x.bonuses?.length && `On its host: ${bonusText(x.bonuses)}`, ...effectLines(x, { ...ctx, mod: true })]))
   Object.assign(doc.system, { type, rating: Math.max(0, num(v.rating)), price: Math.max(0, num(v.cost)), availDef: a.avail ?? '' })
-  const rows = (x.effects ?? []).filter(e => !e.low).flatMap(e => hostChanges(e).map(c => ({ ...c, ...howOf(e), affects: undefined })))
+  const rows = (x.effects ?? []).filter(e => !e.low).flatMap(e => hostChanges(e, Math.max(1, num(v.rating))).map(c => ({ ...c, ...howOf(e), affects: undefined })))
   const out = groupEffects(rows, x.name).map(e => ({ ...e, transfer: false }))
   if (out.length) doc.effects = out
   return icon(doc, x, ctx)
