@@ -316,7 +316,7 @@ describe('effects v2', () => {
       { target: 'derived:minor-actions', op: 'add', value: '1', switch: 'wireless' }, { target: 'attr:str', op: 'add', value: 'edg/2' }] }), ctx())
     expect(d.effects).toBeUndefined()
     expect(d.system.description).toContain('<p>Not applied (unsure): +1 Agility.</p><p>+1 Edge on Stealth tests.</p>' +
-      '<p>Wireless: +1 Minor Actions.</p><p>+edg/2 Strength.</p>')
+      '<p>Wireless: +1 Minor Actions.</p><p>+Edge ÷ 2 Strength.</p>')
   })
   test('R: times the rating; a quality: once per level', () => {
     const d = lineItem(thing({ values: { rating: 3 }, effects: [{ target: 'derived:composure', op: 'add', value: 'R' }] }), ctx())
