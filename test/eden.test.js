@@ -238,6 +238,10 @@ describe('books, effects', () => {
   })
   test('an effect value: a number, or so much per rating; a formula or a list: null', () => {
     expect(['2', '-1', '–1', 'R', '-R', 'R*2', '2*R', 'edg/2', '0,1,1,0,0'].map(v => effectValue(v, 3))).toEqual([2, -1, -1, 3, -3, 6, 6, null, null])
+    // owner decisions 2026-10-11: a level after the first, the book's own value per rating
+    expect(['R-1', 'R*2-2', 'R[1,1,2,2]'].map(v => effectValue(v, 3))).toEqual([2, 4, 2])
+    expect(['R-1', 'R[1,1,2,2]'].map(v => effectValue(v, 1))).toEqual([0, 1])
+    expect(effectValue('R[1,1,2,2]', 9)).toBe(2)
   })
   test('an accessory item:ar effect -> its host attack rating bands', () => {
     expect(hostChanges({ target: 'item:ar', op: 'add', value: '0,1,1,0,0' }))
@@ -256,6 +260,7 @@ describe('books, effects', () => {
     expect(hostChanges({ target: 'item:top-speed', op: 'add', value: '20%' })).toEqual([])  // (a formula: a note)
     expect(hostChanges({ target: 'matrix:firewall', op: 'add', value: 'R' }, 3)).toEqual([{ key: 'system.f', value: '3', mode: 2 }])
     expect(hostChanges({ target: 'item:concealability', op: 'add', value: '1' })).toEqual([])
+    expect(hostChanges({ target: 'item:ar', op: 'add', value: '2,1,-2,0,x' })).toEqual([{ key: 'system.attackRating.0', value: '2', mode: 2 }, { key: 'system.attackRating.1', value: '1', mode: 2 }, { key: 'system.attackRating.2', value: '-2', mode: 2 }])  // (a removed band: a note)
   })
   test('every target the importer produces has a route: an actor effect, a host change or a described line, never unknown', () => {
     // the vocabulary of importer/sr6/effects.py (docs/sr6-data-format.md Effects), one of each
@@ -268,7 +273,7 @@ describe('books, effects', () => {
       'derived:hardened-armor', 'derived:damage-reduction', 'derived:power-points', 'derived:monthly-cost', 'matrix:attack', 'matrix:sleaze', 'matrix:data-processing',
       'matrix:firewall', 'matrix:choice', 'matrix:overwatch', 'item:ar', 'item:dv', 'item:concealability', 'item:handling', 'item:acceleration', 'item:speed-interval',
       'item:top-speed', 'item:body', 'item:armor', 'item:pilot', 'item:sensor', 'item:seats', 'item:size', 'item:ammo', 'action:wrest', 'complex-form:puppeteer',
-      'lifestyle:necessities', 'resource:contact-points', 'pricemod:armor', 'pricemod:lifestyle', 'pool:chase', 'sense:thermographic-vision']
+      'lifestyle:necessities', 'resource:contact-points', 'pricemod:armor', 'pricemod:lifestyle', 'pool:chase', 'sense:thermographic-vision', 'action-max:take-aim']
     const routes = Object.fromEntries(targets.map(t => [t, effectRoute({ target: t, op: 'add', value: '1' })]))
     expect(Object.entries(routes).filter(([, r]) => r === 'unknown')).toEqual([])
     expect(routes['attr:bod']).toBe('actor'); expect(routes['item:dv']).toBe('host'); expect(routes['sense:thermographic-vision']).toBe('note')

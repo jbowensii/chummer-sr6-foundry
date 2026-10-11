@@ -105,10 +105,13 @@ const words = t => String(t ?? '').replace(/^[a-z-]+:/, '').replace(/-/g, ' ')
 const title = t => words(t).replace(/\b\w/g, c => c.toUpperCase())
 // the target kinds whose words need more than their name (the rest: `Firewall`, `Defense Rating`, a skill's name)
 const KIND_WORDS = { 'attr-max': t => `maximum ${ATTR_NAME[words(t)] ?? title(t)}`, 'skill-max': t => `${words(t) === 'choice' ? 'a chosen skill' : title(t)}’s maximum`,
-  pricemod: t => `${title(t)} prices`, pool: t => `the ${title(t)} pool’s Edge`, 'complex-form': t => `the ${title(t)} complex form`, action: t => `the ${title(t)} action` }
+  pricemod: t => `${title(t)} prices`, pool: t => `the ${title(t)} pool’s Edge`, 'complex-form': t => `the ${title(t)} complex form`, action: t => `the ${title(t)} action`,
+  'action-max': t => `the ${title(t)} action’s maximum bonus` }
 const named = t => { const k = String(t ?? '').split(':')[0]; return KIND_WORDS[k]?.(t) ?? ATTR_NAME[String(t ?? '').replace(/^attr:/, '')] ?? (words(t) === 'choice' ? `a chosen ${k === 'matrix' ? 'Matrix attribute' : k === 'skill' ? 'skill' : 'attribute'}` : title(t)) }
 const minus = v => /^[-–−]/.test(v)
-const value = v => (v === 'N' ? 'native' : /^0\.\d+$/.test(v) ? `${Math.round(Number(v) * 100)}%` : v)
+const value = v => (v === 'N' ? 'native' : /^0\.\d+$/.test(v) ? `${Math.round(Number(v) * 100)}%`
+  : /^R(?:\*\d+)?-\d+$/.test(v) ? v.replace(/^R(?:\*(\d+))?-(\d+)$/, (_, n, k) => `${n ? `${n} × ` : ''}(rating − ${k})`)
+  : /^R\[.*\]$/.test(v) ? `${v.slice(2, -1).split(',').join('/')} by rating` : v.includes(',') ? v.split(',').map(x => (x === 'x' ? '— (removed)' : x)).join('/') : v)
 const signed = v => (minus(v) || v.includes(',') || /%$/.test(value(v)) ? value(v) : `+${value(v)}`)
 /** One effect as words: "Wireless: +1 Reaction.", "Edge boosts and actions on Firearms tests cost 1 less.", "Low Light Vision." */
 export function effectText(e) {

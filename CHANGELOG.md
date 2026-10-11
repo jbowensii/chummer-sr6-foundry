@@ -8,6 +8,7 @@ Needs Chummer's export with the third-round effect kinds (`schema/sr6-export.sch
 - A fitted add-on's item effects change its host's own fields: damage, ammunition capacity (a belt feed pack's 1,000 rounds, as an override), a vehicle's handling, acceleration and speed interval on- and off-road (`R/-R`: a point moved between them per rating), top speed, body, armor, pilot, sensor, seats, a device's Attack, Sleaze, Data Processing and Firewall. An Attack Rating modifier limited to fire modes (shock pads: Semi-Auto and Burst Fire) goes on shadowrun6-eden's per-mode AR modifier.
 - Hardened Armor goes on `traits.hardenedArmor`, which shadowrun6-eden's Defense Rating and damage resistance read. A bonus on Magic Resistance tests goes on the spell defense pools (direct and indirect).
 - The described lines word the new kinds: a sense (`Low Light Vision.`), a skill's maximum, prices in percent (`+10% Armor prices`), the chase pool's Edge, a complex form's bonus, a native language.
+- Values per level after the first (`R-1`, `R*2-2`: counted at the item's rating, never below 0) and the book's own value per rating (`R[1,1,2,2]`) are evaluated like `R`; a removed Attack Rating band (`x`) is left out of the host's bands and worded `— (removed)`; a raised maximum (`action-max:`) is a described line.
 
 ## 0.5.0
 

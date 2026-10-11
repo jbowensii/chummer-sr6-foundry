@@ -187,13 +187,18 @@ export function effectKeys({ target, op } = {}) {
   if (kind === 'matrix') return one(MATRIX_KEY[name] && `system.persona.device.mod.${MATRIX_KEY[name]}`)
   return []
 }
-/** A printed effect value at a rating: a number, or so much per rating (`R`, `-R`, `R*2`, `2*R`); null for a formula
- *  or a list (shown only). */
+/** A printed effect value at a rating: a number; so much per rating (`R`, `-R`, `R*2`, `2*R`); so much per level after
+ *  the first (`R-1`, `R*2-2`); the book's own value per rating (`R[1,1,2,2]`, the last beyond the table). null for a
+ *  formula, a percent or a band list (shown only). */
 export function effectValue(v, rating = 1) {
   const s = String(v ?? '').replace(/\s+/g, '').replace(/[–−]/g, '-')
   if (/^[+-]?\d+(\.\d+)?$/.test(s)) return Number(s)
-  const m = /^(-?)R(?:\*(-?\d+(?:\.\d+)?))?$/.exec(s) ?? /^(-?)(\d+(?:\.\d+)?)\*R$/.exec(s)
-  return m ? (m[1] ? -1 : 1) * Number(m[2] ?? 1) * rating : null
+  const list = /^R\[((?:-?\d+(?:\.\d+)?)(?:,-?\d+(?:\.\d+)?)*)\]$/.exec(s)
+  if (list) { const by = list[1].split(',').map(Number); return by[Math.min(Math.max(1, Math.round(rating)), by.length) - 1] }
+  const m = /^(-?)R(?:\*(-?\d+(?:\.\d+)?))?(?:-(\d+(?:\.\d+)?))?$/.exec(s) ?? /^(-?)(\d+(?:\.\d+)?)\*R(?:-(\d+(?:\.\d+)?))?$/.exec(s)
+  if (!m) return null
+  const n = (m[1] ? -1 : 1) * Number(m[2] ?? 1) * rating
+  return m[3] ? Math.max(0, n - Number(m[3])) : n  // (`R*2-2`: twice the rating, less 2, never below 0)
 }
 // An item: effect on the host item (a weapon's, a vehicle's, a device's own fields in Eden's gear template): the key(s)
 // a stat lives at. A vehicle's handling, acceleration and speed interval are on-road/off-road pairs; a value `a/b`
@@ -212,7 +217,7 @@ export function hostChanges({ target, op, value, when } = {}, rating = 1) {
   const mode = op === 'set' ? 5 : 2, out = []
   if (name === 'ar') {
     const modes = String(when ?? '').toLowerCase().split(/,\s*|\s+and\s+|\s+or\s+/).map(w => FIRE_MODE[w.trim()]).filter(Boolean)
-    const vals = String(value ?? '').split(',').map(x => effectValue(x, rating))
+    const vals = String(value ?? '').split(',').map(x => effectValue(x, rating))  // (`x`: a band removed, a note only)
     if (modes.length && vals.length === 1 && vals[0]) return modes.map(m => ({ key: `system.modes.${m}.ar.mod`, value: String(vals[0]), mode }))
     return vals.flatMap((n, i) => (i < 5 && Number.isFinite(n) && n ? [{ key: `system.attackRating.${i}`, value: String(n), mode }] : []))
   }
@@ -227,7 +232,7 @@ export function hostChanges({ target, op, value, when } = {}, rating = 1) {
 }
 // Target kinds and names the importer produces that Eden has no field for: they stay a described line on the item.
 // (docs/sr6-data-format.md Effects; the others map through effectKeys or hostChanges.)
-export const NOTED = { kinds: ['attr-max', 'skill-max', 'action', 'complex-form', 'lifestyle', 'resource', 'pricemod', 'pool', 'sense'],
+export const NOTED = { kinds: ['attr-max', 'skill-max', 'action-max', 'action', 'complex-form', 'lifestyle', 'resource', 'pricemod', 'pool', 'sense'],
   names: ['attr:choice', 'skill:choice', 'skill:knowledge', 'skill:language', 'matrix:choice', 'matrix:overwatch', 'derived:matrix-monitor',
     'derived:movement', 'derived:minor-actions', 'derived:major-actions', 'derived:damage-reduction', 'derived:monthly-cost', 'derived:power-points',
     'test:surprise', 'test:crash', 'test:addiction', 'test:fatigue-resistance', 'test:all', 'test:other', 'item:concealability', 'item:size'],
