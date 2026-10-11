@@ -111,7 +111,8 @@ const named = t => { const k = String(t ?? '').split(':')[0]; return KIND_WORDS[
 const minus = v => /^[-–−]/.test(v)
 const value = v => (v === 'N' ? 'native' : /^0\.\d+$/.test(v) ? `${Math.round(Number(v) * 100)}%`
   : /^R(?:\*\d+)?-\d+$/.test(v) ? v.replace(/^R(?:\*(\d+))?-(\d+)$/, (_, n, k) => `${n ? `${n} × ` : ''}(rating − ${k})`)
-  : /^R\[.*\]$/.test(v) ? `${v.slice(2, -1).split(',').join('/')} by rating` : v.includes(',') ? v.split(',').map(x => (x === 'x' ? '— (removed)' : x)).join('/') : v)
+  : /^R\[.*\]$/.test(v) ? `${v.slice(2, -1).split(',').join('/')} by rating` : v.includes(',') ? v.split(',').map(x => (x === 'x' ? '— (removed)' : x)).join('/')
+  : /^-?[a-z][a-z-]*\/\d+(?: R[DU])?$/.test(v) ? v.replace(/^(-?)([a-z][a-z-]*)\/(\d+)(?: (R[DU]))?$/, (_, m, a, n, r) => `${m}${ATTR_NAME[a] ?? a.replace(/-/g, ' ')} ÷ ${n}${r ? ` (round ${r === 'RD' ? 'down' : 'up'})` : ''}`) : v)
 const signed = v => (minus(v) || v.includes(',') || /%$/.test(value(v)) ? value(v) : `+${value(v)}`)
 /** One effect as words: "Wireless: +1 Reaction.", "Edge boosts and actions on Firearms tests cost 1 less.", "Low Light Vision." */
 export function effectText(e) {
