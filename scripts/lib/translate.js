@@ -72,7 +72,7 @@ function readEffects(x, ctx = {}) {
   const rating = quality ? 1 : num(x.values?.rating) || num(x.level) || 1, times = quality ? num(x.level) || 1 : 1
   for (const e of [...x.effects ?? [], ...linkedEffects(x, ctx)]) {
     if ((Array.isArray(x.bonuses) && inBonuses(e) && !e.low) || (x.kind === 'armor' && e.target === 'derived:defense')) continue
-    const value = effectValue(e.value, rating), keys = ctx.host || ctx.mod || e.low || value == null ? [] : effectKeys(e)
+    const value = effectValue(e.value, rating), keys = ctx.host || ctx.mod || e.low || value == null || e.affects === 'others' ? [] : effectKeys(e)  // (others': a note, never the actor's)
     if (keys.length) rows.push(...keys.map(key => ({ key, value: value * times, ...howOf(e) })))
     else if (!(ctx.mod && hostChanges(e).length)) notes.push(effectText(e))  // (a fitted mod's host changes are its effects, not notes)
   }
@@ -123,7 +123,7 @@ export function effectText(e) {
     'edge-cost-set': `${tests} cost ${v} Edge`, 'no-edge': `No Edge spent on ${tests}`, 'no-edge-gain': `No Edge gained on ${tests}`,
     'wild-die': `A wild die on ${tests}`, hits: `${signed(v)} hits on ${tests}`, threshold: `Threshold ${signed(v)} on ${tests}` }[e.op]
     ?? `${signed(v)} ${String(e.target).startsWith('test:') ? tests : t}`
-  const how = e.affects === 'target' ? 'On the target: ' : SWITCH[e.switch] && e.switch !== 'conditional' ? `${SWITCH[e.switch]}: ` : ''
+  const how = e.affects === 'target' ? 'On the target: ' : e.affects === 'others' ? 'Others get: ' : SWITCH[e.switch] && e.switch !== 'conditional' ? `${SWITCH[e.switch]}: ` : ''
   return `${e.low ? 'Not applied (unsure): ' : ''}${how}${text}${e.when ? ` (${e.when})` : ''}.`
 }
 const linkText = l => `${l.rel === 'as' ? 'Works as' : 'Grants'} ${l.name}${l.level ? ` ${l.level}` : ''}${l.when ? ` (${l.when})` : ''}.`

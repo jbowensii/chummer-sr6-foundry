@@ -341,7 +341,8 @@
           "description": "A spell's or complex form's: on its caster (while sustained) or its target(s) (never counted on the caster).",
           "enum": [
             "caster",
-            "target"
+            "target",
+            "others"
           ]
         }
       },
@@ -481,7 +482,8 @@
               "affects": {
                 "enum": [
                   "caster",
-                  "target"
+                  "target",
+                  "others"
                 ]
               }
             }
