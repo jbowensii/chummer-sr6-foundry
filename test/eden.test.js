@@ -1,7 +1,7 @@
 // shadowrun6-eden vocabulary (scripts/lib/eden.js): invented category strings, Eden's keys only.
 import { describe, expect, test } from 'vitest'
 import {
-  ACCESS_DEVICES, ATTRS, effectOptionKey, missingTargets, OUR_TARGETS, MOR, SKILLS, activationKey, armorSubtype, augmentType, deviceFields, durationKey, edenBook, effectKeys, effectValue,
+  ACCESS_DEVICES, ATTRS, effectOptionKey, effectRoute, missingTargets, OUR_TARGETS, MOR, SKILLS, activationKey, armorSubtype, augmentType, deviceFields, durationKey, edenBook, effectKeys, effectValue,
   electronicsSubtype, gearType, hostChanges, lifestyleKey, martialCategories, modType, normKey, sinQuality, skillKey, softwareType, specKey,
   spellFields, spiritKey, spriteKey, testSkills, vehicleType, vehicleVtype, weaponType,
 } from '../scripts/lib/eden.js'
@@ -219,6 +219,9 @@ describe('books, effects', () => {
       'matrix:data-processing': ['system.persona.device.mod.d'], 'matrix:firewall': ['system.persona.device.mod.f'],
       'test:defense': ['system.defensepool.physical.mod'], 'test:damage-resistance': ['system.defensepool.damage_physical.mod'],
       'test:drain-resistance': ['system.defensepool.drain.mod'], 'test:toxin-resistance': ['system.defensepool.toxin.mod'] })
+    // a Magic Resistance test is the defense against a spell; Hardened Armor is Eden's trait its Defense Rating and soak read
+    expect(keys('test:magic-resistance')).toEqual(['system.defensepool.spells_direct.mod', 'system.defensepool.spells_indirect.mod'])
+    expect(keys('derived:hardened-armor')).toEqual(['traits.hardenedArmor'])
     // a test type: each skill it covers
     expect(keys('test:social')).toEqual(['system.skills.con.modifier', 'system.skills.influence.modifier'])
     expect(keys('test:combat')).toEqual(['system.skills.close_combat.modifier', 'system.skills.exotic_weapons.modifier', 'system.skills.firearms.modifier'])
@@ -227,8 +230,9 @@ describe('books, effects', () => {
     expect(testSkills('magic')).toEqual(['astral', 'conjuring', 'enchanting', 'sorcery'])
     // no Eden field: none
     for (const t of ['skill:basket-weaving', 'skill:choice', 'attr:choice', 'attr-max:agi', 'derived:matrix-monitor', 'derived:movement',
-      'derived:minor-actions', 'derived:major-actions', 'derived:hardened-armor', 'matrix:overwatch', 'test:surprise', 'test:all',
-      'test:spell-combat', 'test:magic-resistance', 'item:ar', 'action:wrest', 'resource:karma', 'lifestyle:comforts']) expect(keys(t), t).toEqual([])
+      'derived:minor-actions', 'derived:major-actions', 'matrix:overwatch', 'test:surprise', 'test:all',
+      'test:spell-combat', 'item:ar', 'action:wrest', 'resource:karma', 'lifestyle:comforts', 'sense:low-light-vision', 'pool:chase',
+      'pricemod:armor', 'skill-max:choice', 'complex-form:static-veil']) expect(keys(t), t).toEqual([])
     for (const op of ['set', 'edge', 'edge-cost', 'edge-cost-set', 'no-edge', 'no-edge-gain', 'wild-die', 'hits', 'threshold'])
       expect(effectKeys({ target: 'skill:firearms', op, value: '1' }), op).toEqual([])
   })
@@ -237,9 +241,40 @@ describe('books, effects', () => {
   })
   test('an accessory item:ar effect -> its host attack rating bands', () => {
     expect(hostChanges({ target: 'item:ar', op: 'add', value: '0,1,1,0,0' }))
-      .toEqual([{ key: 'system.attackRating.1', value: '1' }, { key: 'system.attackRating.2', value: '1' }])
-    expect(hostChanges({ target: 'item:ar', op: 'add', value: '-2,0,1' })).toEqual([{ key: 'system.attackRating.0', value: '-2' }, { key: 'system.attackRating.2', value: '1' }])
+      .toEqual([{ key: 'system.attackRating.1', value: '1', mode: 2 }, { key: 'system.attackRating.2', value: '1', mode: 2 }])
+    expect(hostChanges({ target: 'item:ar', op: 'add', value: '-2,0,1' })).toEqual([{ key: 'system.attackRating.0', value: '-2', mode: 2 }, { key: 'system.attackRating.2', value: '1', mode: 2 }])
     expect(hostChanges({ target: 'attr:agi', op: 'add', value: '1' })).toEqual([])
+  })
+  test('an add-on’s other item effects -> its host’s fields: fire modes, damage, ammunition, a vehicle’s on- and off-road pairs', () => {
+    expect(hostChanges({ target: 'item:ar', op: 'add', value: '1', when: 'semi-auto, burst fire' }))
+      .toEqual([{ key: 'system.modes.SA.ar.mod', value: '1', mode: 2 }, { key: 'system.modes.BF.ar.mod', value: '1', mode: 2 }])
+    expect(hostChanges({ target: 'item:dv', op: 'add', value: '-1' })).toEqual([{ key: 'system.dmg', value: '-1', mode: 2 }])
+    expect(hostChanges({ target: 'item:ammo', op: 'set', value: '1000' })).toEqual([{ key: 'system.ammocap', value: '1000', mode: 5 }])
+    expect(hostChanges({ target: 'item:handling', op: 'add', value: 'R/-R' }, 2)).toEqual([{ key: 'system.handlOn', value: '2', mode: 2 }, { key: 'system.handlOff', value: '-2', mode: 2 }])
+    expect(hostChanges({ target: 'item:handling', op: 'add', value: '-R' }, 2)).toEqual([{ key: 'system.handlOn', value: '-2', mode: 2 }, { key: 'system.handlOff', value: '-2', mode: 2 }])
+    expect(hostChanges({ target: 'item:top-speed', op: 'add', value: '50' })).toEqual([{ key: 'system.tspd', value: '50', mode: 2 }])
+    expect(hostChanges({ target: 'item:top-speed', op: 'add', value: '20%' })).toEqual([])  // (a formula: a note)
+    expect(hostChanges({ target: 'matrix:firewall', op: 'add', value: 'R' }, 3)).toEqual([{ key: 'system.f', value: '3', mode: 2 }])
+    expect(hostChanges({ target: 'item:concealability', op: 'add', value: '1' })).toEqual([])
+  })
+  test('every target the importer produces has a route: an actor effect, a host change or a described line, never unknown', () => {
+    // the vocabulary of importer/sr6/effects.py (docs/sr6-data-format.md Effects), one of each
+    const targets = ['attr:bod', 'attr:edg', 'attr:ess', 'attr:choice', 'attr-max:str', 'attr-max:choice', 'skill:firearms', 'skill:choice', 'skill:knowledge', 'skill:language',
+      'skill-max:choice', 'test:social', 'test:matrix', 'test:magic', 'test:resonance', 'test:combat', 'test:vehicle', 'test:physical', 'test:mental', 'test:attr-cha',
+      'test:damage-resistance', 'test:drain-resistance', 'test:toxin-resistance', 'test:magic-resistance', 'test:fatigue-resistance', 'test:defense', 'test:surprise',
+      'test:crash', 'test:addiction', 'test:spell-illusion', 'test:all', 'test:other', 'derived:defense', 'derived:defense-astral', 'derived:social', 'derived:initiative',
+      'derived:initiative-dice', 'derived:matrix-initiative', 'derived:matrix-initiative-dice', 'derived:physical-monitor', 'derived:stun-monitor', 'derived:matrix-monitor',
+      'derived:overflow', 'derived:composure', 'derived:judge-intentions', 'derived:memory', 'derived:lift', 'derived:movement', 'derived:minor-actions', 'derived:major-actions',
+      'derived:hardened-armor', 'derived:damage-reduction', 'derived:power-points', 'derived:monthly-cost', 'matrix:attack', 'matrix:sleaze', 'matrix:data-processing',
+      'matrix:firewall', 'matrix:choice', 'matrix:overwatch', 'item:ar', 'item:dv', 'item:concealability', 'item:handling', 'item:acceleration', 'item:speed-interval',
+      'item:top-speed', 'item:body', 'item:armor', 'item:pilot', 'item:sensor', 'item:seats', 'item:size', 'item:ammo', 'action:wrest', 'complex-form:puppeteer',
+      'lifestyle:necessities', 'resource:contact-points', 'pricemod:armor', 'pricemod:lifestyle', 'pool:chase', 'sense:thermographic-vision']
+    const routes = Object.fromEntries(targets.map(t => [t, effectRoute({ target: t, op: 'add', value: '1' })]))
+    expect(Object.entries(routes).filter(([, r]) => r === 'unknown')).toEqual([])
+    expect(routes['attr:bod']).toBe('actor'); expect(routes['item:dv']).toBe('host'); expect(routes['sense:thermographic-vision']).toBe('note')
+    expect(routes['item:top-speed']).toBe('host'); expect(routes['test:spell-illusion']).toBe('note')
+    expect(effectRoute({ target: 'item:top-speed', op: 'add', value: '20%' })).toBe('host')  // (the field exists; a formula stays text)
+    for (const op of ['edge', 'edge-cost', 'wild-die', 'hits', 'threshold', 'no-edge']) expect(effectRoute({ target: 'skill:firearms', op, value: '1' })).toBe('note')
   })
 })
 
