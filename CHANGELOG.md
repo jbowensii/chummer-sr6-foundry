@@ -1,6 +1,13 @@
 # Changelog
 
-## 0.5.1
+## 0.6.0
+
+Goes with Chummer Anarchy 2.0 release 0.13.0 (its export with the third-round effect kinds and one catalog item per level;
+`schema/sr6-export.schema.json` is its copy). Import your books again and Replace your runners to get them.
+
+- One item per level (Chummer 0.13.0, owner decision 2026-10-11): a rated or leveled entry comes as one entry per level, each with `family` and `level` in its attrs and its rating in its values. No code change was needed: each level imports as its own item keyed by its own id, with its rating and its effects at that rating; a re-imported book adds the levels beside an older item of the rated parent and deletes nothing (test/levels.test.js).
+
+The 0.5.1 work, unreleased, is in this release:
 
 Needs Chummer's export with the third-round effect kinds (`schema/sr6-export.schema.json` is its copy). Import your books again and Replace your runners to get them.
 
