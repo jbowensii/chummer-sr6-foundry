@@ -63,7 +63,7 @@ async function byKey(pack, key) {
 
 export function registerQuench(quench) {
   const batch = (name, fn) => quench.registerBatch(`${MODULE_ID}.${name.replace(/\W+/g, '-')}`, fn,
-    { displayName: `Chummer SR6 Importer: ${name}` })
+    { displayName: `Nova Prime Chummer — SR6 Importer: ${name}` })
 
   batch('read', ({ describe, it, assert }) => {
     describe('readExport refuses what it cannot read, before anything changes', function () {
@@ -72,7 +72,7 @@ export function registerQuench(quench) {
         assert.isFalse(r.ok); assert.match(r.reason, re); assert.equal(game.actors.size, before)
       }
       it('an Anarchy file, naming the Anarchy importer', () =>
-        refused(JSON.stringify({ format: 'chummer-anarchy2-export', version: 1, kind: 'runners', runners: [{}] }), /Chummer Anarchy 2\.0 Importer/))
+        refused(JSON.stringify({ format: 'chummer-anarchy2-export', version: 1, kind: 'runners', runners: [{}] }), /Anarchy 2 Importer/))
       it('a version 2 file', () => refused(JSON.stringify({ format: 'chummer-sr6-export', version: 2, kind: 'runners', runners: [{}] }), /version 2.*update this module/))
       it('no runners', () => refused(JSON.stringify({ format: 'chummer-sr6-export', version: 1, kind: 'runners', runners: [] }), /no runners/))
       it('the sample file is accepted', async () => { const { file } = await loadSample(); assert.lengthOf(file.runners, 2) })

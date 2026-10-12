@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.1
+
+The app is now named Nova Prime Chummer: the module's title, the import window and button, the refusal messages and the README use the new name. The module id, folders, flags and settings are unchanged, so existing worlds keep working.
+
 ## 0.6.0
 
 Goes with Chummer Anarchy 2.0 release 0.13.0 (its export with the third-round effect kinds and one catalog item per level;

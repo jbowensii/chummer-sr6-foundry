@@ -1,8 +1,8 @@
 {
   "SR6I": {
-    "Button": "Import from Chummer",
-    "Title": "Import from Chummer (SR6)",
-    "ChooseFile": "Choose a Chummer SR6 file",
+    "Button": "Import from Nova Prime Chummer",
+    "Title": "Import from Nova Prime Chummer (SR6)",
+    "ChooseFile": "Choose a Nova Prime Chummer SR6 file",
     "ReadFailed": "This file couldn’t be read: {reason}",
     "NotEden": "This world runs {system}, not Shadowrun 6th Edition (shadowrun6-eden).",
     "NewerEden": "Tested with shadowrun6-eden {tested}; this world runs {version}. The import may miss new fields.",
