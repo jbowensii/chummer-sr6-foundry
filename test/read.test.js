@@ -11,15 +11,15 @@ describe('reading a Chummer SR6 file', () => {
     expect(readExport(sample(n)).ok).toBe(true)
   })
   test.each([
-    ['not JSON', 'nope', /isn’t a Chummer SR6 export/],
-    ['another format', JSON.stringify({ format: 'x', version: 1 }), /isn’t a Chummer SR6 export/],
-    ['an Anarchy file', JSON.stringify({ format: 'chummer-anarchy2-export', version: 1, kind: 'runners', runners: [{}] }), /Chummer Anarchy 2\.0 file.*Anarchy 2\.0 Importer/],
+    ['not JSON', 'nope', /isn’t a Nova Prime Chummer SR6 export/],
+    ['another format', JSON.stringify({ format: 'x', version: 1 }), /isn’t a Nova Prime Chummer SR6 export/],
+    ['an Anarchy file', JSON.stringify({ format: 'chummer-anarchy2-export', version: 1, kind: 'runners', runners: [{}] }), /Nova Prime Chummer Anarchy 2 file.*Anarchy 2 Importer/],
     ['a newer version', JSON.stringify({ format: 'chummer-sr6-export', version: 2, kind: 'runners' }), /version 2.*update this module/],
     ['no runners', JSON.stringify({ format: 'chummer-sr6-export', version: 1, kind: 'runners', runners: [] }), /no runners/],
     ['no books', JSON.stringify({ format: 'chummer-sr6-export', version: 1, kind: 'books', books: [] }), /no books/],
     ['a damaged runner', JSON.stringify({ format: 'chummer-sr6-export', version: 1, kind: 'runners', runners: [{ id: 'a' }] }), /damaged/],
     ['a book without entries', JSON.stringify({ format: 'chummer-sr6-export', version: 1, kind: 'books', books: [{ source: { id: 'X', name: 'X' } }] }), /damaged/],
-    ['a JSON array', '[]', /isn’t a Chummer SR6 export/],
+    ['a JSON array', '[]', /isn’t a Nova Prime Chummer SR6 export/],
   ])('refuses %s', (_, text, reason) => {
     const r = readExport(text)
     expect(r.ok).toBe(false)

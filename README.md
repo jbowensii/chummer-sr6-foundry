@@ -1,6 +1,6 @@
-# Chummer SR6 Importer
+# Nova Prime Chummer — SR6 Importer
 
-A Foundry VTT module that imports runners, NPCs and book data exported from [Chummer Anarchy 2.0](https://github.com/jbowensii/chummer-anarchy2)'s Shadowrun 6 side into the Shadowrun 6th Edition (`shadowrun6-eden`) system.
+A Foundry VTT module that imports runners, NPCs and book data exported from [Nova Prime Chummer](https://github.com/jbowensii/nova-prime-chummer)'s Shadowrun 6 side into the Shadowrun 6th Edition (`shadowrun6-eden`) system.
 
 Tested with shadowrun6-eden 4.0.11 on Foundry 14.368. A newer shadowrun6-eden gets a warning, not a block; other systems are refused.
 
@@ -12,9 +12,9 @@ Once 0.1.0 is published, go to Add-on Modules in Foundry, choose Install Module,
 https://github.com/jbowensii/chummer-sr6-foundry/releases/latest/download/module.json
 ```
 
-Then enable "Chummer SR6 Importer" in your shadowrun6-eden world.
+Then enable "Nova Prime Chummer — SR6 Importer" in your shadowrun6-eden world.
 
-## Export from Chummer
+## Export from Nova Prime Chummer
 
 Use Chummer's Shadowrun 6 side (not the Anarchy side; each module refuses the other game's file):
 
@@ -28,8 +28,8 @@ You get a file ending in `.sr6foundry.json` (`runners-…`, `books-…` or `comp
 
 ## Import into Foundry
 
-1. As the GM, open the Actors sidebar (or the Compendium sidebar) and click **Import from Chummer** at the bottom (players don't see the button).
-2. Choose the file. The module checks it before anything in your world changes; a file it can't use says why. A Chummer Anarchy 2.0 file is refused with a pointer to the Chummer Anarchy 2.0 Importer.
+1. As the GM, open the Actors sidebar (or the Compendium sidebar) and click **Import from Nova Prime Chummer** at the bottom (players don't see the button).
+2. Choose the file. The module checks it before anything in your world changes; a file it can't use says why. A Nova Prime Chummer Anarchy 2 file is refused with a pointer to the Nova Prime Chummer — Anarchy 2 Importer.
 3. Untick anything you don't want, pick what to do with actors already in the world, and click **Import**.
 
 Runners go in the Actors folder "Chummer SR6" as Player actors with linked tokens. The report at the end lists anything that was turned into notes.
@@ -53,7 +53,7 @@ The module writes raw inputs only (attribute bases, skill points, specialization
 
 ## Book data
 
-In the Compendium sidebar, click **Import from Chummer**, choose the book-data file, untick any book you don't want, and click **Import**. There is **one compendium per type, with every book in it**, all in the Compendium folder "Chummer SR6":
+In the Compendium sidebar, click **Import from Nova Prime Chummer**, choose the book-data file, untick any book you don't want, and click **Import**. There is **one compendium per type, with every book in it**, all in the Compendium folder "Chummer SR6":
 
 | Compendium | What goes in it |
 |---|---|
@@ -113,7 +113,7 @@ A compendium a GM made in Chummer imports like a book, but keeps its own compend
 - A runner or NPC exported with a portrait gets it as its image; one with its own token image gets that on its token, otherwise the token shows the portrait. Images are uploaded into the world.
 - A picture you pick in Foundry is never replaced, not by Replace, not by importing a book again and not by Apply icons: only empty images, Foundry's and shadowrun6-eden's stock images, the module's own icons and portraits and tokens imported from Chummer are.
 - Items get an icon by category and sub-kind (weapon type, augmentation, electronics, vehicle or drone size, spell category, quality positive or negative, and so on). The defaults are the Chummer Anarchy 2.0 Importer's art for now; specific SR6 art by name comes in later updates.
-- **Apply icons** (Game Settings → Configure Settings → Chummer SR6 Importer, GM only) re-applies the icons to imported items in the world, on actors and in the module's type compendiums. Portraits and tokens are never touched.
+- **Apply icons** (Game Settings → Configure Settings → Nova Prime Chummer — SR6 Importer, GM only) re-applies the icons to imported items in the world, on actors and in the module's type compendiums. Portraits and tokens are never touched.
 
 ## Not imported yet, or imported differently
 
@@ -135,7 +135,7 @@ For your own Foundry only. Don’t share the export file. A book-data file with 
 ### Tests in Foundry
 
 1. Install and enable [Quench](https://github.com/Ethaks/FVTT-Quench) in a shadowrun6-eden 4.0.11 world (Foundry 13 and 14) alongside this module.
-2. Open the Quench test runner, tick the "Chummer SR6 Importer" batches and run them.
+2. Open the Quench test runner, tick the "Nova Prime Chummer — SR6 Importer" batches and run them.
 
 The batches import the made-up samples in `samples/` (no book text) into a throwaway Actors folder "Chummer SR6 Importer tests" and compendiums named `sr6test-…`, and delete what they made when they finish.
 
