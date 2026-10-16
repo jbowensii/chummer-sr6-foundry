@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.7.0
+
+Goes with Nova Prime Chummer's export of owned vehicles, drones and critters (BUILDER Q12; `schema/sr6-export.schema.json` takes the purchase's `mount`, `diy`, `vehicle`, `npc` and `critter`). Replace your runners to get them.
+
+- A runner's critters are Eden Critter actors in "<runner> critters": the stat block's attributes, skills and innate critter powers (no Karma), its companion qualities as quality items, its critterware and critter gear as its items, its class, taming and trained commands and special training in its notes (a count, or the named ones from a later Chummer). The token is linked and friendly. Eden's Critter has no owner field, so only the module's flags (`runner`, `id`) tie it to the runner. A critter is no longer a stray TOOLS item on the runner.
+- A runner's drones run autonomous (their Pilot and autosofts); vehicles stay manual. A vehicle mod's always-on change to the vehicle's own numbers (handling, acceleration, speed interval, top speed, body, armor, pilot, sensor, seats) is an effect on the mod that shadowrun6-eden applies to the Vehicle actor; the printed numbers stay the base.
+- A weapon on a vehicle or drone says the mount it sits in (and keeps its uid in the flags); a do-it-yourself mod says so.
+- An autosoft is shadowrun6-eden's autosoft of its kind (Clearsight, Electronic Warfare, Evasion, Maneuver, Stealth, Targeting, by its name), which the Vehicle actor rolls with. On a runner too.
+- The Vehicle actor's notes list the mods built in, mod slots shifted, seats taken out for cargo, and a design bought from Chummer's Designer; the seats are what is left.
+- Re-importing (Replace) updates each vehicle, drone and critter in place by the runner and the purchase's uid: no duplicates. Add as new version still leaves them to the original.
+- The import report gives a line once even when a vehicle's mod is both a runner item and a Vehicle actor's.
+
 ## 0.6.1
 
 The app is now named Nova Prime Chummer: the module's title, the import window and button, the refusal messages and the README use the new name. The module id, folders, flags and settings are unchanged, so existing worlds keep working.
