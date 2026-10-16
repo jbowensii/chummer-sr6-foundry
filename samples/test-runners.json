@@ -4,7 +4,7 @@
  "kind": "runners",
  "exportedAt": "2026-10-04T09:00:00.000Z",
  "app": {
-  "name": "Chummer Anarchy 2.0",
+  "name": "Nova Prime Chummer",
   "version": "0.9.0"
  },
  "descriptions": true,
@@ -37,7 +37,7 @@
     },
     "agi": {
      "natural": 5,
-     "augmented": 5
+     "augmented": 6
     },
     "rea": {
      "natural": 4,
@@ -118,7 +118,7 @@
      "name": "Testlandic",
      "kind": "language",
      "native": true,
-     "rank": 0
+     "rank": 4
     },
     {
      "name": "Fakespeak",
@@ -607,11 +607,12 @@
        },
        "parts": [],
        "values": {
-        "cost": 100,
+        "cost": 120,
         "capacity": 1
        },
        "uid": "c1a",
        "qty": 1,
+       "grade": "used",
        "worn": false,
        "bonuses": [],
        "accessories": []
@@ -794,7 +795,11 @@
      "qty": 1,
      "worn": false,
      "bonuses": [],
-     "accessories": []
+     "accessories": [],
+     "vehicle": {
+      "drone": false,
+      "builtin": []
+     }
     },
     {
      "kind": "gear",
@@ -810,6 +815,376 @@
      "worn": false,
      "bonuses": [],
      "accessories": []
+    },
+    {
+     "id": "mur.test-rotor",
+     "kind": "vehicles",
+     "name": "Test Rotor",
+     "source": "MUR",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "category": "Medium drones (air)",
+      "class": "DRONE_MEDIUM/AIR",
+      "handling": "3",
+      "accel": "8",
+      "interval": "10",
+      "topSpeed": "80",
+      "body": "6",
+      "armor": "3",
+      "pilot": "3",
+      "sensor": "3",
+      "seats": "0",
+      "cost": "9000"
+     },
+     "parts": [
+      {
+       "tag": "builtin",
+       "text": ""
+      }
+     ],
+     "values": {
+      "cost": 9000,
+      "vehicle": {
+       "handling": [
+        3,
+        3
+       ],
+       "accel": [
+        8,
+        8
+       ],
+       "interval": [
+        10,
+        10
+       ],
+       "topSpeed": 80,
+       "body": 6,
+       "armor": 3,
+       "pilot": 3,
+       "sensor": 3,
+       "seats": 0
+      }
+     },
+     "uid": "v2",
+     "qty": 1,
+     "worn": false,
+     "bonuses": [],
+     "accessories": [
+      {
+       "effects": [
+        {
+         "target": "item:handling",
+         "op": "add",
+         "value": "-1"
+        },
+        {
+         "target": "item:top-speed",
+         "op": "add",
+         "value": "10"
+        }
+       ],
+       "id": "mur.zippy-rotors",
+       "kind": "gear",
+       "name": "Zippy Rotors",
+       "source": "MUR",
+       "page": 10,
+       "canon": true,
+       "attrs": {
+        "category": "Powertrain mod",
+        "class": "MOD_POWER/MOD_SPEED",
+        "slots": "2",
+        "cost": "1500"
+       },
+       "parts": [
+        {
+         "tag": "effect",
+         "text": ""
+        },
+        {
+         "tag": "effect",
+         "text": ""
+        }
+       ],
+       "values": {
+        "cost": 750
+       },
+       "uid": "v2m",
+       "qty": 1,
+       "worn": false,
+       "bonuses": [],
+       "accessories": [],
+       "diy": true
+      },
+      {
+       "id": "mur.test-mount",
+       "kind": "gear",
+       "name": "Test Standard Weapon Mount",
+       "source": "MUR",
+       "page": 10,
+       "canon": true,
+       "attrs": {
+        "category": "Weapon mount",
+        "class": "MOD_HARD/MOD_MOUNT",
+        "hardpoint": "standard",
+        "cost": "2000"
+       },
+       "parts": [],
+       "values": {
+        "cost": 2000
+       },
+       "uid": "v2h",
+       "qty": 1,
+       "worn": false,
+       "bonuses": [],
+       "accessories": []
+      },
+      {
+       "id": "mur.test-smg",
+       "kind": "weapons",
+       "name": "Test SMG",
+       "source": "MUR",
+       "page": 10,
+       "canon": true,
+       "attrs": {
+        "category": "Submachine guns",
+        "dv": "3P",
+        "ar": "8/8/6/—/—",
+        "modes": "SA/BF",
+        "ammo": "30(c)",
+        "cost": "300"
+       },
+       "parts": [],
+       "values": {
+        "cost": 300,
+        "dv": 3,
+        "stun": false,
+        "ar": [
+         8,
+         8,
+         6,
+         null,
+         null
+        ],
+        "modes": [
+         "SA",
+         "BF"
+        ],
+        "ammo": 30
+       },
+       "uid": "v2w",
+       "qty": 1,
+       "worn": false,
+       "bonuses": [],
+       "accessories": [],
+       "mount": "v2h"
+      },
+      {
+       "id": "mur.test-targeting",
+       "kind": "programs",
+       "name": "Made-up Targeting Autosoft",
+       "source": "MUR",
+       "page": 10,
+       "canon": true,
+       "attrs": {
+        "type": "autosoft",
+        "rating": "1-6",
+        "cost": "500"
+       },
+       "parts": [],
+       "values": {
+        "rating": 3,
+        "cost": 500
+       },
+       "uid": "v2a",
+       "qty": 1,
+       "worn": false,
+       "bonuses": [],
+       "accessories": []
+      }
+     ],
+     "vehicle": {
+      "drone": true,
+      "builtin": [
+       "Made-up plating 2"
+      ]
+     }
+    },
+    {
+     "id": "mus.fake-hound",
+     "kind": "critters",
+     "name": "Fake Hound",
+     "source": "MUS",
+     "page": 10,
+     "canon": true,
+     "attrs": {
+      "category": "Made-up beasts",
+      "bod": "5",
+      "agi": "4",
+      "rea": "4",
+      "str": "5",
+      "wil": "3",
+      "log": "1",
+      "int": "4",
+      "cha": "2",
+      "edg": "1"
+     },
+     "parts": [
+      {
+       "tag": "skills",
+       "text": "Close Combat 4"
+      },
+      {
+       "tag": "powers",
+       "text": "Made-up Glow, Fake Bite"
+      },
+      {
+       "tag": "weaknesses",
+       "text": "Allergy (made-up dust)"
+      }
+     ],
+     "values": {},
+     "uid": "k2",
+     "qty": 1,
+     "worn": false,
+     "bonuses": [],
+     "accessories": [
+      {
+       "id": "mur.test-collar",
+       "kind": "gear",
+       "name": "Made-up Collar",
+       "source": "MUR",
+       "page": 10,
+       "canon": true,
+       "attrs": {
+        "category": "Critter gear",
+        "class": "CRITTERWARE/GEAR",
+        "cost": "100"
+       },
+       "parts": [],
+       "values": {
+        "cost": 100
+       },
+       "uid": "k2c",
+       "qty": 1,
+       "worn": false,
+       "bonuses": [],
+       "accessories": []
+      }
+     ],
+     "npc": {
+      "kind": "critter",
+      "from": {
+       "kind": "critters",
+       "id": "mus.fake-hound",
+       "name": "Fake Hound",
+       "source": "MUS",
+       "page": 10
+      },
+      "stats": [
+       {
+        "key": "bod",
+        "label": "BOD",
+        "printed": "5",
+        "value": "5",
+        "ok": true
+       },
+       {
+        "key": "agi",
+        "label": "AGI",
+        "printed": "4",
+        "value": "4",
+        "ok": true
+       },
+       {
+        "key": "rea",
+        "label": "REA",
+        "printed": "4",
+        "value": "4",
+        "ok": true
+       },
+       {
+        "key": "str",
+        "label": "STR",
+        "printed": "5",
+        "value": "5",
+        "ok": true
+       },
+       {
+        "key": "wil",
+        "label": "WIL",
+        "printed": "3",
+        "value": "3",
+        "ok": true
+       },
+       {
+        "key": "log",
+        "label": "LOG",
+        "printed": "1",
+        "value": "1",
+        "ok": true
+       },
+       {
+        "key": "int",
+        "label": "INT",
+        "printed": "4",
+        "value": "4",
+        "ok": true
+       },
+       {
+        "key": "cha",
+        "label": "CHA",
+        "printed": "2",
+        "value": "2",
+        "ok": true
+       },
+       {
+        "key": "edg",
+        "label": "EDG",
+        "printed": "1",
+        "value": "1",
+        "ok": true
+       }
+      ],
+      "lines": [
+       {
+        "part": "skills",
+        "text": "Close Combat 4"
+       },
+       {
+        "part": "powers",
+        "text": "Made-up Glow, Fake Bite"
+       },
+       {
+        "part": "weaknesses",
+        "text": "Allergy (made-up dust)"
+       }
+      ],
+      "pools": [
+       {
+        "name": "Close Combat",
+        "rating": 4,
+        "attr": "agi",
+        "pool": 8,
+        "printed": "Close Combat 4"
+       }
+      ]
+     },
+     "critter": {
+      "class": "exotic",
+      "tamed": false,
+      "commands": 2,
+      "training": 1,
+      "qualities": [
+       {
+        "uid": "k2q",
+        "id": "mur.test-loyal",
+        "level": 1,
+        "name": "Made-up Loyal",
+        "positive": true
+       }
+      ]
+     }
     }
    ],
    "contacts": [
@@ -881,7 +1256,7 @@
      "physical": 1,
      "stun": 0
     },
-    "defenseRating": 7,
+    "defenseRating": 8,
     "socialRating": 5,
     "composure": 6,
     "judgeIntentions": 7,
@@ -894,16 +1269,16 @@
       "label": "Close Combat",
       "rank": 2,
       "attr": "agi",
-      "dp": 7
+      "dp": 8
      },
      {
       "skill": "mur.firearms",
       "label": "Firearms",
       "rank": 4,
       "attr": "agi",
-      "dp": 10,
+      "dp": 11,
       "spec": "Pistols (Light)",
-      "specDp": 14
+      "specDp": 15
      },
      {
       "skill": "crb.gab",
@@ -937,7 +1312,119 @@
       "attr": "log",
       "dp": 6
      }
-    ]
+    ],
+    "unarmedDamage": null,
+    "spellAttackRating": 10,
+    "matrixInit": {
+     "ar": {
+      "base": 9,
+      "dice": 3
+     },
+     "cold": {
+      "base": 5,
+      "dice": null
+     },
+     "hot": {
+      "base": 5,
+      "dice": null
+     },
+     "dataProcessing": 1
+    },
+    "movement": null
+   },
+   "derivedOn": {
+    "initiative": {
+     "base": 9,
+     "dice": 3
+    },
+    "astralInit": {
+     "base": 9,
+     "dice": 2
+    },
+    "monitors": {
+     "physical": 11,
+     "stun": 10,
+     "overflow": 3
+    },
+    "monitorBonus": {
+     "physical": 1,
+     "stun": 0
+    },
+    "defenseRating": 8,
+    "socialRating": 5,
+    "composure": 6,
+    "judgeIntentions": 7,
+    "memory": 9,
+    "liftCarry": 6,
+    "drain": 8,
+    "pools": [
+     {
+      "skill": "mur.close-combat",
+      "label": "Close Combat",
+      "rank": 2,
+      "attr": "agi",
+      "dp": 8
+     },
+     {
+      "skill": "mur.firearms",
+      "label": "Firearms",
+      "rank": 4,
+      "attr": "agi",
+      "dp": 11,
+      "spec": "Pistols (Light)",
+      "specDp": 15
+     },
+     {
+      "skill": "crb.gab",
+      "label": "Gab",
+      "rank": 0,
+      "attr": "cha",
+      "dp": 1
+     },
+     {
+      "skill": "mur.sorcery",
+      "label": "Sorcery",
+      "rank": 5,
+      "attr": "mag",
+      "dp": 10,
+      "spec": "Made-up Spellshaping",
+      "specDp": 14,
+      "expertise": "Spellcasting",
+      "expertiseDp": 15
+     },
+     {
+      "skill": "crb.tinkering",
+      "label": "Tinkering",
+      "rank": 0,
+      "attr": "log",
+      "dp": 3
+     },
+     {
+      "skill": "mus.basket-weaving",
+      "label": "Underwater Basket Weaving",
+      "rank": 1,
+      "attr": "log",
+      "dp": 6
+     }
+    ],
+    "unarmedDamage": null,
+    "spellAttackRating": 10,
+    "matrixInit": {
+     "ar": {
+      "base": 9,
+      "dice": 3
+     },
+     "cold": {
+      "base": 5,
+      "dice": null
+     },
+     "hot": {
+      "base": 5,
+      "dice": null
+     },
+     "dataProcessing": 1
+    },
+    "movement": null
    },
    "background": "An invented runner for the tests.\n\nShe exists only here.",
    "notes": "Made-up notes & <stuff>.",

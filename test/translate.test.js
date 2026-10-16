@@ -41,14 +41,14 @@ describe('the Player actor', () => {
     const n = run().actor.system.notes
     expect(n).toMatch(/Initiative 9 \+ 3D6, astral 9 \+ 2D6/)
     expect(n).toMatch(/physical 11, stun 10, overflow 3/)
-    expect(n).toMatch(/Defense Rating 7/)
+    expect(n).toMatch(/Defense Rating 8/)
   })
   test('derivedOn: the numbers with switchable effects on, in brackets where they differ', () => {
     const r = mara()
     r.derivedOn = { ...structuredClone(r.derived), defenseRating: 9, initiative: { base: 10, dice: 3 } }
     const n = run(r).actor.system.notes
     expect(n).toMatch(/Initiative 9 \+ 3D6 \(10 \+ 3D6\), astral 9 \+ 2D6</)
-    expect(n).toMatch(/Defense Rating 7 \(9\)/)
+    expect(n).toMatch(/Defense Rating 8 \(9\)/)
     expect(n).toMatch(/physical 11, stun 10, overflow 3/)
   })
 })
@@ -286,13 +286,61 @@ test('a runner’s vehicle is also an Eden Vehicle actor: its stats, Eden’s pi
   const r = mara()
   r.purchases.find(p => p.kind === 'vehicles').accessories = [{ uid: 'v1a', kind: 'gear', name: 'Made-up Spoiler', canon: true, attrs: { category: 'Vehicle mods', slots: '2' }, parts: [], values: { cost: 300 }, qty: 1, bonuses: [], accessories: [] }]
   const t = run(r)
-  expect(t.vehicles).toHaveLength(1)
+  expect(t.vehicles.map(v => v.actor.name)).toEqual(['Test Bike', 'Test Rotor'])
   const [v] = t.vehicles
   expect(v.actor).toMatchObject({ name: 'Test Bike', type: 'Vehicle', system: { handlOn: 4, handlOff: 3, accOn: 10, accOff: 15, tspd: 120, bod: 5, arm: 4,
-    pil: 1, sen: 1, sea: 1, vtype: 'ground_craft', vehicle: { opMode: 'manual' } }, flags: { 'chummer-sr6-importer': { id: 'v1', runner: 'run-mara-1' } } })
+    pil: 1, sen: 1, sea: 1, vtype: 'ground_craft', vehicle: { opMode: 'manual' }, notes: '' }, flags: { 'chummer-sr6-importer': { id: 'v1', runner: 'run-mara-1' } } })
   expect(v.items.map(i => i.name)).toEqual(['Made-up Spoiler'])
   expect(v.items[0].system.description).toMatch(/Fitted to Test Bike\./)
   expect(byName(t, 'Test Bike').type).toBe('gear')  // and the runner keeps it as Eden's vehicle item
+})
+
+test('a drone: autonomous; its mod’s handling and top speed as effects on the actor, its weapon in its mount, its autosoft Eden’s Targeting', () => {
+  const t = run(), M = 'chummer-sr6-importer'
+  const { actor, items } = t.vehicles.find(v => v.actor.flags[M].id === 'v2')
+  expect(actor).toMatchObject({ name: 'Test Rotor', type: 'Vehicle', system: { handlOn: 3, handlOff: 3, tspd: 80, bod: 6, pil: 3, sen: 3, sea: 0,
+    vtype: 'aircraft', vehicle: { opMode: 'autonomous' } } })
+  expect(actor.system.notes).toBe('<p>Built in: Made-up plating 2.</p>')
+  const item = name => items.find(i => i.name === name)
+  // the printed numbers stay the base; the mod's always-on changes are its effect, on the Vehicle actor (transfer)
+  expect(item('Zippy Rotors').effects).toEqual([expect.objectContaining({ name: 'Zippy Rotors', transfer: true, disabled: false,
+    changes: [{ key: 'system.handlOn', value: '-1', mode: 2 }, { key: 'system.handlOff', value: '-1', mode: 2 }, { key: 'system.tspd', value: '10', mode: 2 }] })])
+  expect(item('Zippy Rotors').system.description).toMatch(/Installed by its owner \(half price\)\./)
+  expect(item('Test SMG')).toMatchObject({ type: 'gear', system: { type: 'WEAPON_FIREARMS', dmg: 3 }, flags: { [M]: { mount: 'v2h' } } })
+  expect(item('Test SMG').system.description).toMatch(/Fitted to Test Rotor\. In its Test Standard Weapon Mount\./)
+  expect(item('Made-up Targeting Autosoft')).toMatchObject({ type: 'software', system: { type: 'AUTOSOFT', subtype: 'TARGETING', rating: 3 } })
+  expect(byName(t, 'Test Rotor')).toMatchObject({ type: 'gear', system: { type: 'DRONE_MEDIUM', subtype: 'AIR' } })
+})
+
+test('a vehicle’s build in its notes: slot shifts, seats taken out, a Designer design', () => {
+  const r = mara()
+  r.purchases.find(p => p.uid === 'v1').vehicle = { drone: false, builtin: ['Easily Modified'], slotShifts: [{ from: 'chassis', to: 'electronics' }], seatsRemoved: 1, design: 'des-1' }
+  expect(run(r).vehicles[0].actor.system.notes).toBe('<p>Built in: Easily Modified.</p><p>Mod slots shifted: 2 chassis for 1 electronics.</p>'
+    + '<p>1 seat taken out for cargo.</p><p>Bought from a Designer design.</p>')
+})
+
+test('a critter is a Critter actor tied to the runner: its stats and powers, companion quality, gear, class and training; not a runner item', () => {
+  const t = run(), M = 'chummer-sr6-importer'
+  expect(t.critters).toHaveLength(1)
+  const [{ actor, items }] = t.critters
+  expect(actor).toMatchObject({ name: 'Fake Hound', type: 'Critter', prototypeToken: { actorLink: true, disposition: 1 },
+    flags: { [M]: { id: 'k2', runner: 'run-mara-1', catalogId: 'mus.fake-hound', npc: { kind: 'critter' } } },
+    system: { attributes: { bod: { base: 5 }, agi: { base: 4 } } } })
+  expect(actor.system.skills.close_combat.points).toBe(4)
+  expect(actor.system.notes).toMatch(/^<h3>Companion<\/h3><p>Exotic pet<\/p><p>Trained commands: 2<\/p><p>Special training: 1<\/p><h3>NPC<\/h3>/)
+  expect(items.map(i => [i.type, i.name])).toEqual([['critterpower', 'Made-up Glow'], ['critterpower', 'Fake Bite'], ['quality', 'Made-up Loyal'], ['gear', 'Made-up Collar']])
+  expect(items[2]).toMatchObject({ system: { category: 'ADVANTAGE', value: 1 }, flags: { [M]: { id: 'k2q' } } })
+  expect(t.items.some(i => i.name === 'Fake Hound' || i.name === 'Made-up Collar')).toBe(false)
+  expect(t.textOnly.join('\n')).not.toMatch(/kind critters not known/)
+})
+
+test('a critter’s training as named lists (a later file), a tamed one, a negative bonded quality', () => {
+  const r = mara(), k = r.purchases.find(p => p.uid === 'k2')
+  k.critter = { ...k.critter, tamed: true, commands: ['Heel', { name: 'Fetch' }], training: [],
+    qualities: [{ uid: 'q', id: 'x', level: 2, name: 'Made-up Grumpy', how: 'bonded', positive: false }] }
+  const [{ actor, items }] = run(r).critters
+  expect(actor.system.notes).toMatch(/<p>Tamed from the wild \(no price\)\.<\/p><p>Trained commands: Heel, Fetch<\/p><p>Special training: none<\/p>/)
+  expect(items.find(i => i.type === 'quality')).toMatchObject({ system: { category: 'DISADVANTAGE', value: 2, explain: 'Bonded (Critter Bond).' } })
 })
 
 describe('effects v2', () => {

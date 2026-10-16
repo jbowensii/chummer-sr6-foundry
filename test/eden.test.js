@@ -1,7 +1,7 @@
 // shadowrun6-eden vocabulary (scripts/lib/eden.js): invented category strings, Eden's keys only.
 import { describe, expect, test } from 'vitest'
 import {
-  ACCESS_DEVICES, ATTRS, effectOptionKey, effectRoute, missingTargets, OUR_TARGETS, MOR, SKILLS, activationKey, armorSubtype, augmentType, deviceFields, durationKey, edenBook, effectKeys, effectValue,
+  ACCESS_DEVICES, ATTRS, effectOptionKey, effectRoute, missingTargets, OUR_TARGETS, MOR, SKILLS, activationKey, armorSubtype, augmentType, autosoftSubtype, deviceFields, durationKey, edenBook, effectKeys, effectValue,
   electronicsSubtype, gearType, hostChanges, lifestyleKey, martialCategories, modType, normKey, sinQuality, skillKey, softwareType, specKey,
   spellFields, spiritKey, spriteKey, testSkills, vehicleType, vehicleVtype, weaponType,
 } from '../scripts/lib/eden.js'
@@ -179,6 +179,13 @@ describe('lifestyles, SINs, spirits, sprites', () => {
 })
 
 describe('programs and martial arts', () => {
+  test('autosoftSubtype: Eden’s autosoft kind by the words of its name; none of them -> null', () => {
+    expect(autosoftSubtype('Made-up Targeting Autosoft')).toBe('TARGETING')
+    expect(autosoftSubtype('Electronic Warfare')).toBe('ELECTRONIC_WARFARE')
+    expect(autosoftSubtype('Manoeuvre [Zap Rotor]')).toBe('MANEUVER')
+    expect(autosoftSubtype('Clearsight')).toBe('CLEARSIGHT')
+    expect(autosoftSubtype('Made-up Glitter')).toBeNull()
+  })
   test('softwareType: Eden software types from the printed program type; unknown -> STANDARD, not known', () => {
     expect(softwareType('Hacking')).toEqual({ type: 'HACKING', known: true })
     expect(softwareType('basic')).toEqual({ type: 'STANDARD', known: true })

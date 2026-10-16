@@ -303,6 +303,11 @@ export function softwareType(type) {
   const { hit: [, key], known } = first(SOFTWARE, type, [null, 'STANDARD'])
   return { type: key, known }
 }
+// Eden's autosoft subtypes (software SUBTYPES.AUTOSOFT), which its Vehicle actor reads (the highest of each, actor.js
+// getHighestAutosoftRating): an autosoft's by the words of its name; null: none of them.
+const AUTOSOFT = [[/clearsight/, 'CLEARSIGHT'], [/electronic warfare/, 'ELECTRONIC_WARFARE'], [/evasion/, 'EVASION'],
+  [/maneuver|manoeuvre/, 'MANEUVER'], [/stealth/, 'STEALTH'], [/targeting/, 'TARGETING']]
+export const autosoftSubtype = name => first(AUTOSOFT, name, [null, null]).hit[1]
 
 // Eden martialartstyle system.category flags, from Chummer's printed categories ("Grappling, Weapon")
 const MARTIAL = ['grappling', 'mobility', 'ranged', 'striking', 'weapon']

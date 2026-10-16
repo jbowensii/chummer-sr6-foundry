@@ -221,3 +221,22 @@ test('create: a runner’s vehicle becomes a Vehicle actor that belongs to it, i
   expect(world.filter(a => a.type === 'Vehicle')).toHaveLength(1)  // the same actor, updated
   expect(log.filter(([k, u]) => k === 'update' && u.system?.bod === 6)).toHaveLength(1)
 })
+
+test('create: a runner’s critter becomes a linked, friendly Critter actor in "<runner> critters" (no owner field); replace updates it, no duplicate', async () => {
+  const folders = []
+  globalThis.Folder = { create: async d => { const f = { id: `f${folders.length + 1}`, ...d }; folders.push(f); return f } }
+  game.folders = folders
+  const t = player()
+  t.critters = [{ actor: { name: 'Hound', type: 'Critter', flags: flags({ id: 'k1', runner: 'r1' }), prototypeToken: { actorLink: true, disposition: 1 },
+    system: { attributes: { bod: { base: 5 } } } }, items: [{ name: 'Collar', type: 'gear', flags: flags({ id: 'k1c' }), system: {} }] }]
+  const res = await applyRunner(t, 'create')
+  const hound = world.find(a => a.type === 'Critter')
+  expect(hound).toMatchObject({ name: 'Hound', prototypeToken: { actorLink: true, disposition: 1 } })
+  expect(hound.system).not.toHaveProperty('vehicle')
+  expect(hound.items.map(i => i.name)).toEqual(['Collar'])
+  expect(folders.find(f => f.id === hound.folder)).toMatchObject({ name: 'Mara critters', folder: res.actor.folder })
+  t.critters[0].actor.system.attributes.bod.base = 6
+  await applyRunner(t, 'replace')
+  expect(world.filter(a => a.type === 'Critter')).toEqual([hound])  // the same actor, updated
+  expect(log.filter(([k, u]) => k === 'update' && u.system?.attributes?.bod?.base === 6)).toHaveLength(1)
+})
