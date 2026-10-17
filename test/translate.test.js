@@ -179,8 +179,9 @@ describe('items', () => {
       flags: { 'chummer-sr6-importer': { id: 'w1a', host: 'w1', catalogId: 'mus.made-up-sight' } } })
     expect(sight.system).not.toHaveProperty('product')  // a data-model item: only Eden's book codes
     // its item:ar effect, on its host (not transferred): Chummer's book effect, as a book entry's
+    // (the Zapper's band 2 is 0: Eden's guard against raising it never fires in Foundry 14, so the band is left out here)
     expect(sight.effects).toEqual([{ name: 'Made-up Sight', transfer: false, disabled: false, flags: { 'chummer-sr6-importer': { chummer: true } },
-      changes: [{ key: 'system.attackRating.1', value: '1', mode: 2 }, { key: 'system.attackRating.2', value: '1', mode: 2 }] }])
+      changes: [{ key: 'system.attackRating.1', value: '1', mode: 2 }] }])
     expect(zapper.system.accessories).toBe('Made-up Sight')
   })
   test('a cyberdeck: Eden’s matrix fields; its program as software installed in it', () => {
@@ -378,7 +379,20 @@ describe('effects v2', () => {
       effects: [{ target: 'attr:agi', op: 'add', value: '2', affects: 'caster' }, { target: 'attr:rea', op: 'add', value: '-1', affects: 'target' }] }, ctx())
     expect(fx(d)).toEqual([
       { name: 'Sustained: Made-up Boost', transfer: true, disabled: true, changes: ['system.attributes.agi.mod=2'] },
-      { name: 'On the target: Made-up Boost', transfer: false, disabled: false, changes: ['system.attributes.rea.mod=-1'] }])
+      { name: 'On the target: Made-up Boost', transfer: false, disabled: true, changes: ['system.attributes.rea.mod=-1'] }])  // (disabled: Eden would apply a live one to the spell itself)
+  })
+  test('a runner’s rated gear or focus: an effect of exactly R follows the item’s rating; anything else, and any other item, stays the baked number', () => {
+    const r = mara()
+    r.purchases.push(thing({ uid: 'x7', name: 'Made-up Rated', values: { rating: 3 }, effects: [{ target: 'derived:composure', op: 'add', value: 'R' }, { target: 'derived:memory', op: 'add', value: '-R' },
+      { target: 'derived:lift', op: 'add', value: 'R*2' }, { target: 'test:social', op: 'add', value: 'R', switch: 'wireless' }, { target: 'attr:rea', op: 'add', value: 'R', affects: 'target' }] }),
+    thing({ uid: 'x8', name: 'Made-up Unrated', effects: [{ target: 'derived:composure', op: 'add', value: 'R' }] }))
+    const t = run(r)
+    expect(fx(byName(t, 'Made-up Rated'))).toEqual([
+      { name: 'Made-up Rated', transfer: true, disabled: false, changes: ['system.derived.composure.mod=@item.system.rating', 'system.derived.memory.mod=-3', 'system.derived.lift_carry.mod=6'] },
+      { name: 'Wireless: Made-up Rated', transfer: true, disabled: true, changes: ['system.skills.con.modifier=@item.system.rating', 'system.skills.influence.modifier=@item.system.rating'] },
+      { name: 'On the target: Made-up Rated', transfer: false, disabled: true, changes: ['system.attributes.rea.mod=3'] }])
+    expect(fx(byName(t, 'Made-up Unrated'))[0].changes).toEqual(['system.derived.composure.mod=1'])  // (no rating on the item: baked)
+    expect(fx(lineItem(thing({ values: { rating: 3 }, effects: [{ target: 'derived:composure', op: 'add', value: 'R' }] }), ctx()))[0].changes).toEqual(['system.derived.composure.mod=3'])  // (a book entry: baked)
   })
   test('a runner purchase: its bonuses carry what they hold (no double count); its switchable bonus is a disabled effect', () => {
     const d = lineItem(thing({ effects: [{ target: 'attr:rea', op: 'add', value: '1' }, { target: 'derived:composure', op: 'add', value: '1' }],
@@ -393,6 +407,28 @@ describe('effects v2', () => {
     expect(fx(byName(run(r), 'Made-up Thing'))).toEqual([
       { name: 'Made-up Thing', transfer: true, disabled: false, changes: ['system.overflow.mod=2'] },
       { name: 'Wireless: Made-up Thing', transfer: true, disabled: true, changes: ['system.stun.mod=1'] }])
+  })
+  test('an effect from a Commlink6 override (gen: cl6) applies like the book’s, as its own effect named and flagged for it; the book’s is not flagged', () => {
+    const d = lineItem(thing({ effects: [{ target: 'attr:rea', op: 'add', value: '1' }, { target: 'attr:agi', op: 'add', value: '1', gen: 'cl6' },
+      { target: 'skill:con', op: 'add', value: '2', switch: 'wireless', gen: 'cl6' }] }), ctx())
+    expect(fx(d)).toEqual([
+      { name: 'Made-up Thing', transfer: true, disabled: false, changes: ['system.attributes.rea.mod=1'] },
+      { name: 'Made-up Thing (CommLink6)', transfer: true, disabled: false, changes: ['system.attributes.agi.mod=1'] },
+      { name: 'Wireless: Made-up Thing (CommLink6)', transfer: true, disabled: true, changes: ['system.skills.con.modifier=2'] }])
+    expect(d.effects.map(e => e.flags[M].gen)).toEqual([undefined, 'cl6', 'cl6'])
+    expect(d.effects.every(e => e.flags[M].chummer)).toBe(true)
+    expect(d.effects[0].flags[M]).toEqual({ chummer: true })  // (the shared OUR_EFFECT is never written to)
+  })
+  test('a link marked copied is not followed again: its effects are already on the entry (from); an unmarked link is, as before', () => {
+    const r = mara()
+    r.picks.push({ uid: 'p8', kind: 'adeptpowers', pick: 'adeptpowers', id: 'mus.made-up-grip', name: 'Made-up Grip', canon: true, attrs: {}, parts: [], values: {}, bonuses: [],
+      effects: [{ target: 'derived:initiative', op: 'add', value: '2' }] })
+    r.qualities.push({ uid: 'q8', kind: 'qualities', name: 'Made-up Knack', canon: true, attrs: {}, parts: [], values: {}, positive: true, level: 1,
+      effects: [{ target: 'derived:initiative', op: 'add', value: '2', from: 'mus.made-up-grip' }],
+      links: [{ rel: 'grants', name: 'Made-up Grip', id: 'mus.made-up-grip', kind: 'adeptpowers', copied: true }] })
+    expect(fx(byName(run(r), 'Made-up Knack'))[0].changes).toEqual(['system.initiative.physical.mod=2'])
+    delete r.qualities.at(-1).links[0].copied
+    expect(fx(byName(run(r), 'Made-up Knack'))[0].changes).toEqual(['system.initiative.physical.mod=2', 'system.initiative.physical.mod=2'])
   })
   test('a link uses the linked item’s effects (by id, else kind and name), with the link’s condition', () => {
     const r = mara()

@@ -32,7 +32,7 @@ const BONUS_KEY = b => (b.target === 'initDice' ? 'system.initiative.physical.di
   : b.target === 'defense' ? 'system.defenserating.physical.mod' : MONITOR[b.target]
   ?? (b.target === 'skill' ? (skillOf(b) ? `system.skills.${skillOf(b)}.modifier` : null)
     : ATTRS.includes(b.target) ? `system.attributes.${b.target}.mod` : null))
-const howOf = x => ({ switch: x.switch, when: x.when, spec: x.spec, affects: x.affects })
+const howOf = x => ({ switch: x.switch, when: x.when, spec: x.spec, affects: x.affects, gen: x.gen })
 const bonusRows = bonuses => (bonuses ?? []).flatMap(b => { const key = BONUS_KEY(b); return key ? [{ key, value: num(b.value), ...howOf(b) }] : [] })
 export const bonusChanges = bonuses => bonusRows(bonuses).map(r => ({ key: r.key, value: String(r.value), mode: 2 }))
 const BONUS_LABEL = { initDice: 'Initiative dice', defense: 'Defense Rating' }
@@ -51,10 +51,11 @@ const inBonuses = e => {
     : kind === 'derived' && BONUS_DERIVED.includes(name)))
 }
 /** An entry's links (grants, works as) -> the linked entries' effects, found in the same import (ctx.entries) by id, else
- *  by kind and name; a link's condition goes on its effects. Two levels deep, as Chummer reads them. */
+ *  by kind and name; a link's condition goes on its effects. Two levels deep, as Chummer reads them. A link marked `copied`
+ *  (the importer put its effects on the entry itself, each with `from`) is skipped: they are already the entry's own. */
 export function linkedEffects(x, ctx = {}, depth = 0) {
   if (depth >= 2) return []
-  return (x.links ?? []).flatMap(l => {
+  return (x.links ?? []).filter(l => !l.copied).flatMap(l => {
     const fits = e => e !== x && (!l.kind || e.kind === l.kind)
     const e = (l.id && ctx.entries?.find(e => fits(e) && e.id === l.id)) || ctx.entries?.find(e => fits(e) && normKey(e.name) === normKey(l.name))
     return e ? [...e.effects ?? [], ...linkedEffects(e, ctx, depth + 1)].map(f => (l.when ? { ...f, when: l.when } : f)) : []
@@ -65,7 +66,7 @@ export function linkedEffects(x, ctx = {}, depth = 0) {
  * text }. A note, never applied: a low-confidence effect, one Eden has no field for, a formula. Left out: what the item's
  * bonuses already hold, and armor's Defense Rating (Eden counts the armor's own). On an accessory (ctx.host) all are its
  * host's: notes. A quality counts each effect once per level (as Chummer does); R is the item's rating or level.
- * ctx.mod: a fitted mod, whose item:ar effects go on its host (modItem).
+ * ctx.mod: a fitted mod, whose item:ar effects go on its host (modItem); ctx.hostAr: that host weapon's attack rating bands.
  */
 function readEffects(x, ctx = {}) {
   const rows = [], notes = [], quality = x.kind === 'qualities'
@@ -73,8 +74,9 @@ function readEffects(x, ctx = {}) {
   for (const e of [...x.effects ?? [], ...linkedEffects(x, ctx)]) {
     if ((Array.isArray(x.bonuses) && inBonuses(e) && !e.low) || (x.kind === 'armor' && e.target === 'derived:defense')) continue
     const value = effectValue(e.value, rating), keys = ctx.host || ctx.mod || e.low || value == null || e.affects === 'others' ? [] : effectKeys(e)  // (others': a note, never the actor's)
-    if (keys.length) rows.push(...keys.map(key => ({ key, value: value * times, ...howOf(e) })))
-    else if (!(ctx.mod && hostChanges(e).length)) notes.push(effectText(e))  // (a fitted mod's host changes are its effects, not notes)
+    // perRating: exactly R, once (groupEffects: Eden's @item.system.rating when the item can carry it)
+    if (keys.length) rows.push(...keys.map(key => ({ key, value: value * times, perRating: times === 1 && String(e.value).trim() === 'R', ...howOf(e) })))
+    else if (!(ctx.mod && hostChanges(e, rating, ctx.hostAr).length)) notes.push(effectText(e))  // (a fitted mod's host changes are its effects, not notes)
   }
   return { rows, notes }
 }
@@ -83,18 +85,26 @@ const SWITCH = { wireless: 'Wireless', activated: 'Activated', sustained: 'Susta
  * Changes with how they turn on -> Active Effects. Always on: one enabled effect named after the item. Switchable or
  * conditional: a disabled effect for each way it turns on, named for it ("Wireless: Smartlink"), for the player to switch
  * on. A spell's or complex form's: on its caster, a disabled effect (on while sustained); on its target, an effect not
- * transferred to the caster, for a GM to apply to the target. ctx.stored: keys whose always-on value the actor already
- * holds (its monitor boxes), left out here.
+ * transferred to the caster and disabled (Eden applies an item's own non-transfer effects to the item itself, item.mjs:601-607,
+ * so a live one would write the target's keys into the spell), for a GM to apply to the target. ctx.stored: keys whose
+ * always-on value the actor already holds (its monitor boxes), left out here. ctx.perRating: a per-rating row is Eden's
+ * @item.system.rating (actor.js:329-338), not the baked number. A row from a Commlink6 override (gen: 'cl6') is its own
+ * effect, named "... (CommLink6)" and flagged gen: 'cl6', so the owner sees it; it applies like the others.
  */
 function groupEffects(rows, name, ctx = {}) {
   const out = new Map()
   for (const r of rows) {
     const target = r.affects === 'target', on = !target && !r.switch && !r.when && !r.spec && r.affects !== 'caster'
     if (on && ctx.stored?.includes(r.key)) continue
-    const label = target ? `On the target: ${name}` : on ? name
-      : `${SWITCH[r.switch] ?? (r.affects === 'caster' ? 'Sustained' : 'Conditional')}: ${name}${r.spec ? ` (${r.spec})` : ''}${r.when ? ` (${r.when})` : ''}`
-    if (!out.has(label)) out.set(label, ours({ name: label, transfer: !target, disabled: !on && !target, changes: [] }))
-    out.get(label).changes.push({ key: r.key, value: String(r.value), mode: r.mode ?? 2 })
+    const cl6 = r.gen === 'cl6'
+    const label = (target ? `On the target: ${name}` : on ? name
+      : `${SWITCH[r.switch] ?? (r.affects === 'caster' ? 'Sustained' : 'Conditional')}: ${name}${r.spec ? ` (${r.spec})` : ''}${r.when ? ` (${r.when})` : ''}`) + (cl6 ? ' (CommLink6)' : '')
+    if (!out.has(label)) {
+      const e = ours({ name: label, transfer: !target, disabled: !on, changes: [] })
+      if (cl6) e.flags = { ...e.flags, [MODULE_ID]: { ...e.flags[MODULE_ID], gen: 'cl6' } }  // (a new object: OUR_EFFECT is shared)
+      out.set(label, e)
+    }
+    out.get(label).changes.push({ key: r.key, value: ctx.perRating && r.perRating && !target ? '@item.system.rating' : String(r.value), mode: r.mode ?? 2 })
   }
   return [...out.values()].sort((a, b) => (b.name === name) - (a.name === name))  // the always-on one first
 }
@@ -150,8 +160,10 @@ export function base(x, type, ctx, extra = []) {
 }
 // a runner's bonuses (ctx.host: an accessory's are its host's, never the runner's: no effect) and the catalog's
 // effects (what the book's text says the entry does), on a book entry and a runner's item alike, as Active Effects
+// ctx.rated (a runner's items): a gear or focus item with a rating (Eden's template.json gear and focus have system.rating) follows it
 const withEffects = (doc, x, ctx = {}) => {
-  const effects = groupEffects([...ctx.host ? [] : bonusRows(x.bonuses), ...readEffects(x, ctx).rows], x.name, ctx)
+  const perRating = !!ctx.rated && ['gear', 'focus'].includes(doc.type) && doc.system.rating > 0
+  const effects = groupEffects([...ctx.host ? [] : bonusRows(x.bonuses), ...readEffects(x, ctx).rows], x.name, { ...ctx, perRating })
   if (effects.length) doc.effects = effects
   return doc
 }
@@ -240,7 +252,7 @@ export function modItem(x, ctx, type) {
   const doc = dataModelSource(base(x, 'mod', ctx, [a.slots && `Mod slots: ${a.slots}`, x.note,
     x.bonuses?.length && `On its host: ${bonusText(x.bonuses)}`, ...effectLines(x, { ...ctx, mod: true })]))
   Object.assign(doc.system, { type, rating: Math.max(0, num(v.rating)), price: Math.max(0, num(v.cost)), availDef: a.avail ?? '' })
-  const rows = (x.effects ?? []).filter(e => !e.low).flatMap(e => hostChanges(e, Math.max(1, num(v.rating))).map(c => ({ ...c, ...howOf(e), affects: undefined })))
+  const rows = (x.effects ?? []).filter(e => !e.low).flatMap(e => hostChanges(e, Math.max(1, num(v.rating)), ctx.hostAr).map(c => ({ ...c, ...howOf(e), affects: undefined })))
   const out = groupEffects(rows, x.name).map(e => ({ ...e, transfer: false }))
   if (out.length) doc.effects = out
   return icon(doc, x, ctx)
@@ -417,7 +429,7 @@ function runnerItems(r, ctx) {
     if (!parent) doc = lineItem(p, ctx)
     else {
       const type = p.kind === 'programs' ? null : modType(parent.kind, p.attrs?.category)
-      doc = p.kind === 'programs' ? lineItem(p, ctx) : type ? modItem(p, ctx, type) : lineItem(p, { ...ctx, host: parent })
+      doc = p.kind === 'programs' ? lineItem(p, ctx) : type ? modItem(p, { ...ctx, hostAr: parent.kind === 'weapons' ? parent.values?.ar : null }, type) : lineItem(p, { ...ctx, host: parent })
       if (p.kind === 'programs' || type) doc.flags[MODULE_ID].host = parent.uid
       else doc.system.description += sanitize([`Fitted to ${parent.name}.`, p.bonuses?.length && `On its host: ${bonusText(p.bonuses)}`].filter(Boolean).join(' '))
     }
@@ -483,7 +495,7 @@ export function translateRunner(r, opts) {
   const { exportedAt, appVersion, sanitize = escapeText, icons = null, specs = {}, complexForms = {} } = opts
   const name = r.streetName || r.realName || 'Runner', lines = []
   // stored: the always-on monitor boxes Chummer counted, which the actor holds (below), so not an effect too
-  const ctx = { exportedAt, appVersion, sanitize, icons: iconSet(icons), specs, complexForms, say: t => lines.push(t), entries: runnerEntries(r),
+  const ctx = { exportedAt, appVersion, sanitize, icons: iconSet(icons), specs, complexForms, say: t => lines.push(t), entries: runnerEntries(r), rated: true,
     stored: r.derived?.monitorBonus ? [MONITOR.physical, MONITOR.stun] : [] }
   const flag = id => ({ [MODULE_ID]: { id, exportedAt, appVersion } })
 
