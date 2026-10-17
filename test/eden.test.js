@@ -1,7 +1,7 @@
 // shadowrun6-eden vocabulary (scripts/lib/eden.js): invented category strings, Eden's keys only.
 import { describe, expect, test } from 'vitest'
 import {
-  ACCESS_DEVICES, ATTRS, effectOptionKey, effectRoute, missingTargets, OUR_TARGETS, MOR, SKILLS, activationKey, armorSubtype, augmentType, deviceFields, durationKey, edenBook, effectKeys, effectValue,
+  ACCESS_DEVICES, ATTRS, effectOptionKey, effectRoute, missingTargets, OUR_TARGETS, MOR, SKILLS, activationKey, armorSubtype, augmentType, autosoftSubtype, deviceFields, durationKey, edenBook, effectKeys, effectValue,
   electronicsSubtype, gearType, hostChanges, lifestyleKey, martialCategories, modType, normKey, sinQuality, skillKey, softwareType, specKey,
   spellFields, spiritKey, spriteKey, testSkills, vehicleType, vehicleVtype, weaponType,
 } from '../scripts/lib/eden.js'
@@ -179,6 +179,13 @@ describe('lifestyles, SINs, spirits, sprites', () => {
 })
 
 describe('programs and martial arts', () => {
+  test('autosoftSubtype: Eden’s autosoft kind by the words of its name; none of them -> null', () => {
+    expect(autosoftSubtype('Made-up Targeting Autosoft')).toBe('TARGETING')
+    expect(autosoftSubtype('Electronic Warfare')).toBe('ELECTRONIC_WARFARE')
+    expect(autosoftSubtype('Manoeuvre [Zap Rotor]')).toBe('MANEUVER')
+    expect(autosoftSubtype('Clearsight')).toBe('CLEARSIGHT')
+    expect(autosoftSubtype('Made-up Glitter')).toBeNull()
+  })
   test('softwareType: Eden software types from the printed program type; unknown -> STANDARD, not known', () => {
     expect(softwareType('Hacking')).toEqual({ type: 'HACKING', known: true })
     expect(softwareType('basic')).toEqual({ type: 'STANDARD', known: true })
@@ -206,7 +213,8 @@ describe('books, effects', () => {
       'derived:social', 'derived:initiative', 'derived:initiative-dice', 'derived:matrix-initiative', 'derived:matrix-initiative-dice',
       'derived:physical-monitor', 'derived:stun-monitor', 'derived:overflow', 'derived:composure', 'derived:judge-intentions',
       'derived:memory', 'derived:lift', 'matrix:attack', 'matrix:sleaze', 'matrix:data-processing', 'matrix:firewall', 'test:defense',
-      'test:damage-resistance', 'test:drain-resistance', 'test:toxin-resistance'].map(t => [t, keys(t)]))).toEqual({
+      'test:damage-resistance', 'test:toxin-resistance', 'derived:matrix-defense', 'derived:unarmed-ar', 'test:defense-astral', 'test:defense-spell-direct',
+      'test:defense-spell-indirect'].map(t => [t, keys(t)]))).toEqual({
       'attr:agi': ['system.attributes.agi.mod'], 'attr:edg': ['system.edge.max'], 'attr:ess': ['system.attributes.essence.mod'],
       'skill:close-combat': ['system.skills.close_combat.modifier'], 'derived:defense': ['system.defenserating.physical.mod'],
       'derived:defense-astral': ['system.defenserating.astral.mod'], 'derived:social': ['system.defenserating.social.mod'],
@@ -218,7 +226,9 @@ describe('books, effects', () => {
       'matrix:attack': ['system.persona.device.mod.a'], 'matrix:sleaze': ['system.persona.device.mod.s'],
       'matrix:data-processing': ['system.persona.device.mod.d'], 'matrix:firewall': ['system.persona.device.mod.f'],
       'test:defense': ['system.defensepool.physical.mod'], 'test:damage-resistance': ['system.defensepool.damage_physical.mod'],
-      'test:drain-resistance': ['system.defensepool.drain.mod'], 'test:toxin-resistance': ['system.defensepool.toxin.mod'] })
+      'test:toxin-resistance': ['system.defensepool.toxin.mod'], 'derived:matrix-defense': ['system.defenserating.matrix.mod'], 'derived:unarmed-ar': ['system.attackrating.physical.mod'],
+      'test:defense-astral': ['system.defensepool.astral.mod'], 'test:defense-spell-direct': ['system.defensepool.spells_direct.mod'],
+      'test:defense-spell-indirect': ['system.defensepool.spells_indirect.mod'] })
     // a Magic Resistance test is the defense against a spell; Hardened Armor is Eden's trait its Defense Rating and soak read
     expect(keys('test:magic-resistance')).toEqual(['system.defensepool.spells_direct.mod', 'system.defensepool.spells_indirect.mod'])
     expect(keys('derived:hardened-armor')).toEqual(['traits.hardenedArmor'])
@@ -228,8 +238,8 @@ describe('books, effects', () => {
     expect(testSkills('physical')).toEqual(['athletics', 'close_combat', 'exotic_weapons', 'firearms', 'piloting', 'stealth'])
     expect(testSkills('attr-cha')).toEqual(['con', 'influence'])
     expect(testSkills('magic')).toEqual(['astral', 'conjuring', 'enchanting', 'sorcery'])
-    // no Eden field: none
-    for (const t of ['skill:basket-weaving', 'skill:choice', 'attr:choice', 'attr-max:agi', 'derived:matrix-monitor', 'derived:movement',
+    // no Eden field: none (drain and fading resistance: Eden's template has no pool.mod for them, a string add would concatenate)
+    for (const t of ['test:drain-resistance', 'test:fading-resistance', 'limb-attr:agi', 'derived:unarmed-dv', 'derived:unarmed-damage', 'skill:basket-weaving', 'skill:choice', 'attr:choice', 'attr-max:agi', 'derived:matrix-monitor', 'derived:movement',
       'derived:minor-actions', 'derived:major-actions', 'matrix:overwatch', 'test:surprise', 'test:all',
       'test:spell-combat', 'item:ar', 'action:wrest', 'resource:karma', 'lifestyle:comforts', 'sense:low-light-vision', 'pool:chase',
       'pricemod:armor', 'skill-max:choice', 'complex-form:static-veil']) expect(keys(t), t).toEqual([])
@@ -249,6 +259,13 @@ describe('books, effects', () => {
     expect(hostChanges({ target: 'item:ar', op: 'add', value: '-2,0,1' })).toEqual([{ key: 'system.attackRating.0', value: '-2', mode: 2 }, { key: 'system.attackRating.2', value: '1', mode: 2 }])
     expect(hostChanges({ target: 'attr:agi', op: 'add', value: '1' })).toEqual([])
   })
+  test('item:ar on a host whose band is 0 or '-': that band is left out (Eden’s own guard never fires in Foundry 14); a set and a fire mode are not bands', () => {
+    const ar = { target: 'item:ar', op: 'add', value: '1,1,1,1,1' }
+    expect(hostChanges(ar, 1, [9, 7, 0, '-', 3]).map(c => c.key)).toEqual(['system.attackRating.0', 'system.attackRating.1', 'system.attackRating.4'])
+    expect(hostChanges(ar, 1, null)).toHaveLength(5)  // (host unknown: all bands)
+    expect(hostChanges({ ...ar, op: 'set' }, 1, [0, 0, 0, 0, 0])).toHaveLength(5)
+    expect(hostChanges({ ...ar, value: '1', when: 'semi-auto' }, 1, [0, 0, 0, 0, 0])).toEqual([{ key: 'system.modes.SA.ar.mod', value: '1', mode: 2 }])
+  })
   test('an add-on’s other item effects -> its host’s fields: fire modes, damage, ammunition, a vehicle’s on- and off-road pairs', () => {
     expect(hostChanges({ target: 'item:ar', op: 'add', value: '1', when: 'semi-auto, burst fire' }))
       .toEqual([{ key: 'system.modes.SA.ar.mod', value: '1', mode: 2 }, { key: 'system.modes.BF.ar.mod', value: '1', mode: 2 }])
@@ -266,7 +283,8 @@ describe('books, effects', () => {
     // the vocabulary of importer/sr6/effects.py (docs/sr6-data-format.md Effects), one of each
     const targets = ['attr:bod', 'attr:edg', 'attr:ess', 'attr:choice', 'attr-max:str', 'attr-max:choice', 'skill:firearms', 'skill:choice', 'skill:knowledge', 'skill:language',
       'skill-max:choice', 'test:social', 'test:matrix', 'test:magic', 'test:resonance', 'test:combat', 'test:vehicle', 'test:physical', 'test:mental', 'test:attr-cha',
-      'test:damage-resistance', 'test:drain-resistance', 'test:toxin-resistance', 'test:magic-resistance', 'test:fatigue-resistance', 'test:defense', 'test:surprise',
+      'test:damage-resistance', 'test:drain-resistance', 'test:fading-resistance', 'test:toxin-resistance', 'test:magic-resistance', 'test:fatigue-resistance', 'test:defense',
+      'test:defense-astral', 'test:defense-spell-direct', 'test:defense-spell-indirect', 'derived:matrix-defense', 'limb-attr:str', 'derived:unarmed-ar', 'derived:unarmed-dv', 'derived:unarmed-damage', 'test:surprise',
       'test:crash', 'test:addiction', 'test:spell-illusion', 'test:all', 'test:other', 'derived:defense', 'derived:defense-astral', 'derived:social', 'derived:initiative',
       'derived:initiative-dice', 'derived:matrix-initiative', 'derived:matrix-initiative-dice', 'derived:physical-monitor', 'derived:stun-monitor', 'derived:matrix-monitor',
       'derived:overflow', 'derived:composure', 'derived:judge-intentions', 'derived:memory', 'derived:lift', 'derived:movement', 'derived:minor-actions', 'derived:major-actions',
@@ -276,6 +294,9 @@ describe('books, effects', () => {
       'lifestyle:necessities', 'resource:contact-points', 'pricemod:armor', 'pricemod:lifestyle', 'pool:chase', 'sense:thermographic-vision', 'action-max:take-aim']
     const routes = Object.fromEntries(targets.map(t => [t, effectRoute({ target: t, op: 'add', value: '1' })]))
     expect(Object.entries(routes).filter(([, r]) => r === 'unknown')).toEqual([])
+    expect(routes['test:drain-resistance']).toBe('note'); expect(routes['test:fading-resistance']).toBe('note'); expect(routes['limb-attr:str']).toBe('note'); expect(routes['derived:unarmed-ar']).toBe('actor')
+    expect(['derived:unarmed-dv', 'derived:unarmed-damage'].map(t => routes[t])).toEqual(['note', 'note'])
+    expect(['test:defense-astral', 'test:defense-spell-direct', 'test:defense-spell-indirect', 'derived:matrix-defense'].map(t => routes[t])).toEqual(['actor', 'actor', 'actor', 'actor'])
     expect(routes['attr:bod']).toBe('actor'); expect(routes['item:dv']).toBe('host'); expect(routes['sense:thermographic-vision']).toBe('note')
     expect(routes['item:top-speed']).toBe('host'); expect(routes['test:spell-illusion']).toBe('note')
     expect(effectRoute({ target: 'item:top-speed', op: 'add', value: '20%' })).toBe('host')  // (the field exists; a formula stays text)

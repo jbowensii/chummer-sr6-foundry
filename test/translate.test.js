@@ -41,14 +41,14 @@ describe('the Player actor', () => {
     const n = run().actor.system.notes
     expect(n).toMatch(/Initiative 9 \+ 3D6, astral 9 \+ 2D6/)
     expect(n).toMatch(/physical 11, stun 10, overflow 3/)
-    expect(n).toMatch(/Defense Rating 7/)
+    expect(n).toMatch(/Defense Rating 8/)
   })
   test('derivedOn: the numbers with switchable effects on, in brackets where they differ', () => {
     const r = mara()
     r.derivedOn = { ...structuredClone(r.derived), defenseRating: 9, initiative: { base: 10, dice: 3 } }
     const n = run(r).actor.system.notes
     expect(n).toMatch(/Initiative 9 \+ 3D6 \(10 \+ 3D6\), astral 9 \+ 2D6</)
-    expect(n).toMatch(/Defense Rating 7 \(9\)/)
+    expect(n).toMatch(/Defense Rating 8 \(9\)/)
     expect(n).toMatch(/physical 11, stun 10, overflow 3/)
   })
 })
@@ -179,8 +179,9 @@ describe('items', () => {
       flags: { 'chummer-sr6-importer': { id: 'w1a', host: 'w1', catalogId: 'mus.made-up-sight' } } })
     expect(sight.system).not.toHaveProperty('product')  // a data-model item: only Eden's book codes
     // its item:ar effect, on its host (not transferred): Chummer's book effect, as a book entry's
+    // (the Zapper's band 2 is 0: Eden's guard against raising it never fires in Foundry 14, so the band is left out here)
     expect(sight.effects).toEqual([{ name: 'Made-up Sight', transfer: false, disabled: false, flags: { 'chummer-sr6-importer': { chummer: true } },
-      changes: [{ key: 'system.attackRating.1', value: '1', mode: 2 }, { key: 'system.attackRating.2', value: '1', mode: 2 }] }])
+      changes: [{ key: 'system.attackRating.1', value: '1', mode: 2 }] }])
     expect(zapper.system.accessories).toBe('Made-up Sight')
   })
   test('a cyberdeck: Eden’s matrix fields; its program as software installed in it', () => {
@@ -286,13 +287,61 @@ test('a runner’s vehicle is also an Eden Vehicle actor: its stats, Eden’s pi
   const r = mara()
   r.purchases.find(p => p.kind === 'vehicles').accessories = [{ uid: 'v1a', kind: 'gear', name: 'Made-up Spoiler', canon: true, attrs: { category: 'Vehicle mods', slots: '2' }, parts: [], values: { cost: 300 }, qty: 1, bonuses: [], accessories: [] }]
   const t = run(r)
-  expect(t.vehicles).toHaveLength(1)
+  expect(t.vehicles.map(v => v.actor.name)).toEqual(['Test Bike', 'Test Rotor'])
   const [v] = t.vehicles
   expect(v.actor).toMatchObject({ name: 'Test Bike', type: 'Vehicle', system: { handlOn: 4, handlOff: 3, accOn: 10, accOff: 15, tspd: 120, bod: 5, arm: 4,
-    pil: 1, sen: 1, sea: 1, vtype: 'ground_craft', vehicle: { opMode: 'manual' } }, flags: { 'chummer-sr6-importer': { id: 'v1', runner: 'run-mara-1' } } })
+    pil: 1, sen: 1, sea: 1, vtype: 'ground_craft', vehicle: { opMode: 'manual' }, notes: '' }, flags: { 'chummer-sr6-importer': { id: 'v1', runner: 'run-mara-1' } } })
   expect(v.items.map(i => i.name)).toEqual(['Made-up Spoiler'])
   expect(v.items[0].system.description).toMatch(/Fitted to Test Bike\./)
   expect(byName(t, 'Test Bike').type).toBe('gear')  // and the runner keeps it as Eden's vehicle item
+})
+
+test('a drone: autonomous; its mod’s handling and top speed as effects on the actor, its weapon in its mount, its autosoft Eden’s Targeting', () => {
+  const t = run(), M = 'chummer-sr6-importer'
+  const { actor, items } = t.vehicles.find(v => v.actor.flags[M].id === 'v2')
+  expect(actor).toMatchObject({ name: 'Test Rotor', type: 'Vehicle', system: { handlOn: 3, handlOff: 3, tspd: 80, bod: 6, pil: 3, sen: 3, sea: 0,
+    vtype: 'aircraft', vehicle: { opMode: 'autonomous' } } })
+  expect(actor.system.notes).toBe('<p>Built in: Made-up plating 2.</p>')
+  const item = name => items.find(i => i.name === name)
+  // the printed numbers stay the base; the mod's always-on changes are its effect, on the Vehicle actor (transfer)
+  expect(item('Zippy Rotors').effects).toEqual([expect.objectContaining({ name: 'Zippy Rotors', transfer: true, disabled: false,
+    changes: [{ key: 'system.handlOn', value: '-1', mode: 2 }, { key: 'system.handlOff', value: '-1', mode: 2 }, { key: 'system.tspd', value: '10', mode: 2 }] })])
+  expect(item('Zippy Rotors').system.description).toMatch(/Installed by its owner \(half price\)\./)
+  expect(item('Test SMG')).toMatchObject({ type: 'gear', system: { type: 'WEAPON_FIREARMS', dmg: 3 }, flags: { [M]: { mount: 'v2h' } } })
+  expect(item('Test SMG').system.description).toMatch(/Fitted to Test Rotor\. In its Test Standard Weapon Mount\./)
+  expect(item('Made-up Targeting Autosoft')).toMatchObject({ type: 'software', system: { type: 'AUTOSOFT', subtype: 'TARGETING', rating: 3 } })
+  expect(byName(t, 'Test Rotor')).toMatchObject({ type: 'gear', system: { type: 'DRONE_MEDIUM', subtype: 'AIR' } })
+})
+
+test('a vehicle’s build in its notes: slot shifts, seats taken out, a Designer design', () => {
+  const r = mara()
+  r.purchases.find(p => p.uid === 'v1').vehicle = { drone: false, builtin: ['Easily Modified'], slotShifts: [{ from: 'chassis', to: 'electronics' }], seatsRemoved: 1, design: 'des-1' }
+  expect(run(r).vehicles[0].actor.system.notes).toBe('<p>Built in: Easily Modified.</p><p>Mod slots shifted: 2 chassis for 1 electronics.</p>'
+    + '<p>1 seat taken out for cargo.</p><p>Bought from a Designer design.</p>')
+})
+
+test('a critter is a Critter actor tied to the runner: its stats and powers, companion quality, gear, class and training; not a runner item', () => {
+  const t = run(), M = 'chummer-sr6-importer'
+  expect(t.critters).toHaveLength(1)
+  const [{ actor, items }] = t.critters
+  expect(actor).toMatchObject({ name: 'Fake Hound', type: 'Critter', prototypeToken: { actorLink: true, disposition: 1 },
+    flags: { [M]: { id: 'k2', runner: 'run-mara-1', catalogId: 'mus.fake-hound', npc: { kind: 'critter' } } },
+    system: { attributes: { bod: { base: 5 }, agi: { base: 4 } } } })
+  expect(actor.system.skills.close_combat.points).toBe(4)
+  expect(actor.system.notes).toMatch(/^<h3>Companion<\/h3><p>Exotic pet<\/p><p>Trained commands: 2<\/p><p>Special training: 1<\/p><h3>NPC<\/h3>/)
+  expect(items.map(i => [i.type, i.name])).toEqual([['critterpower', 'Made-up Glow'], ['critterpower', 'Fake Bite'], ['quality', 'Made-up Loyal'], ['gear', 'Made-up Collar']])
+  expect(items[2]).toMatchObject({ system: { category: 'ADVANTAGE', value: 1 }, flags: { [M]: { id: 'k2q' } } })
+  expect(t.items.some(i => i.name === 'Fake Hound' || i.name === 'Made-up Collar')).toBe(false)
+  expect(t.textOnly.join('\n')).not.toMatch(/kind critters not known/)
+})
+
+test('a critter’s training as named lists (a later file), a tamed one, a negative bonded quality', () => {
+  const r = mara(), k = r.purchases.find(p => p.uid === 'k2')
+  k.critter = { ...k.critter, tamed: true, commands: ['Heel', { name: 'Fetch' }], training: [],
+    qualities: [{ uid: 'q', id: 'x', level: 2, name: 'Made-up Grumpy', how: 'bonded', positive: false }] }
+  const [{ actor, items }] = run(r).critters
+  expect(actor.system.notes).toMatch(/<p>Tamed from the wild \(no price\)\.<\/p><p>Trained commands: Heel, Fetch<\/p><p>Special training: none<\/p>/)
+  expect(items.find(i => i.type === 'quality')).toMatchObject({ system: { category: 'DISADVANTAGE', value: 2, explain: 'Bonded (Critter Bond).' } })
 })
 
 describe('effects v2', () => {
@@ -330,7 +379,20 @@ describe('effects v2', () => {
       effects: [{ target: 'attr:agi', op: 'add', value: '2', affects: 'caster' }, { target: 'attr:rea', op: 'add', value: '-1', affects: 'target' }] }, ctx())
     expect(fx(d)).toEqual([
       { name: 'Sustained: Made-up Boost', transfer: true, disabled: true, changes: ['system.attributes.agi.mod=2'] },
-      { name: 'On the target: Made-up Boost', transfer: false, disabled: false, changes: ['system.attributes.rea.mod=-1'] }])
+      { name: 'On the target: Made-up Boost', transfer: false, disabled: true, changes: ['system.attributes.rea.mod=-1'] }])  // (disabled: Eden would apply a live one to the spell itself)
+  })
+  test('a runner’s rated gear or focus: an effect of exactly R follows the item’s rating; anything else, and any other item, stays the baked number', () => {
+    const r = mara()
+    r.purchases.push(thing({ uid: 'x7', name: 'Made-up Rated', values: { rating: 3 }, effects: [{ target: 'derived:composure', op: 'add', value: 'R' }, { target: 'derived:memory', op: 'add', value: '-R' },
+      { target: 'derived:lift', op: 'add', value: 'R*2' }, { target: 'test:social', op: 'add', value: 'R', switch: 'wireless' }, { target: 'attr:rea', op: 'add', value: 'R', affects: 'target' }] }),
+    thing({ uid: 'x8', name: 'Made-up Unrated', effects: [{ target: 'derived:composure', op: 'add', value: 'R' }] }))
+    const t = run(r)
+    expect(fx(byName(t, 'Made-up Rated'))).toEqual([
+      { name: 'Made-up Rated', transfer: true, disabled: false, changes: ['system.derived.composure.mod=@item.system.rating', 'system.derived.memory.mod=-3', 'system.derived.lift_carry.mod=6'] },
+      { name: 'Wireless: Made-up Rated', transfer: true, disabled: true, changes: ['system.skills.con.modifier=@item.system.rating', 'system.skills.influence.modifier=@item.system.rating'] },
+      { name: 'On the target: Made-up Rated', transfer: false, disabled: true, changes: ['system.attributes.rea.mod=3'] }])
+    expect(fx(byName(t, 'Made-up Unrated'))[0].changes).toEqual(['system.derived.composure.mod=1'])  // (no rating on the item: baked)
+    expect(fx(lineItem(thing({ values: { rating: 3 }, effects: [{ target: 'derived:composure', op: 'add', value: 'R' }] }), ctx()))[0].changes).toEqual(['system.derived.composure.mod=3'])  // (a book entry: baked)
   })
   test('a runner purchase: its bonuses carry what they hold (no double count); its switchable bonus is a disabled effect', () => {
     const d = lineItem(thing({ effects: [{ target: 'attr:rea', op: 'add', value: '1' }, { target: 'derived:composure', op: 'add', value: '1' }],
@@ -345,6 +407,28 @@ describe('effects v2', () => {
     expect(fx(byName(run(r), 'Made-up Thing'))).toEqual([
       { name: 'Made-up Thing', transfer: true, disabled: false, changes: ['system.overflow.mod=2'] },
       { name: 'Wireless: Made-up Thing', transfer: true, disabled: true, changes: ['system.stun.mod=1'] }])
+  })
+  test('an effect from a Commlink6 override (gen: cl6) applies like the book’s, as its own effect named and flagged for it; the book’s is not flagged', () => {
+    const d = lineItem(thing({ effects: [{ target: 'attr:rea', op: 'add', value: '1' }, { target: 'attr:agi', op: 'add', value: '1', gen: 'cl6' },
+      { target: 'skill:con', op: 'add', value: '2', switch: 'wireless', gen: 'cl6' }] }), ctx())
+    expect(fx(d)).toEqual([
+      { name: 'Made-up Thing', transfer: true, disabled: false, changes: ['system.attributes.rea.mod=1'] },
+      { name: 'Made-up Thing (CommLink6)', transfer: true, disabled: false, changes: ['system.attributes.agi.mod=1'] },
+      { name: 'Wireless: Made-up Thing (CommLink6)', transfer: true, disabled: true, changes: ['system.skills.con.modifier=2'] }])
+    expect(d.effects.map(e => e.flags[M].gen)).toEqual([undefined, 'cl6', 'cl6'])
+    expect(d.effects.every(e => e.flags[M].chummer)).toBe(true)
+    expect(d.effects[0].flags[M]).toEqual({ chummer: true })  // (the shared OUR_EFFECT is never written to)
+  })
+  test('a link marked copied is not followed again: its effects are already on the entry (from); an unmarked link is, as before', () => {
+    const r = mara()
+    r.picks.push({ uid: 'p8', kind: 'adeptpowers', pick: 'adeptpowers', id: 'mus.made-up-grip', name: 'Made-up Grip', canon: true, attrs: {}, parts: [], values: {}, bonuses: [],
+      effects: [{ target: 'derived:initiative', op: 'add', value: '2' }] })
+    r.qualities.push({ uid: 'q8', kind: 'qualities', name: 'Made-up Knack', canon: true, attrs: {}, parts: [], values: {}, positive: true, level: 1,
+      effects: [{ target: 'derived:initiative', op: 'add', value: '2', from: 'mus.made-up-grip' }],
+      links: [{ rel: 'grants', name: 'Made-up Grip', id: 'mus.made-up-grip', kind: 'adeptpowers', copied: true }] })
+    expect(fx(byName(run(r), 'Made-up Knack'))[0].changes).toEqual(['system.initiative.physical.mod=2'])
+    delete r.qualities.at(-1).links[0].copied
+    expect(fx(byName(run(r), 'Made-up Knack'))[0].changes).toEqual(['system.initiative.physical.mod=2', 'system.initiative.physical.mod=2'])
   })
   test('a link uses the linked item’s effects (by id, else kind and name), with the link’s condition', () => {
     const r = mara()

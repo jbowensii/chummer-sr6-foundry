@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.7.0
+
+Goes with Nova Prime Chummer's export of owned vehicles, drones and critters (BUILDER Q12; `schema/sr6-export.schema.json` takes the purchase's `mount`, `diy`, `vehicle`, `npc` and `critter`). Replace your runners to get them.
+
+- A runner's critters are Eden Critter actors in "<runner> critters": the stat block's attributes, skills and innate critter powers (no Karma), its companion qualities as quality items, its critterware and critter gear as its items, its class, taming and trained commands and special training in its notes (a count, or the named ones from a later Chummer). The token is linked and friendly. Eden's Critter has no owner field, so only the module's flags (`runner`, `id`) tie it to the runner. A critter is no longer a stray TOOLS item on the runner.
+- A runner's drones run autonomous (their Pilot and autosofts); vehicles stay manual. A vehicle mod's always-on change to the vehicle's own numbers (handling, acceleration, speed interval, top speed, body, armor, pilot, sensor, seats) is an effect on the mod that shadowrun6-eden applies to the Vehicle actor; the printed numbers stay the base.
+- A weapon on a vehicle or drone says the mount it sits in (and keeps its uid in the flags); a do-it-yourself mod says so.
+- An autosoft is shadowrun6-eden's autosoft of its kind (Clearsight, Electronic Warfare, Evasion, Maneuver, Stealth, Targeting, by its name), which the Vehicle actor rolls with. On a runner too.
+- The Vehicle actor's notes list the mods built in, mod slots shifted, seats taken out for cargo, and a design bought from Chummer's Designer; the seats are what is left.
+- Re-importing (Replace) updates each vehicle, drone and critter in place by the runner and the purchase's uid: no duplicates. Add as new version still leaves them to the original.
+- The import report gives a line once even when a vehicle's mod is both a runner item and a Vehicle actor's.
+- New effect targets: Astral, Direct Spell and Indirect Spell defense tests (`test:defense-astral`, `test:defense-spell-direct`, `test:defense-spell-indirect`) go to Eden's own defense pools, Matrix Defense Rating (`derived:matrix-defense`) to its Matrix defense rating mod (Eden applies it to Matrix users only). A cyberlimb's own attribute (`limb-attr:<abbr>`) has no Eden field: a described line.
+- Drain and fading resistance are now described lines, not an effect: Eden's template has no mod for those pools, so an added value would be glued to the pool as text ("5" + "2" = "52").
+- A spell's or form's "On the target" effect is written disabled: Eden applies an item's own non-transferred effects to the item, so a live one would change the spell. Enable it on the target.
+- A weapon accessory's attack rating bonus skips a band where its weapon's is 0 or "-" (Eden's own guard for that never fires in Foundry 14). A book accessory, whose weapon is not known, keeps every band.
+- A runner's rated gear or focus: an effect of exactly the rating (`R`) is Eden's `@item.system.rating`, so it follows the rating if you change it on the sheet. Other values stay the number the importer worked out.
+
 ## 0.6.1
 
 The app is now named Nova Prime Chummer: the module's title, the import window and button, the refusal messages and the README use the new name. The module id, folders, flags and settings are unchanged, so existing worlds keep working.

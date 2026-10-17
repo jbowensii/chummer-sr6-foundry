@@ -145,11 +145,13 @@ export const edenBook = source => EDEN_BOOKS[String(source ?? '').toUpperCase()]
 // and the Player template's own fields). Read from Eden 4.0.11's config.js, template.json and documents/actor.js.
 // Eden has no field for: derived:matrix-monitor (a Player has no Matrix monitor of its own), movement (traits.movementRate
 // is a rate, not a modifier), minor-actions and major-actions (Eden counts actions from initiative dice, with no modifier),
-// damage-reduction, monthly-cost, power-points. Those stay a note on the item (NOTED, below). Hardened Armor: Eden's
+// damage-reduction, monthly-cost, power-points, drain and fading resistance (TEST_POOL, below), a cyberlimb's own attribute
+// (limb-attr:<abbr>), unarmed DV and damage (Eden's Unarmed is a gear item, not an actor field). Those stay a note on the item (NOTED, below). Matrix Defense Rating: Eden applies its mod only to a
+// Matrix user (actor.js:1289-1296). Hardened Armor: Eden's
 // traits.hardenedArmor, which its Defense Rating and damage resistance read (documents/actor.js, SR6Roll.js).
 const DERIVED_KEY = { defense: 'system.defenserating.physical.mod', 'defense-astral': 'system.defenserating.astral.mod',
   social: 'system.defenserating.social.mod', initiative: 'system.initiative.physical.mod', 'initiative-dice': 'system.initiative.physical.diceMod',
-  'matrix-initiative': 'system.initiative.matrix.mod', 'matrix-initiative-dice': 'system.initiative.matrix.diceMod',
+  'matrix-defense': 'system.defenserating.matrix.mod', 'unarmed-ar': 'system.attackrating.physical.mod', 'matrix-initiative': 'system.initiative.matrix.mod', 'matrix-initiative-dice': 'system.initiative.matrix.diceMod',
   'physical-monitor': 'system.physical.mod', 'stun-monitor': 'system.stun.mod', overflow: 'system.overflow.mod',
   composure: 'system.derived.composure.mod', 'judge-intentions': 'system.derived.judge_intentions.mod',
   memory: 'system.derived.memory.mod', lift: 'system.derived.lift_carry.mod', 'hardened-armor': 'traits.hardenedArmor' }
@@ -158,8 +160,12 @@ const DERIVED_KEY = { defense: 'system.defenserating.physical.mod', 'defense-ast
 const MATRIX_KEY = { attack: 'a', sleaze: 's', 'data-processing': 'd', firewall: 'f' }
 // The tests Eden keeps a pool of its own for (its defense and resistance pools; a Magic Resistance test is the defense
 // against a spell, direct or indirect). Fatigue, surprise, crash, addiction, a spell category, all tests: no pool, so a note.
-const TEST_POOL = { defense: ['system.defensepool.physical.mod'], 'damage-resistance': ['system.defensepool.damage_physical.mod'],
-  'drain-resistance': ['system.defensepool.drain.mod'], 'toxin-resistance': ['system.defensepool.toxin.mod'],
+// Drain and fading resistance: no pool.mod in Eden's template (template.json:152-182), so an add lands on a missing field as the
+// effect's own string ("2": #castDelta leaves a null target's value as it is) and Eden's `pool += mod` (actor.js:1506, 1516)
+// concatenates it: a note (NOTED), not a pool.
+const TEST_POOL = { defense: ['system.defensepool.physical.mod'], 'defense-astral': ['system.defensepool.astral.mod'],
+  'damage-resistance': ['system.defensepool.damage_physical.mod'], 'toxin-resistance': ['system.defensepool.toxin.mod'],
+  'defense-spell-direct': ['system.defensepool.spells_direct.mod'], 'defense-spell-indirect': ['system.defensepool.spells_indirect.mod'],
   'magic-resistance': ['system.defensepool.spells_direct.mod', 'system.defensepool.spells_indirect.mod'] }
 // The skills a test type covers (Chummer's TEST_TYPES); physical, mental and attr-<abbr>: the skills linked to those
 // attributes (Eden's ATTRIB_BY_SKILL).
@@ -209,8 +215,10 @@ const HOST_ONE = { dv: 'system.dmg', ammo: 'system.ammocap', 'top-speed': 'syste
 const FIRE_MODE = { 'semi-auto': 'SA', 'semi-automatic': 'SA', sa: 'SA', 'burst fire': 'BF', bf: 'BF', 'full auto': 'FA', 'full automatic': 'FA', fa: 'FA', 'single shot': 'SS', ss: 'SS' }
 /** An add-on's item: effect (an accessory's, an ammo type's, a vehicle mod's) -> changes on its host item (mode 2 ADD;
  *  a `set` is mode 5 OVERRIDE). item:ar `0,1,1,0,0`: one value a range band, system.attackRating.N; limited to fire
- *  modes (`when`: `semi-auto, burst fire`) Eden's per-mode AR modifier instead. rating: the add-on's, for a value per rating. */
-export function hostChanges({ target, op, value, when } = {}, rating = 1) {
+ *  modes (`when`: `semi-auto, burst fire`) Eden's per-mode AR modifier instead. rating: the add-on's, for a value per rating.
+ *  bands: the host's own attack rating bands when known; an add to a band that is 0 or '-' is left out (Eden's guard for it,
+ *  item.mjs:557, compares change.mode, a non-enumerable shim after deepClone in Foundry 14: it never fires, so we do). */
+export function hostChanges({ target, op, value, when } = {}, rating = 1, bands = null) {
   const [kind, name = ''] = String(target ?? '').split(':')
   if (kind !== 'item' && kind !== 'matrix') return []
   if (op !== 'add' && op !== 'set') return []
@@ -219,7 +227,7 @@ export function hostChanges({ target, op, value, when } = {}, rating = 1) {
     const modes = String(when ?? '').toLowerCase().split(/,\s*|\s+and\s+|\s+or\s+/).map(w => FIRE_MODE[w.trim()]).filter(Boolean)
     const vals = String(value ?? '').split(',').map(x => effectValue(x, rating))  // (`x`: a band removed, a note only)
     if (modes.length && vals.length === 1 && vals[0]) return modes.map(m => ({ key: `system.modes.${m}.ar.mod`, value: String(vals[0]), mode }))
-    return vals.flatMap((n, i) => (i < 5 && Number.isFinite(n) && n ? [{ key: `system.attackRating.${i}`, value: String(n), mode }] : []))
+    return vals.flatMap((n, i) => (i < 5 && Number.isFinite(n) && n && !(mode === 2 && bands && !Number(bands[i])) ? [{ key: `system.attackRating.${i}`, value: String(n), mode }] : []))
   }
   if (HOST_PAIR[name]) {
     const parts = String(value ?? '').split('/').map(x => effectValue(x, rating))
@@ -232,10 +240,10 @@ export function hostChanges({ target, op, value, when } = {}, rating = 1) {
 }
 // Target kinds and names the importer produces that Eden has no field for: they stay a described line on the item.
 // (docs/sr6-data-format.md Effects; the others map through effectKeys or hostChanges.)
-export const NOTED = { kinds: ['attr-max', 'skill-max', 'action-max', 'action', 'complex-form', 'lifestyle', 'resource', 'pricemod', 'pool', 'sense'],
+export const NOTED = { kinds: ['attr-max', 'skill-max', 'action-max', 'action', 'complex-form', 'lifestyle', 'resource', 'pricemod', 'pool', 'sense', 'limb-attr'],
   names: ['attr:choice', 'skill:choice', 'skill:knowledge', 'skill:language', 'matrix:choice', 'matrix:overwatch', 'derived:matrix-monitor',
-    'derived:movement', 'derived:minor-actions', 'derived:major-actions', 'derived:damage-reduction', 'derived:monthly-cost', 'derived:power-points',
-    'test:surprise', 'test:crash', 'test:addiction', 'test:fatigue-resistance', 'test:all', 'test:other', 'item:concealability', 'item:size'],
+    'derived:movement', 'derived:minor-actions', 'derived:major-actions', 'derived:damage-reduction', 'derived:monthly-cost', 'derived:power-points', 'derived:unarmed-dv', 'derived:unarmed-damage',
+    'test:drain-resistance', 'test:fading-resistance', 'test:surprise', 'test:crash', 'test:addiction', 'test:fatigue-resistance', 'test:all', 'test:other', 'item:concealability', 'item:size'],
   prefixes: ['test:spell-'] }
 /** Where a catalog effect goes: `actor` (an Active Effect on the actor), `host` (a change on the item it fits), `note`
  *  (Eden has no field: a described line), or `unknown` (a target this module has no rule for: the test lists none). */
@@ -303,6 +311,11 @@ export function softwareType(type) {
   const { hit: [, key], known } = first(SOFTWARE, type, [null, 'STANDARD'])
   return { type: key, known }
 }
+// Eden's autosoft subtypes (software SUBTYPES.AUTOSOFT), which its Vehicle actor reads (the highest of each, actor.js
+// getHighestAutosoftRating): an autosoft's by the words of its name; null: none of them.
+const AUTOSOFT = [[/clearsight/, 'CLEARSIGHT'], [/electronic warfare/, 'ELECTRONIC_WARFARE'], [/evasion/, 'EVASION'],
+  [/maneuver|manoeuvre/, 'MANEUVER'], [/stealth/, 'STEALTH'], [/targeting/, 'TARGETING']]
+export const autosoftSubtype = name => first(AUTOSOFT, name, [null, null]).hit[1]
 
 // Eden martialartstyle system.category flags, from Chummer's printed categories ("Grappling, Weapon")
 const MARTIAL = ['grappling', 'mobility', 'ranged', 'striking', 'weapon']

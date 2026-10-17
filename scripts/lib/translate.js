@@ -4,7 +4,7 @@ import { chummerFlags } from './chummer-id.js'
 import { MODULE_ID } from './constants.js'
 import { iconFor, itemIconKey, npcIconKey, withIcon } from './icons.js'
 import {
-  ACCESS_DEVICES, ATTRS, MOR, SKILLS, SPELL_CATEGORIES, activationKey, armorSubtype, augmentType, deviceFields, durationKey, edenBook,
+  ACCESS_DEVICES, ATTRS, MOR, SKILLS, SPELL_CATEGORIES, activationKey, armorSubtype, augmentType, autosoftSubtype, deviceFields, durationKey, edenBook,
   effectKeys, effectValue, electronicsSubtype, gearType, hostChanges, lifestyleKey, martialCategories, modType, normKey, rangeKey, sinQuality, skillKey,
   softwareType, specKey, spellFields, spiritKey, spriteKey, testSkills, vehicleType, vehicleVtype, weaponType,
 } from './eden.js'
@@ -32,7 +32,7 @@ const BONUS_KEY = b => (b.target === 'initDice' ? 'system.initiative.physical.di
   : b.target === 'defense' ? 'system.defenserating.physical.mod' : MONITOR[b.target]
   ?? (b.target === 'skill' ? (skillOf(b) ? `system.skills.${skillOf(b)}.modifier` : null)
     : ATTRS.includes(b.target) ? `system.attributes.${b.target}.mod` : null))
-const howOf = x => ({ switch: x.switch, when: x.when, spec: x.spec, affects: x.affects })
+const howOf = x => ({ switch: x.switch, when: x.when, spec: x.spec, affects: x.affects, gen: x.gen })
 const bonusRows = bonuses => (bonuses ?? []).flatMap(b => { const key = BONUS_KEY(b); return key ? [{ key, value: num(b.value), ...howOf(b) }] : [] })
 export const bonusChanges = bonuses => bonusRows(bonuses).map(r => ({ key: r.key, value: String(r.value), mode: 2 }))
 const BONUS_LABEL = { initDice: 'Initiative dice', defense: 'Defense Rating' }
@@ -51,10 +51,11 @@ const inBonuses = e => {
     : kind === 'derived' && BONUS_DERIVED.includes(name)))
 }
 /** An entry's links (grants, works as) -> the linked entries' effects, found in the same import (ctx.entries) by id, else
- *  by kind and name; a link's condition goes on its effects. Two levels deep, as Chummer reads them. */
+ *  by kind and name; a link's condition goes on its effects. Two levels deep, as Chummer reads them. A link marked `copied`
+ *  (the importer put its effects on the entry itself, each with `from`) is skipped: they are already the entry's own. */
 export function linkedEffects(x, ctx = {}, depth = 0) {
   if (depth >= 2) return []
-  return (x.links ?? []).flatMap(l => {
+  return (x.links ?? []).filter(l => !l.copied).flatMap(l => {
     const fits = e => e !== x && (!l.kind || e.kind === l.kind)
     const e = (l.id && ctx.entries?.find(e => fits(e) && e.id === l.id)) || ctx.entries?.find(e => fits(e) && normKey(e.name) === normKey(l.name))
     return e ? [...e.effects ?? [], ...linkedEffects(e, ctx, depth + 1)].map(f => (l.when ? { ...f, when: l.when } : f)) : []
@@ -65,7 +66,7 @@ export function linkedEffects(x, ctx = {}, depth = 0) {
  * text }. A note, never applied: a low-confidence effect, one Eden has no field for, a formula. Left out: what the item's
  * bonuses already hold, and armor's Defense Rating (Eden counts the armor's own). On an accessory (ctx.host) all are its
  * host's: notes. A quality counts each effect once per level (as Chummer does); R is the item's rating or level.
- * ctx.mod: a fitted mod, whose item:ar effects go on its host (modItem).
+ * ctx.mod: a fitted mod, whose item:ar effects go on its host (modItem); ctx.hostAr: that host weapon's attack rating bands.
  */
 function readEffects(x, ctx = {}) {
   const rows = [], notes = [], quality = x.kind === 'qualities'
@@ -73,8 +74,9 @@ function readEffects(x, ctx = {}) {
   for (const e of [...x.effects ?? [], ...linkedEffects(x, ctx)]) {
     if ((Array.isArray(x.bonuses) && inBonuses(e) && !e.low) || (x.kind === 'armor' && e.target === 'derived:defense')) continue
     const value = effectValue(e.value, rating), keys = ctx.host || ctx.mod || e.low || value == null || e.affects === 'others' ? [] : effectKeys(e)  // (others': a note, never the actor's)
-    if (keys.length) rows.push(...keys.map(key => ({ key, value: value * times, ...howOf(e) })))
-    else if (!(ctx.mod && hostChanges(e).length)) notes.push(effectText(e))  // (a fitted mod's host changes are its effects, not notes)
+    // perRating: exactly R, once (groupEffects: Eden's @item.system.rating when the item can carry it)
+    if (keys.length) rows.push(...keys.map(key => ({ key, value: value * times, perRating: times === 1 && String(e.value).trim() === 'R', ...howOf(e) })))
+    else if (!(ctx.mod && hostChanges(e, rating, ctx.hostAr).length)) notes.push(effectText(e))  // (a fitted mod's host changes are its effects, not notes)
   }
   return { rows, notes }
 }
@@ -83,18 +85,26 @@ const SWITCH = { wireless: 'Wireless', activated: 'Activated', sustained: 'Susta
  * Changes with how they turn on -> Active Effects. Always on: one enabled effect named after the item. Switchable or
  * conditional: a disabled effect for each way it turns on, named for it ("Wireless: Smartlink"), for the player to switch
  * on. A spell's or complex form's: on its caster, a disabled effect (on while sustained); on its target, an effect not
- * transferred to the caster, for a GM to apply to the target. ctx.stored: keys whose always-on value the actor already
- * holds (its monitor boxes), left out here.
+ * transferred to the caster and disabled (Eden applies an item's own non-transfer effects to the item itself, item.mjs:601-607,
+ * so a live one would write the target's keys into the spell), for a GM to apply to the target. ctx.stored: keys whose
+ * always-on value the actor already holds (its monitor boxes), left out here. ctx.perRating: a per-rating row is Eden's
+ * @item.system.rating (actor.js:329-338), not the baked number. A row from a Commlink6 override (gen: 'cl6') is its own
+ * effect, named "... (CommLink6)" and flagged gen: 'cl6', so the owner sees it; it applies like the others.
  */
 function groupEffects(rows, name, ctx = {}) {
   const out = new Map()
   for (const r of rows) {
     const target = r.affects === 'target', on = !target && !r.switch && !r.when && !r.spec && r.affects !== 'caster'
     if (on && ctx.stored?.includes(r.key)) continue
-    const label = target ? `On the target: ${name}` : on ? name
-      : `${SWITCH[r.switch] ?? (r.affects === 'caster' ? 'Sustained' : 'Conditional')}: ${name}${r.spec ? ` (${r.spec})` : ''}${r.when ? ` (${r.when})` : ''}`
-    if (!out.has(label)) out.set(label, ours({ name: label, transfer: !target, disabled: !on && !target, changes: [] }))
-    out.get(label).changes.push({ key: r.key, value: String(r.value), mode: r.mode ?? 2 })
+    const cl6 = r.gen === 'cl6'
+    const label = (target ? `On the target: ${name}` : on ? name
+      : `${SWITCH[r.switch] ?? (r.affects === 'caster' ? 'Sustained' : 'Conditional')}: ${name}${r.spec ? ` (${r.spec})` : ''}${r.when ? ` (${r.when})` : ''}`) + (cl6 ? ' (CommLink6)' : '')
+    if (!out.has(label)) {
+      const e = ours({ name: label, transfer: !target, disabled: !on, changes: [] })
+      if (cl6) e.flags = { ...e.flags, [MODULE_ID]: { ...e.flags[MODULE_ID], gen: 'cl6' } }  // (a new object: OUR_EFFECT is shared)
+      out.set(label, e)
+    }
+    out.get(label).changes.push({ key: r.key, value: ctx.perRating && r.perRating && !target ? '@item.system.rating' : String(r.value), mode: r.mode ?? 2 })
   }
   return [...out.values()].sort((a, b) => (b.name === name) - (a.name === name))  // the always-on one first
 }
@@ -150,8 +160,10 @@ export function base(x, type, ctx, extra = []) {
 }
 // a runner's bonuses (ctx.host: an accessory's are its host's, never the runner's: no effect) and the catalog's
 // effects (what the book's text says the entry does), on a book entry and a runner's item alike, as Active Effects
+// ctx.rated (a runner's items): a gear or focus item with a rating (Eden's template.json gear and focus have system.rating) follows it
 const withEffects = (doc, x, ctx = {}) => {
-  const effects = groupEffects([...ctx.host ? [] : bonusRows(x.bonuses), ...readEffects(x, ctx).rows], x.name, ctx)
+  const perRating = !!ctx.rated && ['gear', 'focus'].includes(doc.type) && doc.system.rating > 0
+  const effects = groupEffects([...ctx.host ? [] : bonusRows(x.bonuses), ...readEffects(x, ctx).rows], x.name, { ...ctx, perRating })
   if (effects.length) doc.effects = effects
   return doc
 }
@@ -240,7 +252,7 @@ export function modItem(x, ctx, type) {
   const doc = dataModelSource(base(x, 'mod', ctx, [a.slots && `Mod slots: ${a.slots}`, x.note,
     x.bonuses?.length && `On its host: ${bonusText(x.bonuses)}`, ...effectLines(x, { ...ctx, mod: true })]))
   Object.assign(doc.system, { type, rating: Math.max(0, num(v.rating)), price: Math.max(0, num(v.cost)), availDef: a.avail ?? '' })
-  const rows = (x.effects ?? []).filter(e => !e.low).flatMap(e => hostChanges(e, Math.max(1, num(v.rating))).map(c => ({ ...c, ...howOf(e), affects: undefined })))
+  const rows = (x.effects ?? []).filter(e => !e.low).flatMap(e => hostChanges(e, Math.max(1, num(v.rating)), ctx.hostAr).map(c => ({ ...c, ...howOf(e), affects: undefined })))
   const out = groupEffects(rows, x.name).map(e => ({ ...e, transfer: false }))
   if (out.length) doc.effects = out
   return icon(doc, x, ctx)
@@ -301,6 +313,9 @@ export function programItem(x, ctx) {
   if (!s.known) unknown(ctx, x, `program type "${a.type ?? ''}" not known → ${s.type}`)
   const doc = dataModelSource(base(x, 'software', ctx))
   Object.assign(doc.system, { type: s.type, rating: Math.max(0, num(v.rating)), price: Math.max(0, num(v.cost)), availDef: a.avail ?? '' })
+  // an autosoft's kind, by its name: the one Eden's Vehicle actor rolls with (Targeting, Maneuver, …)
+  const sub = s.type === 'AUTOSOFT' ? autosoftSubtype(x.name) : null
+  if (sub) doc.system.subtype = sub
   return icon(doc, x, ctx)
 }
 /** A random genesisID, as Eden's own create button makes one for a new style (SR6ActorSheet _create_UUID). */
@@ -328,21 +343,72 @@ export function techniqueItem(x, ctx, style = '') {
 // Everything a runner file holds as items, for runners and NPCs alike (an NPC's build is usually blank).
 // Eden's Vehicle actor vtype: its piloting specialization keys (actor.js maps the gear item's GROUND/WATER/AIR to them)
 const ACTOR_VTYPE = { GROUND: 'ground_craft', WATER: 'watercraft', AIR: 'aircraft' }
+// The Vehicle actor's own numbers (the same keys as the vehicle gear item's, eden.js hostChanges): a fitted mod's item:
+// effects on them become effects on the mod that Eden applies to the actor. A weapon's or device's keys are not the vehicle's.
+const VEHICLE_KEYS = new Set(['system.handlOn', 'system.handlOff', 'system.accOn', 'system.accOff', 'system.spdiOn', 'system.spdiOff',
+  'system.tspd', 'system.bod', 'system.arm', 'system.pil', 'system.sen', 'system.sea'])
+const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`
 /**
  * A vehicle or drone (a book entry or a runner's purchase) as Eden's Vehicle actor: its handling, acceleration, speed
- * interval, top speed, body, armor, pilot, sensor and seats; on a runner its mods and mounted weapons (the purchase's
- * accessories) as its own items. vehicle.belongs (the owner's actor id) is set by foundry/apply.js once the runner exists.
+ * interval, top speed, body, armor, pilot, sensor and seats; a drone runs autonomous (its Pilot and autosofts), a vehicle
+ * manual. On a runner its mods, mounts, mounted weapons (saying their mount) and autosofts (the purchase's accessories)
+ * are its own items; a mod's always-on changes to its numbers are effects Eden applies to it (the printed numbers stay the
+ * base). Its own build (the export's vehicle block: the mods built in, slot shifts, seats taken out, a Designer design) is
+ * in its notes. vehicle.belongs (the owner's actor id) is set by foundry/apply.js once the runner exists.
  */
 export function vehicleActor(p, ctx) {
-  const g = lineItem({ ...p, accessories: [], bonuses: undefined }, ctx), s = g.system
-  const items = (p.accessories ?? []).map(a => { const d = lineItem({ ...a, accessories: [] }, { ...ctx, host: p }); d.system.description += ctx.sanitize(`Fitted to ${p.name}.`); return d })
+  const g = lineItem({ ...p, accessories: [], bonuses: undefined }, ctx), s = g.system, b = p.vehicle ?? {}
+  const fits = p.accessories ?? [], nameOf = uid => fits.find(a => a.uid === uid)?.name
+  const items = fits.map(a => {
+    const d = lineItem({ ...a, accessories: [] }, { ...ctx, host: p })
+    d.system.description += ctx.sanitize([`Fitted to ${p.name}.`, a.mount && nameOf(a.mount) && `In its ${nameOf(a.mount)}.`,
+      a.diy && 'Installed by its owner (half price).'].filter(Boolean).join(' '))
+    if (a.mount) d.flags[MODULE_ID].mount = a.mount
+    // (a `set` stays the description's: effectData writes every change as an add)
+    const rows = (a.effects ?? []).filter(e => !e.low).flatMap(e => hostChanges(e, Math.max(1, num(a.values?.rating)))
+      .filter(c => c.mode === 2 && VEHICLE_KEYS.has(c.key)).map(c => ({ ...c, ...howOf(e), affects: undefined })))
+    const fx = groupEffects(rows, a.name)
+    if (fx.length) d.effects = fx
+    return d
+  })
+  const drone = b.drone ?? /^DRONE/.test(s.type)
+  const notes = [...(b.builtin ?? []).map(t => `Built in: ${t}.`),
+    b.slotShifts?.length && `Mod slots shifted: ${b.slotShifts.map(x => `2 ${x.from} for 1 ${x.to}`).join(', ')}.`,
+    b.seatsRemoved && `${plural(b.seatsRemoved, 'seat')} taken out for cargo.`, b.design && 'Bought from a Designer design.']
   const actor = { name: p.name, type: 'Vehicle', img: g.img,
     flags: { [MODULE_ID]: { ...g.flags[MODULE_ID] } },
     system: { handlOn: s.handlOn, handlOff: s.handlOff, accOn: s.accOn, accOff: s.accOff, spdiOn: s.spdiOn, spdiOff: s.spdiOff,
       tspd: s.tspd, bod: s.bod, arm: s.arm, pil: s.pil, sen: s.sen, sea: s.sea, vtype: ACTOR_VTYPE[s.vtype] ?? 'ground_craft',
-      vehicle: { opMode: 'manual' }, description: s.description, notes: '' } }
+      vehicle: { opMode: drone ? 'autonomous' : 'manual' }, description: s.description, notes: ctx.sanitize(notes.filter(Boolean).join('\n\n')) } }
   if (!actor.img) delete actor.img
   return { actor, items }
+}
+
+const CRITTER_CLASS = { mundane: 'Mundane pet', exotic: 'Exotic pet', wild: 'Wild pet', awakened: 'Awakened', emerged: 'Emerged' }
+const QUALITY_HOW = { tamed: 'From its taming.', bonded: 'Bonded (Critter Bond).' }
+// trained commands and special training: a count, or (a later file) the named ones
+const trained = v => (Array.isArray(v) ? v.map(x => x?.name ?? x).join(', ') || 'none' : String(num(Number(v))))
+/**
+ * A runner's critter (a critters purchase with its npc stat block and critter block) as Eden's Critter actor
+ * (beingActor): its stats, skills and innate powers (no Karma); its companion qualities as quality items; its
+ * critterware and gear (the purchase's accessories) as its items, their bonuses its own (Eden works out the Essence they
+ * take); its class, taming and training in its notes. Its token is linked and friendly. Eden's Critter has no owner
+ * field: flags.runner (set by translateRunner) ties it to the runner.
+ */
+export function critterActor(p, ctx) {
+  const c = p.critter ?? {}, own = base(p, 'Critter', ctx)
+  const being = beingActor({ stats: [], lines: [], ...p.npc, kind: 'critter' }, { name: p.name, flags: own.flags, sanitize: ctx.sanitize, icons: ctx.icons })
+  for (const l of being.lines) ctx.say(`${p.name}: ${l}`)
+  const qualities = (c.qualities ?? []).map(q => qualityItem({ uid: q.uid, id: q.id, kind: 'qualities', name: q.name ?? q.id, canon: false, attrs: {},
+    positive: q.positive !== false, level: q.level, note: QUALITY_HOW[q.how] }, { ...ctx, ref: () => '' }))
+  const gear = (p.accessories ?? []).map(a => lineItem({ ...a, accessories: [] }, { ...ctx, stored: [] }))
+  const { actor } = being, s = actor.system
+  const facts = [CRITTER_CLASS[c.class] ?? 'Critter', c.tamed && 'Tamed from the wild (no price).',
+    `Trained commands: ${trained(c.commands)}`, `Special training: ${trained(c.training)}`, p.note]
+  s.notes = '<h3>Companion</h3>' + ctx.sanitize(facts.filter(Boolean).join('\n\n')) + s.notes
+  s.description = own.system.description
+  actor.prototypeToken = { ...actor.prototypeToken, actorLink: true, disposition: 1 }  // (CONST.TOKEN_DISPOSITIONS.FRIENDLY)
+  return { actor, items: [...being.items, ...qualities, ...gear] }
 }
 
 function runnerItems(r, ctx) {
@@ -363,7 +429,7 @@ function runnerItems(r, ctx) {
     if (!parent) doc = lineItem(p, ctx)
     else {
       const type = p.kind === 'programs' ? null : modType(parent.kind, p.attrs?.category)
-      doc = p.kind === 'programs' ? lineItem(p, ctx) : type ? modItem(p, ctx, type) : lineItem(p, { ...ctx, host: parent })
+      doc = p.kind === 'programs' ? lineItem(p, ctx) : type ? modItem(p, { ...ctx, hostAr: parent.kind === 'weapons' ? parent.values?.ar : null }, type) : lineItem(p, { ...ctx, host: parent })
       if (p.kind === 'programs' || type) doc.flags[MODULE_ID].host = parent.uid
       else doc.system.description += sanitize([`Fitted to ${parent.name}.`, p.bonuses?.length && `On its host: ${bonusText(p.bonuses)}`].filter(Boolean).join(' '))
     }
@@ -372,7 +438,8 @@ function runnerItems(r, ctx) {
     // Eden's own accessories line on the host (its sheet's text field)
     if (p.accessories?.length && doc.type === 'gear') doc.system.accessories = p.accessories.map(a => a.name).join(', ')
   }
-  for (const p of r.purchases ?? []) addLine(p)
+  // (a critter is its own Critter actor, critterActor: Eden's Player has nowhere to hold one)
+  for (const p of r.purchases ?? []) if (p.kind !== 'critters') addLine(p)
   // the first access device of each kind is the one Eden's persona uses (usedForPool); the player switches on the sheet
   const inUse = new Set()
   for (const d of items.filter(i => i.type === 'gear' && ACCESS_DEVICES.includes(i.system.subtype) && !i.flags[MODULE_ID].host))
@@ -428,7 +495,7 @@ export function translateRunner(r, opts) {
   const { exportedAt, appVersion, sanitize = escapeText, icons = null, specs = {}, complexForms = {} } = opts
   const name = r.streetName || r.realName || 'Runner', lines = []
   // stored: the always-on monitor boxes Chummer counted, which the actor holds (below), so not an effect too
-  const ctx = { exportedAt, appVersion, sanitize, icons: iconSet(icons), specs, complexForms, say: t => lines.push(t), entries: runnerEntries(r),
+  const ctx = { exportedAt, appVersion, sanitize, icons: iconSet(icons), specs, complexForms, say: t => lines.push(t), entries: runnerEntries(r), rated: true,
     stored: r.derived?.monitorBonus ? [MONITOR.physical, MONITOR.stun] : [] }
   const flag = id => ({ [MODULE_ID]: { id, exportedAt, appVersion } })
 
@@ -475,13 +542,16 @@ export function translateRunner(r, opts) {
   actor.system.attributes.res.submersion = num(m.submersion)
   // the boxes beyond Eden's own formula (Built Tough's): Eden's stored monitor modifiers
   if (d?.monitorBonus) { actor.system.physical = { mod: num(d.monitorBonus.physical) }; actor.system.stun = { mod: num(d.monitorBonus.stun) } }
-  // its vehicles and drones also as Vehicle actors (Eden's tokens), linked to it by foundry/apply.js
-  const vehicles = (r.purchases ?? []).filter(p => p.kind === 'vehicles').map(p => {
-    const v = vehicleActor(p, ctx)
+  // its vehicles and drones also as Vehicle actors (Eden's tokens), its critters as Critter actors, tied to it by
+  // flags.runner and (a vehicle) linked to it by foundry/apply.js
+  const owned = (kind, make) => (r.purchases ?? []).filter(p => p.kind === kind).map(p => {
+    const v = make(p, ctx)
     v.actor.flags[MODULE_ID].runner = r.id
     return v
   })
-  return { actor, items, vehicles, textOnly: lines.map(t => `${name}: ${t}`) }
+  const vehicles = owned('vehicles', vehicleActor), critters = owned('critters', critterActor)
+  // (a vehicle's mod is a runner item and a Vehicle actor's: its report line once)
+  return { actor, items, vehicles, critters, textOnly: [...new Set(lines)].map(t => `${name}: ${t}`) }
 }
 
 // NPCs (Chummer's src/sr6/engine/npc.ts): kind -> [Eden actor type, headline label, rating label].
