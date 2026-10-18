@@ -5,8 +5,8 @@ import { MODULE_ID } from './constants.js'
 import { iconFor, itemIconKey, npcIconKey, withIcon } from './icons.js'
 import {
   ACCESS_DEVICES, ATTRS, MOR, SKILLS, SPELL_CATEGORIES, activationKey, armorSubtype, augmentType, autosoftSubtype, deviceFields, durationKey, edenBook,
-  effectKeys, effectValue, electronicsSubtype, gearType, hostChanges, lifestyleKey, martialCategories, modType, normKey, rangeKey, sinQuality, skillKey,
-  softwareType, specKey, spellFields, spiritKey, spriteKey, testSkills, vehicleType, vehicleVtype, weaponType,
+  actorChanges, electronicsSubtype, gearType, hostChanges, lifestyleKey, martialCategories, modType, normKey, rangeKey, sinQuality, skillKey,
+  softwareType, specKey, spellFields, spiritKey, spriteKey, testSkills, vehicleType, vehicleVtype, weaponBorne, weaponChanges, weaponType,
 } from './eden.js'
 
 const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }
@@ -34,7 +34,7 @@ const BONUS_KEY = b => (b.target === 'initDice' ? 'system.initiative.physical.di
     : ATTRS.includes(b.target) ? `system.attributes.${b.target}.mod` : null))
 const howOf = x => ({ switch: x.switch, when: x.when, spec: x.spec, affects: x.affects, gen: x.gen })
 const bonusRows = bonuses => (bonuses ?? []).flatMap(b => { const key = BONUS_KEY(b); return key ? [{ key, value: num(b.value), ...howOf(b) }] : [] })
-export const bonusChanges = bonuses => bonusRows(bonuses).map(r => ({ key: r.key, value: String(r.value), mode: 2 }))
+export const bonusChanges = bonuses => bonusRows(bonuses).map(r => ({ key: r.key, value: r.value, mode: 2 }))
 const BONUS_LABEL = { initDice: 'Initiative dice', defense: 'Defense Rating' }
 const bonusText = bonuses => (bonuses ?? []).map(b => `${b.target === 'skill' ? b.name ?? b.id : BONUS_LABEL[b.target] ?? String(b.target).toUpperCase()} ${num(b.value) >= 0 ? '+' : ''}${num(b.value)}`).join(', ')
 /** The flag that marks an Active Effect as this module's: a re-import or Replace swaps only these, never a user's own. */
@@ -66,17 +66,45 @@ export function linkedEffects(x, ctx = {}, depth = 0) {
  * text }. A note, never applied: a low-confidence effect, one Eden has no field for, a formula. Left out: what the item's
  * bonuses already hold, and armor's Defense Rating (Eden counts the armor's own). On an accessory (ctx.host) all are its
  * host's: notes. A quality counts each effect once per level (as Chummer does); R is the item's rating or level.
- * ctx.mod: a fitted mod, whose item:ar effects go on its host (modItem); ctx.hostAr: that host weapon's attack rating bands.
+ * Each row has a scope: `actor` (transferred to the actor), `item` (not transferred: Eden applies it to this item, a
+ * weapon's own attack bonus or wild die), `host` (a fitted mod's, on the item it fits), `target` (for a spell's or form's
+ * target, never the owner's: foundry/targets.js copies it to the targets). ctx.mod: a fitted mod; ctx.hostAr: its host
+ * weapon's attack rating bands; ctx.device: false when its host is no Matrix access device; ctx.weapon: its host is a weapon.
+ * ctx.audit: a Map each effect is recorded in (actor, item, host, target, note, covered), for the coverage test.
  */
+// an effect for someone else (others, a spell's target): never the owner's or the host's
+const foreign = e => e.affects === 'others' || e.affects === 'target'
+// the kinds with an "Apply to targets" control (foundry/targets.js): their effects for others go to the targeted tokens
+const TARGETABLE = new Set(['spells', 'rituals', 'complexforms', 'critterpowers'])
+// a value only the table knows (net hits, Force): the control asks for it; the stored change holds 0 until then
+const PROMPT = /^(-?)(hits|R)$/i
+function plan(x, e, ctx, rating) {
+  if (e.low || ctx.host) return null
+  if (foreign(e)) {
+    if (ctx.mod || !TARGETABLE.has(x.kind)) return null
+    const p = PROMPT.exec(String(e.value ?? '').trim()), changes = actorChanges(p ? { ...e, value: '0' } : e, rating)
+    return changes.length ? { scope: 'target', changes, prompt: p ? { what: /^hits$/i.test(p[2]) ? 'hits' : 'Force', sign: p[1] ? -1 : 1 } : null } : null
+  }
+  if (ctx.mod) {
+    const changes = hostChanges(e, rating, { bands: ctx.hostAr, device: ctx.device !== false, weapon: !!ctx.weapon })
+    return changes.length ? { scope: 'host', changes } : null
+  }
+  if (x.kind === 'weapons' && weaponBorne(e)) { const changes = weaponChanges(e, rating); return changes.length ? { scope: 'item', changes } : null }  // (never the actor's skill)
+  const changes = actorChanges(e, rating)
+  return changes.length ? { scope: 'actor', changes } : null
+}
 function readEffects(x, ctx = {}) {
   const rows = [], notes = [], quality = x.kind === 'qualities'
   const rating = quality ? 1 : num(x.values?.rating) || num(x.level) || 1, times = quality ? num(x.level) || 1 : 1
   for (const e of [...x.effects ?? [], ...linkedEffects(x, ctx)]) {
-    if ((Array.isArray(x.bonuses) && inBonuses(e) && !e.low) || (x.kind === 'armor' && e.target === 'derived:defense')) continue
-    const value = effectValue(e.value, rating), keys = ctx.host || ctx.mod || e.low || value == null || e.affects === 'others' ? [] : effectKeys(e)  // (others': a note, never the actor's)
-    // perRating: exactly R, once (groupEffects: Eden's @item.system.rating when the item can carry it)
-    if (keys.length) rows.push(...keys.map(key => ({ key, value: value * times, perRating: times === 1 && String(e.value).trim() === 'R', ...howOf(e) })))
-    else if (!(ctx.mod && hostChanges(e, rating, ctx.hostAr).length)) notes.push(effectText(e))  // (a fitted mod's host changes are its effects, not notes)
+    const seen = out => ctx.audit?.set(e, { id: x.id, kind: x.kind, out })
+    if ((Array.isArray(x.bonuses) && inBonuses(e) && !e.low) || (x.kind === 'armor' && e.target === 'derived:defense')) { seen('covered'); continue }
+    const p = plan(x, e, ctx, rating)
+    if (!p) { seen('note'); notes.push(effectText(e)); continue }
+    seen(p.scope)
+    // perRating: exactly R, once, on one change (groupEffects: Eden's @item.system.rating when the item can carry it)
+    const perRating = times === 1 && String(e.value).trim() === 'R'
+    rows.push(...p.changes.map(c => ({ ...c, value: typeof c.value === 'number' ? c.value * times : c.value, scope: p.scope, perRating, prompt: p.prompt, ...howOf(e) })))
   }
   return { rows, notes }
 }
@@ -84,27 +112,33 @@ const SWITCH = { wireless: 'Wireless', activated: 'Activated', sustained: 'Susta
 /**
  * Changes with how they turn on -> Active Effects. Always on: one enabled effect named after the item. Switchable or
  * conditional: a disabled effect for each way it turns on, named for it ("Wireless: Smartlink"), for the player to switch
- * on. A spell's or complex form's: on its caster, a disabled effect (on while sustained); on its target, an effect not
- * transferred to the caster and disabled (Eden applies an item's own non-transfer effects to the item itself, item.mjs:601-607,
- * so a live one would write the target's keys into the spell), for a GM to apply to the target. ctx.stored: keys whose
- * always-on value the actor already holds (its monitor boxes), left out here. ctx.perRating: a per-rating row is Eden's
- * @item.system.rating (actor.js:329-338), not the baked number. A row from a Commlink6 override (gen: 'cl6') is its own
- * effect, named "... (CommLink6)" and flagged gen: 'cl6', so the owner sees it; it applies like the others.
+ * on. A spell's or complex form's: on its caster, a disabled effect (on while sustained); on its target (or others), an
+ * effect not transferred to the caster and disabled (Eden applies an item's own non-transfer effects to the item itself,
+ * item.mjs:601-607, so a live one would write the target's keys into the spell), flagged forTargets for foundry/targets.js
+ * to copy to the targeted tokens (flags.prompt: the value it asks for). A weapon's own (scope item) and a mod's (host) are
+ * not transferred either. ctx.stored: keys whose always-on value the actor already holds (its monitor boxes), left out
+ * here. ctx.perRating: a per-rating row is Eden's @item.system.rating (actor.js:329-338), not the baked number. A row from a
+ * Commlink6 override (gen: 'cl6') is its own effect, named "... (CommLink6)" and flagged gen: 'cl6', so the owner sees it;
+ * it applies like the others.
  */
 function groupEffects(rows, name, ctx = {}) {
   const out = new Map()
   for (const r of rows) {
-    const target = r.affects === 'target', on = !target && !r.switch && !r.when && !r.spec && r.affects !== 'caster'
+    const scope = r.scope ?? 'actor', target = scope === 'target' || r.affects === 'target', on = !target && !r.switch && !r.when && !r.spec && r.affects !== 'caster'
     if (on && ctx.stored?.includes(r.key)) continue
     const cl6 = r.gen === 'cl6'
-    const label = (target ? `On the target: ${name}` : on ? name
+    const label = (target ? `${r.affects === 'others' ? 'Others get' : 'On the target'}: ${name}` : on ? name
       : `${SWITCH[r.switch] ?? (r.affects === 'caster' ? 'Sustained' : 'Conditional')}: ${name}${r.spec ? ` (${r.spec})` : ''}${r.when ? ` (${r.when})` : ''}`) + (cl6 ? ' (CommLink6)' : '')
-    if (!out.has(label)) {
-      const e = ours({ name: label, transfer: !target, disabled: !on, changes: [] })
-      if (cl6) e.flags = { ...e.flags, [MODULE_ID]: { ...e.flags[MODULE_ID], gen: 'cl6' } }  // (a new object: OUR_EFFECT is shared)
-      out.set(label, e)
+    const id = `${scope}|${label}`
+    if (!out.has(id)) {
+      const e = ours({ name: label, transfer: scope === 'actor' && !target, disabled: !on, changes: [] })
+      const flags = { ...e.flags[MODULE_ID], ...cl6 ? { gen: 'cl6' } : {}, ...scope === 'target' ? { forTargets: true } : {} }  // (a new object: OUR_EFFECT is shared)
+      e.flags = { ...e.flags, [MODULE_ID]: flags }
+      out.set(id, e)
     }
-    out.get(label).changes.push({ key: r.key, value: ctx.perRating && r.perRating && !target ? '@item.system.rating' : String(r.value), mode: r.mode ?? 2 })
+    const e = out.get(id)
+    e.changes.push({ key: r.key, value: ctx.perRating && r.perRating && scope !== 'target' && scope !== 'host' ? '@item.system.rating' : r.value, mode: r.mode ?? 2 })
+    if (r.prompt) { const f = e.flags[MODULE_ID]; f.prompt = { ...f.prompt, [r.key]: r.prompt } }
   }
   return [...out.values()].sort((a, b) => (b.name === name) - (a.name === name))  // the always-on one first
 }
@@ -119,7 +153,7 @@ const KIND_WORDS = { 'attr-max': t => `maximum ${ATTR_NAME[words(t)] ?? title(t)
   'action-max': t => `the ${title(t)} action’s maximum bonus` }
 const named = t => { const k = String(t ?? '').split(':')[0]; return KIND_WORDS[k]?.(t) ?? ATTR_NAME[String(t ?? '').replace(/^attr:/, '')] ?? (words(t) === 'choice' ? `a chosen ${k === 'matrix' ? 'Matrix attribute' : k === 'skill' ? 'skill' : 'attribute'}` : title(t)) }
 const minus = v => /^[-–−]/.test(v)
-const value = v => (v === 'N' ? 'native' : /^0\.\d+$/.test(v) ? `${Math.round(Number(v) * 100)}%`
+const value = v => (v === 'N' ? 'native' : /^x\d+(?:\.\d+)?$/.test(v) ? `× ${v.slice(1)}` : /^rank:[a-z-]+$/.test(v) ? `${title(v.slice(5))} ranks` : /^[a-z]{3}\/\d+\+\d+$/.test(v) ? v.replace(/^([a-z]{3})\/(\d+)\+(\d+)$/, (_, a, n, k) => `${ATTR_NAME[a] ?? a} ÷ ${n} + ${k}`) : /^0\.\d+$/.test(v) ? `${Math.round(Number(v) * 100)}%`
   : /^R(?:\*\d+)?-\d+$/.test(v) ? v.replace(/^R(?:\*(\d+))?-(\d+)$/, (_, n, k) => `${n ? `${n} × ` : ''}(rating − ${k})`)
   : /^R\[.*\]$/.test(v) ? `${v.slice(2, -1).split(',').join('/')} by rating` : v.includes(',') ? v.split(',').map(x => (x === 'x' ? '— (removed)' : x)).join('/')
   : /^-?[a-z][a-z-]*\/\d+(?: R[DU])?$/.test(v) ? v.replace(/^(-?)([a-z][a-z-]*)\/(\d+)(?: (R[DU]))?$/, (_, m, a, n, r) => `${m}${ATTR_NAME[a] ?? a.replace(/-/g, ' ')} ÷ ${n}${r ? ` (round ${r === 'RD' ? 'down' : 'up'})` : ''}`) : v)
@@ -131,7 +165,9 @@ export function effectText(e) {
   const text = { set: `${t} ${value(v)}`, edge: `${signed(v)} Edge on ${tests}`,
     'edge-cost': `Edge boosts and actions on ${tests} cost ${v.replace(/^[-–−]/, '')} ${minus(v) ? 'less' : 'more'}`,
     'edge-cost-set': `${tests} cost ${v} Edge`, 'no-edge': `No Edge spent on ${tests}`, 'no-edge-gain': `No Edge gained on ${tests}`,
-    'wild-die': `A wild die on ${tests}`, hits: `${signed(v)} hits on ${tests}`, threshold: `Threshold ${signed(v)} on ${tests}` }[e.op]
+    'wild-die': `A wild die on ${tests}`, hits: `${signed(v)} hits on ${tests}`, threshold: `Threshold ${signed(v)} on ${tests}`,
+    'threshold-set': `${t} test threshold ${v}` }[e.op]
+    ?? (/^rank:/.test(v) ? `+${value(v)} to ${t}` : null)
     ?? `${signed(v)} ${String(e.target).startsWith('test:') ? tests : t}`
   const how = e.affects === 'target' ? 'On the target: ' : e.affects === 'others' ? 'Others get: ' : SWITCH[e.switch] && e.switch !== 'conditional' ? `${SWITCH[e.switch]}: ` : ''
   return `${e.low ? 'Not applied (unsure): ' : ''}${how}${text}${e.when ? ` (${e.when})` : ''}.`
@@ -161,7 +197,7 @@ export function base(x, type, ctx, extra = []) {
 // a runner's bonuses (ctx.host: an accessory's are its host's, never the runner's: no effect) and the catalog's
 // effects (what the book's text says the entry does), on a book entry and a runner's item alike, as Active Effects
 // ctx.rated (a runner's items): a gear or focus item with a rating (Eden's template.json gear and focus have system.rating) follows it
-const withEffects = (doc, x, ctx = {}) => {
+export const withEffects = (doc, x, ctx = {}) => {
   const perRating = !!ctx.rated && ['gear', 'focus'].includes(doc.type) && doc.system.rating > 0
   const effects = groupEffects([...ctx.host ? [] : bonusRows(x.bonuses), ...readEffects(x, ctx).rows], x.name, { ...ctx, perRating })
   if (effects.length) doc.effects = effects
@@ -241,6 +277,8 @@ function focus(p, ctx, extra) {
   return icon(withEffects(doc, p, ctx), p, ctx)
 }
 
+// the mod types whose host is no Matrix access device (modType): a matrix: effect on them is a note
+const NOT_DEVICE = new Set(['weapon_mod', 'accessory_weapon', 'armor_mod'])
 /**
  * An accessory as Eden's `mod` item (type: eden.js modType): fitted to its host by system.embeddedInUuid, which
  * foundry/apply.js sets from flags.host (the host's uid) once the host has its id. Its
@@ -249,11 +287,11 @@ function focus(p, ctx, extra) {
  */
 export function modItem(x, ctx, type) {
   const a = x.attrs ?? {}, v = x.values ?? {}
+  const mctx = { ...ctx, mod: true, device: !NOT_DEVICE.has(type), weapon: /^(?:weapon_mod|accessory_weapon)$/.test(type) }
   const doc = dataModelSource(base(x, 'mod', ctx, [a.slots && `Mod slots: ${a.slots}`, x.note,
-    x.bonuses?.length && `On its host: ${bonusText(x.bonuses)}`, ...effectLines(x, { ...ctx, mod: true })]))
+    x.bonuses?.length && `On its host: ${bonusText(x.bonuses)}`, ...effectLines(x, mctx)]))
   Object.assign(doc.system, { type, rating: Math.max(0, num(v.rating)), price: Math.max(0, num(v.cost)), availDef: a.avail ?? '' })
-  const rows = (x.effects ?? []).filter(e => !e.low).flatMap(e => hostChanges(e, Math.max(1, num(v.rating)), ctx.hostAr).map(c => ({ ...c, ...howOf(e), affects: undefined })))
-  const out = groupEffects(rows, x.name).map(e => ({ ...e, transfer: false }))
+  const out = groupEffects(readEffects(x, mctx).rows, x.name)  // (scope host: not transferred, Eden applies a fitted mod's effects to its host)
   if (out.length) doc.effects = out
   return icon(doc, x, ctx)
 }
@@ -297,6 +335,12 @@ export function qualityItem(q, ctx) {
 }
 /** A critter power the book lists as a weakness (attrs.weakness): Eden has no field for it, so its description says so. */
 export const weaknessLine = e => yes(e?.attrs?.weakness) && 'Weakness.'
+/** A critter or sprite power (a book entry, or the one a being lists) as Eden item data, with its effects as every item's. */
+export function powerItem(x, type, ctx, extra = []) {
+  const doc = base(x, type, ctx, [...extra, weaknessLine(x), ...effectLines(x, ctx)])
+  if (type === 'critterpower') Object.assign(doc.system, critterPowerFields(x))
+  return withEffects(doc, x, ctx)
+}
 /** A critter power entry's Eden fields (Eden's critterpower sheet: type, action, range, duration). */
 export function critterPowerFields(e) {
   const a = e.attrs ?? {}
@@ -311,12 +355,12 @@ export function critterPowerFields(e) {
 export function programItem(x, ctx) {
   const a = x.attrs ?? {}, v = x.values ?? {}, s = softwareType(a.type)
   if (!s.known) unknown(ctx, x, `program type "${a.type ?? ''}" not known → ${s.type}`)
-  const doc = dataModelSource(base(x, 'software', ctx))
+  const doc = dataModelSource(base(x, 'software', ctx, effectLines(x, ctx)))
   Object.assign(doc.system, { type: s.type, rating: Math.max(0, num(v.rating)), price: Math.max(0, num(v.cost)), availDef: a.avail ?? '' })
   // an autosoft's kind, by its name: the one Eden's Vehicle actor rolls with (Targeting, Maneuver, …)
   const sub = s.type === 'AUTOSOFT' ? autosoftSubtype(x.name) : null
   if (sub) doc.system.subtype = sub
-  return icon(doc, x, ctx)
+  return icon(withEffects(doc, x, ctx), x, ctx)
 }
 /** A random genesisID, as Eden's own create button makes one for a new style (SR6ActorSheet _create_UUID). */
 export const randomGenesisId = () => globalThis.crypto.randomUUID()
@@ -326,18 +370,18 @@ export const randomGenesisId = () => globalThis.crypto.randomUUID()
  * create button gives it (ctx.newGenesisId; a re-import keeps the one the entry already has: foundry/books.js).
  */
 export function martialArtItem(x, ctx) {
-  const a = x.attrs ?? {}, doc = base(x, 'martialartstyle', ctx, [a.signature && `Signature technique: ${a.signature}`])
+  const a = x.attrs ?? {}, doc = base(x, 'martialartstyle', ctx, [a.signature && `Signature technique: ${a.signature}`, ...effectLines(x, ctx)])
   Object.assign(doc.system, { genesisID: (ctx.newGenesisId ?? randomGenesisId)(), category: martialCategories(a.categories) })
-  return icon(doc, x, ctx)
+  return icon(withEffects(doc, x, ctx), x, ctx)
 }
 /** A martial art technique -> Eden martialarttech; style: the genesisID of its style ('' when the book ties it to none). */
 // a technique's printed prerequisites (Chummer's requires: { kind, name, met? }); met: false on a runner that lacks it
 const REQUIRES = { adeptpower: 'adept power', technique: 'technique', quality: 'quality', augmentation: 'augmentation' }
 const requiresLine = rs => rs?.length && `Requires: ${rs.map(r => `${r.name}${REQUIRES[r.kind] ? ` (${REQUIRES[r.kind]})` : ''}${r.met === false ? ' — missing' : ''}`).join('; ')}`
 export function techniqueItem(x, ctx, style = '') {
-  const doc = base(x, 'martialarttech', ctx, [x.attrs?.category && `Category: ${x.attrs.category}`, requiresLine(x.requires)])
+  const doc = base(x, 'martialarttech', ctx, [x.attrs?.category && `Category: ${x.attrs.category}`, requiresLine(x.requires), ...effectLines(x, ctx)])
   Object.assign(doc.system, { style, choice: '' })
-  return icon(doc, x, ctx)
+  return icon(withEffects(doc, x, ctx), x, ctx)
 }
 
 // Everything a runner file holds as items, for runners and NPCs alike (an NPC's build is usually blank).
@@ -364,9 +408,12 @@ export function vehicleActor(p, ctx) {
     d.system.description += ctx.sanitize([`Fitted to ${p.name}.`, a.mount && nameOf(a.mount) && `In its ${nameOf(a.mount)}.`,
       a.diy && 'Installed by its owner (half price).'].filter(Boolean).join(' '))
     if (a.mount) d.flags[MODULE_ID].mount = a.mount
-    // (a `set` stays the description's: effectData writes every change as an add)
-    const rows = (a.effects ?? []).filter(e => !e.low).flatMap(e => hostChanges(e, Math.max(1, num(a.values?.rating)))
-      .filter(c => c.mode === 2 && VEHICLE_KEYS.has(c.key)).map(c => ({ ...c, ...howOf(e), affects: undefined })))
+    // (the vehicle's own numbers only; an effect for others or a target is the description's, never the owner's vehicle)
+    const rows = (a.effects ?? []).filter(e => !e.low && !foreign(e)).flatMap(e => {
+      const ch = hostChanges(e, Math.max(1, num(a.values?.rating)), { device: false }).filter(c => c.mode === 2 && VEHICLE_KEYS.has(c.key))
+      if (ch.length) ctx.audit?.set(e, { id: a.id, kind: a.kind, out: 'host' })
+      return ch.map(c => ({ ...c, ...howOf(e), affects: undefined, scope: 'actor' }))
+    })
     const fx = groupEffects(rows, a.name)
     if (fx.length) d.effects = fx
     return d
@@ -620,10 +667,9 @@ export function beingActor(npc, { name, flags, sanitize = escapeText, icons = nu
   for (const part of ['powers', 'optionalPowers']) for (const l of (npc.lines ?? []).filter(l => l.part === part)) for (const p of splitTop(l.text)) {
     const e = powers[normKey(p)] ?? powers[normKey(p.replace(/\s*\(.*$/, ''))]
     const optional = part === 'optionalPowers' && 'Optional power.'
-    const doc = e ? base({ ...e, name: p, uid: `power:${p}` }, powerType, ctx, [optional, weaknessLine(e)])
+    const doc = e ? powerItem({ ...e, name: p, uid: `power:${p}` }, powerType, ctx, [optional])
       : { name: p, type: powerType, flags: { [MODULE_ID]: { id: `power:${p}`, exportedAt: f.exportedAt, appVersion: f.appVersion } },
         system: { genesisID: '', description: optional ? sanitize(optional) : '' } }
-    if (e && powerType === 'critterpower') Object.assign(doc.system, critterPowerFields(e))
     items.push(icon(doc, e, ctx))
   }
 

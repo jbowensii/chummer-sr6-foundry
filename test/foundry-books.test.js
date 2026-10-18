@@ -303,7 +303,7 @@ test('a pack item’s effects go in in Foundry 14’s shape (system.changes)', a
   await importBooks([tr(mus)])
   const q = [...got('chummer-sr6-qualities').docs.values()].find(d => d.name === 'Lucky Break')
   expect(q.effects[0]).toMatchObject({ name: 'Lucky Break', transfer: true, disabled: false,
-    system: { changes: [{ key: 'system.attributes.agi.mod', type: 'add', value: '1' }, { key: 'system.defenserating.physical.mod', type: 'add', value: '1' }] } })
+    system: { changes: [{ key: 'system.attributes.agi.mod', type: 'add', value: 1 }, { key: 'system.defenserating.physical.mod', type: 'add', value: 1 }] } })
   expect(q.effects[0]).not.toHaveProperty('changes')
 })
 

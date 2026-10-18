@@ -2,7 +2,7 @@
 // Replace order and rollback. The real thing runs in Foundry's Quench batches (scripts/foundry/quench.js).
 import { beforeEach, expect, test, vi } from 'vitest'
 import { MODULE_ID } from '../scripts/lib/constants.js'
-import { applyRunner, dedupeUnarmed, effectData } from '../scripts/foundry/apply.js'
+import { applyRunner, dedupeUnarmed, effectData, refreshPersona } from '../scripts/foundry/apply.js'
 
 let log, world, n, failCreateItems
 const flags = f => ({ [MODULE_ID]: { exportedAt: '2026-10-04T09:00:00.000Z', ...f } })
@@ -19,6 +19,7 @@ class FakeActor {
   set items(v) { this._items = Object.assign(v, { get: id => v.find(i => i.id === id) }) }
   get items() { return this._items }
   async update(u) { log.push(['update', u]); Object.assign(this.system, u.system ?? {}) }
+  async updatePersona() { log.push(['persona', this.name]) }
   async createEmbeddedDocuments(_, arr) {
     log.push(['items', arr])
     if (failCreateItems) throw new Error('items failed')
@@ -39,11 +40,11 @@ beforeEach(() => {
   globalThis.game = { actors: world, folders: [], release: { generation: 13 } }
   globalThis.Folder = { create: async d => ({ id: 'f', ...d }) }
   globalThis.Actor = { create: async d => { log.push(['create', d]); return new FakeActor(d) } }
-  globalThis.CONST = { ACTIVE_EFFECT_MODES: { ADD: 2 } }
+  globalThis.CONST = { ACTIVE_EFFECT_MODES: { ADD: 2, OVERRIDE: 5 } }
 })
 
 const ware = { name: 'Made-up Booster', type: 'gear', flags: flags({ id: 'w' }),
-  effects: [{ name: 'Made-up Booster', transfer: true, disabled: false, changes: [{ key: 'system.attributes.rea.mod', value: '1', mode: 2 }] }] }
+  effects: [{ name: 'Made-up Booster', transfer: true, disabled: false, changes: [{ key: 'system.attributes.rea.mod', value: 1, mode: 2 }] }] }
 const player = (system = {}) => ({ actor: { name: 'Mara', type: 'Player', flags: flags({ id: 'r1' }), prototypeToken: { actorLink: true },
   system: { edge: { max: 3 }, karma: 5, ...system } }, items: [ware] })
 
@@ -55,13 +56,30 @@ test('create: actor first with Edge full, then its items with Foundry 13 effects
   expect(created).toMatchObject({ name: 'Mara', folder: 'f', system: { edge: { max: 3, value: 3 } }, prototypeToken: { actorLink: true } })
   expect(created).not.toHaveProperty('items')
   expect(items[0].effects[0]).toEqual({ name: 'Made-up Booster', transfer: true, disabled: false,
-    changes: [{ key: 'system.attributes.rea.mod', value: '1', mode: 2 }] })
+    changes: [{ key: 'system.attributes.rea.mod', value: 1, mode: 2 }] })
+})
+
+test('create and replace: Eden’s stored persona is rebuilt once the items exist (it only does so on a device update), after the items', async () => {
+  await applyRunner(player(), 'create')
+  expect(log.map(([k]) => k)).toEqual(['create', 'items', 'persona'])
+  log = []
+  new FakeActor({ name: 'Mara', flags: flags({ id: 'r1' }), items: [{ name: 'old', old: true, flags: flags({ id: 'w' }) }] })
+  await applyRunner(player(), 'replace')
+  const order = log.map(([k]) => k)
+  expect(order.at(-1)).toBe('persona')
+  expect(order.indexOf('items')).toBeLessThan(order.indexOf('persona'))
+})
+
+test('refreshPersona: an actor without updatePersona is left alone; a failing one is logged, never thrown', async () => {
+  expect(await refreshPersona({ name: 'Plain' })).toBe(false)
+  expect(await refreshPersona({ name: 'Broken', updatePersona: async () => { throw new Error('nope') } })).toBe(false)
+  expect(console.error).toHaveBeenCalled()
 })
 
 test('effectData: Foundry 14 puts the changes in system.changes with a change type', () => {
   game.release.generation = 14
   expect(effectData(ware.effects[0])).toEqual({ name: 'Made-up Booster', transfer: true, disabled: false,
-    system: { changes: [{ key: 'system.attributes.rea.mod', type: 'add', value: '1' }] } })
+    system: { changes: [{ key: 'system.attributes.rea.mod', type: 'add', value: 1 }] } })
 })
 
 test('create: items failing deletes the new actor and reports', async () => {
@@ -142,7 +160,7 @@ test('replace: one actor update, one item create, one item delete; a duplicate U
   const [late, first] = doc.items.map(i => i.id)
   const res = await applyRunner(player(), 'replace')
   expect(res.action).toBe('replace')
-  expect(log.map(([k]) => k)).toEqual(['update', 'items', 'deleteItems', 'deleteItems'])
+  expect(log.map(([k]) => k)).toEqual(['update', 'items', 'deleteItems', 'deleteItems', 'persona'])
   expect(log[3][1]).toEqual([late])
   expect(doc.items.filter(i => i.system?.genesisID === 'unarmed').map(i => i.id)).toEqual([first])
 })

@@ -1,10 +1,13 @@
 // Entry point: the import window is built at init; GMs get an "Import from Chummer" button in the Actors and Compendium sidebars.
 import { createImportApp } from './foundry/app.js'
+import { patchArmorSuppression } from './foundry/eden-armor.js'
 import { guardEdenItemHooks } from './foundry/eden-guard.js'
+import { patchEdenUnarmed } from './foundry/eden-unarmed.js'
 import { addIndexFields, registerEffectTargets } from './foundry/apply.js'
 import { createIconsApp, loadIconIndex } from './foundry/icons.js'
 import { MODULE_ID } from './lib/constants.js'
 import { registerQuench } from './foundry/quench.js'
+import { registerTargets } from './foundry/targets.js'
 
 let ImportApp = null
 let icons = null  // icons/index.json, loaded once at init; null = no icons
@@ -47,7 +50,8 @@ Hooks.on('renderActorDirectory', (app, html) => addButton(html, 'actors'))
 Hooks.on('renderCompendiumDirectory', (app, html) => addButton(html, 'compendium'))
 Hooks.on('changeSidebarTab', app => { if (app.tabName === 'actors' || app.tabName === 'compendium') addButton(null, app.tabName) })
 // after Eden's own ready, which rebuilds CONFIG.SR6 (the system's hooks are registered before a module's)
-Hooks.once('ready', () => { registerEffectTargets(); addButton(null, 'actors'); addButton(null, 'compendium') })
-// again at setup, in case the system set its Item class after our init (guardEdenItemHooks runs once)
-Hooks.once('setup', () => guardEdenItemHooks())
+Hooks.once('ready', () => { registerEffectTargets(); registerTargets(); addButton(null, 'actors'); addButton(null, 'compendium') })
+// again at setup, in case the system set its Item class after our init (guardEdenItemHooks runs once); the rest wraps Eden's
+// own classes, which exist by now: Unarmed's getters read the actor's unarmed effects, an unworn armor's effects are suppressed
+Hooks.once('setup', () => { guardEdenItemHooks(); patchEdenUnarmed(); patchArmorSuppression() })
 Hooks.on('quenchReady', quench => registerQuench(quench))

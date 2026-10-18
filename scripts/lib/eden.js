@@ -143,28 +143,37 @@ export const edenBook = source => EDEN_BOOKS[String(source ?? '').toUpperCase()]
 
 // A catalog effect's target (Chummer's export `effects`) -> Eden's Active Effect keys (CONFIG.SR6.ACTIVE_EFFECT_OPTIONS
 // and the Player template's own fields). Read from Eden 4.0.11's config.js, template.json and documents/actor.js.
-// Eden has no field for: derived:matrix-monitor (a Player has no Matrix monitor of its own), movement (traits.movementRate
-// is a rate, not a modifier), minor-actions and major-actions (Eden counts actions from initiative dice, with no modifier),
-// damage-reduction, monthly-cost, power-points, drain and fading resistance (TEST_POOL, below), a cyberlimb's own attribute
-// (limb-attr:<abbr>), unarmed DV and damage (Eden's Unarmed is a gear item, not an actor field). Those stay a note on the item (NOTED, below). Matrix Defense Rating: Eden applies its mod only to a
-// Matrix user (actor.js:1289-1296). Hardened Armor: Eden's
-// traits.hardenedArmor, which its Defense Rating and damage resistance read (documents/actor.js, SR6Roll.js).
+// Eden has no field for: derived:matrix-monitor (a Player has no Matrix monitor of its own), minor-actions and major-actions
+// (Eden counts actions from initiative dice, with no modifier), damage-reduction, monthly-cost, power-points, a cyberlimb's
+// own attribute (limb-attr:<abbr>), concealability and size. Those stay a note on the item (NOTED, below). Matrix Defense
+// Rating: Eden applies its mod only to a Matrix user (actor.js:1289-1296). Hardened Armor: Eden's traits.hardenedArmor,
+// which its Defense Rating and damage resistance read (documents/actor.js, SR6Roll.js).
 const DERIVED_KEY = { defense: 'system.defenserating.physical.mod', 'defense-astral': 'system.defenserating.astral.mod',
   social: 'system.defenserating.social.mod', initiative: 'system.initiative.physical.mod', 'initiative-dice': 'system.initiative.physical.diceMod',
   'matrix-defense': 'system.defenserating.matrix.mod', 'unarmed-ar': 'system.attackrating.physical.mod', 'matrix-initiative': 'system.initiative.matrix.mod', 'matrix-initiative-dice': 'system.initiative.matrix.diceMod',
   'physical-monitor': 'system.physical.mod', 'stun-monitor': 'system.stun.mod', overflow: 'system.overflow.mod',
   composure: 'system.derived.composure.mod', 'judge-intentions': 'system.derived.judge_intentions.mod',
-  memory: 'system.derived.memory.mod', lift: 'system.derived.lift_carry.mod', 'hardened-armor': 'traits.hardenedArmor' }
-// Matrix attributes: the Player's persona.device.mod, which Eden adds to the active device's own (actor.js updatePersona).
-// Overwatch and a chosen attribute: no field.
+  memory: 'system.derived.memory.mod', lift: 'system.derived.lift_carry.mod', 'hardened-armor': 'traits.hardenedArmor',
+  // Eden's Unarmed is a gear item, not an actor field: its AR is the actor's physical attack rating mod, its DV and its
+  // Physical damage are these module traits, which foundry/eden-unarmed.js makes its getters read
+  'unarmed-dv': 'traits.unarmedDv', 'unarmed-damage': 'traits.unarmedPhysical',
+  // Eden's movement traits (actor.js:213-215): a value `walk/sprint base/sprint per hit` (MOVEMENT_KEYS)
+  movement: 'traits.movementRate' }
+export const MOVEMENT_KEYS = ['traits.movementRate', 'traits.movementSprintBase', 'traits.movementSprintMultiplier']
+// Matrix attributes: the persona's `used` values, which Eden's prepare reads for attack/defense rating and initiative
+// (actor.js:1174-1201, 1290) and itself writes Active Effects on (SR6ActorSheet.js:1723-1740, a host's attributes). The
+// stored `used` is rebuilt only by updatePersona() when an access device is switched, so an effect on device.mod waits for
+// that; one on `used` counts at the next prepare, on every toggle. Overwatch and a chosen attribute: no field.
+// ponytail: a device with no A or S still shows the bonus (Eden's own device.mod rule ignores it on a 0 base).
 const MATRIX_KEY = { attack: 'a', sleaze: 's', 'data-processing': 'd', firewall: 'f' }
 // The tests Eden keeps a pool of its own for (its defense and resistance pools; a Magic Resistance test is the defense
 // against a spell, direct or indirect). Fatigue, surprise, crash, addiction, a spell category, all tests: no pool, so a note.
-// Drain and fading resistance: no pool.mod in Eden's template (template.json:152-182), so an add lands on a missing field as the
-// effect's own string ("2": #castDelta leaves a null target's value as it is) and Eden's `pool += mod` (actor.js:1506, 1516)
-// concatenates it: a note (NOTED), not a pool.
+// Drain and fading resistance: Eden creates those two pools in _prepareDefensePools (ActorTypes.js:84-101), after the effects
+// run, so their mod is not in the template; a NUMBER added to the missing field is stored as it is (#castDelta, null target),
+// where the string the module wrote before ("2") was concatenated by Eden's `pool += mod` (actor.js:1506, 1516).
 const TEST_POOL = { defense: ['system.defensepool.physical.mod'], 'defense-astral': ['system.defensepool.astral.mod'],
   'damage-resistance': ['system.defensepool.damage_physical.mod'], 'toxin-resistance': ['system.defensepool.toxin.mod'],
+  'drain-resistance': ['system.defensepool.drain.mod'], 'fading-resistance': ['system.defensepool.fading.mod'],
   'defense-spell-direct': ['system.defensepool.spells_direct.mod'], 'defense-spell-indirect': ['system.defensepool.spells_indirect.mod'],
   'magic-resistance': ['system.defensepool.spells_direct.mod', 'system.defensepool.spells_indirect.mod'] }
 // The skills a test type covers (Chummer's TEST_TYPES); physical, mental and attr-<abbr>: the skills linked to those
@@ -180,17 +189,24 @@ export function testSkills(type) {
   const t = String(type ?? ''), attrs = t.startsWith('attr-') ? [t.slice(5)] : LINKED[t]
   return attrs ? SKILLS.filter(k => attrs.includes(SKILL_ATTR[k])) : TEST_SKILLS[t] ?? []
 }
+// Low-light vision: Foundry's own light amplification vision mode on the actor's tokens (Eden passes `token.` changes on,
+// actor.js applyActiveEffectsV14; Foundry 14 only: other versions ignore it). Other senses: no mode, a note.
+const VISION = { 'low-light-vision': 'lightAmplification' }
+export const FLYING = /\b(?:fly|flying|flight|flies)\b/i  // (a movement value that only holds in flight stays a note)
 /** A catalog effect ({ target, op }) on an actor -> its change keys; [] when Eden has no field for it (an Edge
- *  operation, an item: target, a name it doesn't know). Only `add`: Eden has no field for the rest. */
-export function effectKeys({ target, op } = {}) {
-  if (op !== 'add') return []
+ *  operation, an item: target, a name it doesn't know). Only `add` has a field; the exceptions are a `set` of Physical
+ *  unarmed damage and a sense (vision mode, which the value does not matter to). */
+export function effectKeys({ target, op, when } = {}) {
   const [kind, name = ''] = String(target ?? '').split(':')
   const one = k => (k ? [k] : [])
+  if (kind === 'derived' && name === 'unarmed-damage') return op === 'set' ? [DERIVED_KEY[name]] : []
+  if (kind === 'sense') return op === 'add' && VISION[name] ? ['token.sight.visionMode'] : []
+  if (op !== 'add') return []
   if (kind === 'attr') return one(name === 'edg' ? 'system.edge.max' : name === 'ess' ? 'system.attributes.essence.mod' : ATTRS.includes(name) ? `system.attributes.${name}.mod` : null)
   if (kind === 'skill') return one(SKILLS.includes(normKey(name)) && `system.skills.${normKey(name)}.modifier`)
   if (kind === 'test') return TEST_POOL[name] ?? testSkills(name).map(k => `system.skills.${k}.modifier`)
-  if (kind === 'derived') return one(DERIVED_KEY[name])
-  if (kind === 'matrix') return one(MATRIX_KEY[name] && `system.persona.device.mod.${MATRIX_KEY[name]}`)
+  if (kind === 'derived') return name === 'movement' ? (FLYING.test(when ?? '') ? [] : MOVEMENT_KEYS) : one(DERIVED_KEY[name])
+  if (kind === 'matrix') return one(MATRIX_KEY[name] && `system.persona.used.${MATRIX_KEY[name]}`)
   return []
 }
 /** A printed effect value at a rating: a number; so much per rating (`R`, `-R`, `R*2`, `2*R`); so much per level after
@@ -206,45 +222,99 @@ export function effectValue(v, rating = 1) {
   const n = (m[1] ? -1 : 1) * Number(m[2] ?? 1) * rating
   return m[3] ? Math.max(0, n - Number(m[3])) : n  // (`R*2-2`: twice the rating, less 2, never below 0)
 }
+/**
+ * A catalog effect on an actor -> Eden's changes `{ key, value, mode }` (mode 2 ADD, 5 OVERRIDE); [] when there is none
+ * or the value is not a number the module can work out (a formula, `hits`: a note). Values are NUMBERS (Eden's own import
+ * writes numbers; a string added to a field Eden creates later was concatenated), except the override of a boolean or of
+ * the vision mode. movement `a/b/c`: the walking rate, the sprint base and the sprint per hit, each added to its trait.
+ * An unarmed attack rating `2,0,0,0,0`: its first band (Eden's Unarmed has one AR).
+ */
+export function actorChanges(e = {}, rating = 1) {
+  const keys = effectKeys(e)
+  if (!keys.length) return []
+  const [kind, name = ''] = String(e.target).split(':')
+  if (kind === 'sense') return [{ key: keys[0], value: VISION[name], mode: 5 }]
+  if (kind === 'derived' && name === 'unarmed-damage') return /^\s*P\s*$/i.test(e.value) ? [{ key: keys[0], value: true, mode: 5 }] : []
+  if (kind === 'derived' && name === 'movement') {
+    const v = String(e.value ?? '').split('/').map(x => effectValue(x, rating))
+    return v.length === 3 && v.every(Number.isFinite) ? MOVEMENT_KEYS.map((key, i) => ({ key, value: v[i], mode: 2 })) : []
+  }
+  let v = effectValue(e.value, rating)
+  if (v == null && name === 'unarmed-ar') {
+    const bands = String(e.value ?? '').split(',').map(x => effectValue(x, rating))
+    if (bands.length === 5 && bands.slice(1).every(n => n === 0) && Number.isFinite(bands[0])) v = bands[0]
+  }
+  return v == null ? [] : keys.map(key => ({ key, value: v, mode: 2 }))
+}
 // An item: effect on the host item (a weapon's, a vehicle's, a device's own fields in Eden's gear template): the key(s)
 // a stat lives at. A vehicle's handling, acceleration and speed interval are on-road/off-road pairs; a value `a/b`
 // gives each its own, one value both. Concealability and size: no field (a note).
 const HOST_PAIR = { handling: ['system.handlOn', 'system.handlOff'], acceleration: ['system.accOn', 'system.accOff'], 'speed-interval': ['system.spdiOn', 'system.spdiOff'] }
 const HOST_ONE = { dv: 'system.dmg', ammo: 'system.ammocap', 'top-speed': 'system.tspd', body: 'system.bod', armor: 'system.arm', pilot: 'system.pil',
   sensor: 'system.sen', seats: 'system.sea', attack: 'system.a', sleaze: 'system.s', 'data-processing': 'system.d', firewall: 'system.f' }
+// Eden's per-mode attack rating modifier is a flat number on the weapon (item.mjs:341-345; its own Shock Pads effect adds to
+// system.modes.SA_ar_mod); a single shot has none. The boolean flags system.modes.SA/BF/FA/SS are the weapon's own modes: never written.
 const FIRE_MODE = { 'semi-auto': 'SA', 'semi-automatic': 'SA', sa: 'SA', 'burst fire': 'BF', bf: 'BF', 'full auto': 'FA', 'full automatic': 'FA', fa: 'FA', 'single shot': 'SS', ss: 'SS' }
+// An attack bonus a weapon carries (a rocket's +R, a guncam's, a chain's) is Eden's weapon dice pool modifier, which its
+// weapon roll adds (Rolls.js:125-126; Eden's own Smartgun System effect), not the actor's skill; a wild die the weapon gives
+// is the weapon's own `wild` (RollTypes.js:478; Eden's rEVO stock effect).
+const ATTACK_SKILLS = ['firearms', 'close_combat', 'exotic_weapons']
+const isAttack = ({ target } = {}) => { const [kind, name = ''] = String(target ?? '').split(':'); return (kind === 'test' && name === 'combat') || (kind === 'skill' && ATTACK_SKILLS.includes(normKey(name))) }
+/** Is this an attack bonus or a wild die on an attack test or skill: what a weapon (or an accessory, for its host weapon) carries. */
+export const weaponBorne = (e = {}) => isAttack(e) && ((e.op === 'add' && !e.spec) || e.op === 'wild-die')
+export function weaponChanges(e = {}, rating = 1) {
+  if (!weaponBorne(e)) return []
+  if (e.op === 'wild-die') return [{ key: 'system.wild', value: true, mode: 5 }]
+  const n = effectValue(e.value, rating)
+  return n == null ? [] : [{ key: 'system.modes.dicePoolMod', value: n, mode: 2 }]
+}
 /** An add-on's item: effect (an accessory's, an ammo type's, a vehicle mod's) -> changes on its host item (mode 2 ADD;
- *  a `set` is mode 5 OVERRIDE). item:ar `0,1,1,0,0`: one value a range band, system.attackRating.N; limited to fire
- *  modes (`when`: `semi-auto, burst fire`) Eden's per-mode AR modifier instead. rating: the add-on's, for a value per rating.
- *  bands: the host's own attack rating bands when known; an add to a band that is 0 or '-' is left out (Eden's guard for it,
- *  item.mjs:557, compares change.mode, a non-enumerable shim after deepClone in Foundry 14: it never fires, so we do). */
-export function hostChanges({ target, op, value, when } = {}, rating = 1, bands = null) {
+ *  a `set` is mode 5 OVERRIDE). item:ar `0,1,1,0,0`: one value a range band, system.attackRating.N; `x`: that band is
+ *  removed (override to 0, which Eden shows as "-"); one value alone: every band; limited to fire modes (`when`:
+ *  `semi-auto, burst fire`) Eden's per-mode AR modifier instead. rating: the add-on's, for a value per rating.
+ *  opts.bands: the host's own attack rating bands when known; an add to a band that is 0 or '-' is left out (Eden's guard for
+ *  it, item.mjs:557, compares change.mode, a non-enumerable shim after deepClone in Foundry 14: it never fires, so we do).
+ *  opts.device: false when the host is no Matrix access device (a weapon's or armor's accessory): Eden reads system.a/s/d/f
+ *  only on an access device (actor.js _preparePersona), so a matrix: effect there is a note, not a change.
+ *  opts.weapon: the host is a weapon, so an attack bonus or a wild die is its change (weaponChanges). */
+export function hostChanges(e = {}, rating = 1, { bands = null, device = true, weapon = false } = {}) {
+  const { target, op, value, when } = e
+  if (weapon) { const w = weaponChanges(e, rating); if (w.length) return w }
   const [kind, name = ''] = String(target ?? '').split(':')
   if (kind !== 'item' && kind !== 'matrix') return []
   if (op !== 'add' && op !== 'set') return []
+  if (kind === 'matrix' && !device) return []
   const mode = op === 'set' ? 5 : 2, out = []
   if (name === 'ar') {
     const modes = String(when ?? '').toLowerCase().split(/,\s*|\s+and\s+|\s+or\s+/).map(w => FIRE_MODE[w.trim()]).filter(Boolean)
-    const vals = String(value ?? '').split(',').map(x => effectValue(x, rating))  // (`x`: a band removed, a note only)
-    if (modes.length && vals.length === 1 && vals[0]) return modes.map(m => ({ key: `system.modes.${m}.ar.mod`, value: String(vals[0]), mode }))
-    return vals.flatMap((n, i) => (i < 5 && Number.isFinite(n) && n && !(mode === 2 && bands && !Number(bands[i])) ? [{ key: `system.attackRating.${i}`, value: String(n), mode }] : []))
+    const vals = String(value ?? '').split(',').map(x => (x.trim() === 'x' ? 'x' : effectValue(x, rating)))
+    if (modes.length && vals.length === 1 && vals[0] && vals[0] !== 'x')
+      return modes.filter(m => m !== 'SS').map(m => ({ key: `system.modes.${m}_ar_mod`, value: vals[0], mode }))
+    if (modes.length) return []
+    if (vals.length === 1) vals.push(...Array(4).fill(vals[0]))  // (one value: every band)
+    const live = i => !(bands && !Number(bands[i]))
+    return vals.flatMap((n, i) => {
+      if (i > 4) return []
+      if (n === 'x') return live(i) ? [{ key: `system.attackRating.${i}`, value: 0, mode: 5 }] : []
+      return Number.isFinite(n) && n && (mode === 5 || live(i)) ? [{ key: `system.attackRating.${i}`, value: n, mode }] : []
+    })
   }
   if (HOST_PAIR[name]) {
     const parts = String(value ?? '').split('/').map(x => effectValue(x, rating))
     const [on, off] = parts.length === 2 ? parts : [parts[0], parts[0]]
-    HOST_PAIR[name].forEach((key, i) => { const n = i ? off : on; if (Number.isFinite(n) && n != null) out.push({ key, value: String(n), mode }) })
+    HOST_PAIR[name].forEach((key, i) => { const n = i ? off : on; if (Number.isFinite(n) && n != null) out.push({ key, value: n, mode }) })
     return out
   }
   const n = effectValue(value, rating)
-  return HOST_ONE[name] && n != null ? [{ key: HOST_ONE[name], value: String(n), mode }] : []
+  return HOST_ONE[name] && n != null ? [{ key: HOST_ONE[name], value: n, mode }] : []
 }
 // Target kinds and names the importer produces that Eden has no field for: they stay a described line on the item.
 // (docs/sr6-data-format.md Effects; the others map through effectKeys or hostChanges.)
 export const NOTED = { kinds: ['attr-max', 'skill-max', 'action-max', 'action', 'complex-form', 'lifestyle', 'resource', 'pricemod', 'pool', 'sense', 'limb-attr'],
   names: ['attr:choice', 'skill:choice', 'skill:knowledge', 'skill:language', 'matrix:choice', 'matrix:overwatch', 'derived:matrix-monitor',
-    'derived:movement', 'derived:minor-actions', 'derived:major-actions', 'derived:damage-reduction', 'derived:monthly-cost', 'derived:power-points', 'derived:unarmed-dv', 'derived:unarmed-damage',
-    'test:drain-resistance', 'test:fading-resistance', 'test:surprise', 'test:crash', 'test:addiction', 'test:fatigue-resistance', 'test:all', 'test:other', 'item:concealability', 'item:size'],
-  prefixes: ['test:spell-'] }
+    'derived:minor-actions', 'derived:major-actions', 'derived:damage-reduction', 'derived:monthly-cost', 'derived:power-points', 'derived:essence-hole',
+    'test:surprise', 'test:crash', 'test:addiction', 'test:fatigue-resistance', 'test:all', 'test:other', 'item:concealability', 'item:size', 'item:cargo'],
+  prefixes: ['test:spell-', 'test:attr-'] }
 /** Where a catalog effect goes: `actor` (an Active Effect on the actor), `host` (a change on the item it fits), `note`
  *  (Eden has no field: a described line), or `unknown` (a target this module has no rule for: the test lists none). */
 export function effectRoute(e = {}) {
@@ -257,6 +327,7 @@ export function effectRoute(e = {}) {
   if (kind === 'attr' && !['edg', 'ess', ...ATTRS].includes(name)) return 'note'
   if (kind === 'item' && (HOST_ONE[name] || HOST_PAIR[name] || name === 'ar')) return 'host'  // (a value Eden cannot number: a formula)
   if ((kind === 'derived' && DERIVED_KEY[name]) || (kind === 'matrix' && MATRIX_KEY[name]) || (kind === 'test' && (TEST_POOL[name] || testSkills(name).length))) return 'actor'
+  if (e.op === 'set' && kind !== 'item') return 'note'  // (Eden's fields take an add: a set is shown, e.g. a program's skill rating)
   return 'unknown'
 }
 
@@ -325,8 +396,9 @@ export const martialCategories = printed => { const w = words(printed).map(x => 
 export const effectOptionKey = path => String(path).replaceAll('_', '__').replaceAll('.', '_')
 /** Every change path this module writes (bonusChanges, effectKeys, hostChanges): Eden's effect editor should offer them. */
 export const OUR_TARGETS = [...new Set([...ATTRS.map(a => `system.attributes.${a}.mod`), 'system.attributes.essence.mod', 'system.edge.max',
-  ...Object.values(DERIVED_KEY), ...Object.values(TEST_POOL).flat(), ...Object.values(MATRIX_KEY).map(k => `system.persona.device.mod.${k}`),
+  ...Object.values(DERIVED_KEY), ...Object.values(TEST_POOL).flat(), ...Object.values(MATRIX_KEY).map(k => `system.persona.used.${k}`),
   ...SKILLS.map(k => `system.skills.${k}.modifier`), ...[0, 1, 2, 3, 4].map(i => `system.attackRating.${i}`),
-  ...['SA', 'BF', 'FA', 'SS'].map(m => `system.modes.${m}.ar.mod`), ...Object.values(HOST_ONE), ...Object.values(HOST_PAIR).flat()])]
+  ...['SA', 'BF', 'FA'].map(m => `system.modes.${m}_ar_mod`), 'system.modes.dicePoolMod', 'system.wild', ...MOVEMENT_KEYS, 'token.sight.visionMode',
+  ...Object.values(HOST_ONE), ...Object.values(HOST_PAIR).flat()])]
 /** The ones Eden's options lack (options: CONFIG.SR6.ACTIVE_EFFECT_OPTIONS): { [optionKey]: path }. */
 export const missingTargets = options => Object.fromEntries(OUR_TARGETS.map(p => [effectOptionKey(p), p]).filter(([k]) => !Object.hasOwn(options ?? {}, k)))
