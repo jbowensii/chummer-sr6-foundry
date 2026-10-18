@@ -6,8 +6,8 @@ import { LINE_KINDS, matchThing, npcThings, overrideStats, thingTie } from './np
 import { lifestyleKey, modType, normKey, spiritKey } from './eden.js'
 import { itemIconKey, withIcon } from './icons.js'
 import {
-  base, beingActor, critterPowerFields, escapeText, lineItem, martialArtItem, modItem, pickItem, programItem, qualityItem, techniqueItem,
-  translateNpc, vehicleActor, weaknessLine,
+  base, beingActor, effectLines, escapeText, lineItem, martialArtItem, modItem, pickItem, powerItem, programItem, qualityItem, techniqueItem,
+  translateNpc, vehicleActor,
 } from './translate.js'
 
 // One world compendium per TYPE, every book merged into it (a GM's compendium: its own set, lib/books.js planTypePacks).
@@ -205,13 +205,13 @@ export function accessoryHostKind(e, kindOf) {
  * entry has it; otherwise the description says "See <SOURCE> p.N".
  * Returns { source, packs: { [key]: docs[] }, portraits: { [chummerID]: dataUrl }, tokens: { [chummerID]: dataUrl }, textOnly: string[] }.
  */
-export function translateBook(book, { exportedAt, appVersion, descriptions = false, sanitize = escapeText, icons = null, specs = {}, complexForms = {}, newGenesisId, entries: linked }) {
+export function translateBook(book, { audit, exportedAt, appVersion, descriptions = false, sanitize = escapeText, icons = null, specs = {}, complexForms = {}, newGenesisId, entries: linked }) {
   const src = book.source, textOnly = [], packs = {}, portraits = {}, tokens = {}, iconSet = icons ? new Set(icons) : null
   const comp = src.compendium === true ? { compendium: true } : {}
   const see = x => `See ${x.source ?? src.id}${x.page ? ` p.${x.page}` : ''}`
   // specs, complexForms: Eden's own tables as Foundry loaded them (foundry/apply.js); entries: where an entry's links are
   // found (every book in the file; default this one's)
-  const ctx = { exportedAt, appVersion, sanitize, icons: iconSet, ref: see, say: l => textOnly.push(l), specs, complexForms,
+  const ctx = { audit, exportedAt, appVersion, sanitize, icons: iconSet, ref: see, say: l => textOnly.push(l), specs, complexForms,
     entries: linked ?? book.entries ?? [], ...newGenesisId ? { newGenesisId } : {} }
   // a document into its type pack (typeKey; a journal: the key given), its category folder in flags.category (categoryOf)
   const add = (e, doc, key = typeKey(doc, e?.attrs?.category)) => {
@@ -299,9 +299,8 @@ export function translateBook(book, { exportedAt, appVersion, descriptions = fal
       else if (kind === 'qualities') add(e, own(kind, e, qualityItem({ ...e, positive: !/^\s*neg/i.test(e.attrs?.kind ?? '') }, ctx)))
       else if (kind === 'critterpowers') {
         // a power the book files as a sprite's: Eden's sprite power (no critter power fields)
-        const sprite = /sprite/i.test(e.attrs?.category ?? ''), doc = base(e, sprite ? 'spritepower' : 'critterpower', ctx, [weaknessLine(e)])
-        if (!sprite) Object.assign(doc.system, critterPowerFields(e))
-        add(e, own(kind, e, icon(doc, e)))
+        const sprite = /sprite/i.test(e.attrs?.category ?? '')
+        add(e, own(kind, e, icon(powerItem(e, sprite ? 'spritepower' : 'critterpower', ctx), e)))
       } else if (kind === 'lifestyles') {
         const key = lifestyleKey(e.name), doc = base(e, 'lifestyle', ctx)
         if (!key) ctx.say(`Lifestyle ${e.name}: not a shadowrun6-eden lifestyle → middle`)
@@ -321,14 +320,15 @@ export function translateBook(book, { exportedAt, appVersion, descriptions = fal
       } else if (kind !== 'rules') (skipped[kind] ??= []).push(raw)
     } catch (err) { textOnly.push(`${e.name ?? e.id}: not imported (${err?.message ?? err})`) }
   }
-  // the kinds Eden has no document for: a Reference journal each, a page per entry
+  // the kinds Eden has no document for: a Reference journal each, a page per entry. A page holds no Active Effect, so an
+  // entry's effects (an ammo type's modifiers, a data structure's bonus) are described lines on it (effectLines with ctx.host).
   const esc = v => String(v ?? '')
   const stats = e => [...Object.entries(e.attrs ?? {}).map(([k, v]) => `${k}: ${esc(v)}`), ...(e.parts ?? []).filter(x => x.text).map(x => `${x.tag}: ${x.text}`)]
   for (const [kind, list] of Object.entries(skipped)) {
     add({ kind }, { name: REFERENCE[kind] ?? titled(kind), flags: { [MODULE_ID]: bookFlags({ id: kind, page: list[0].page }, 'reference') },
       pages: list.map((e, i) => ({ name: e.name || e.id, type: 'text', sort: (i + 1) * SORT, title: { show: true, level: 1 },
         flags: { [MODULE_ID]: bookFlags(e) },
-        text: { content: sanitize(stats(e).join('\n\n')) + sanitize(text(e) ?? '') + sanitize(see(e)), format: 1 } })) }, 'reference')
+        text: { content: sanitize(stats(e).join('\n\n')) + sanitize(effectLines(e, { ...ctx, host: true }).join('\n\n')) + sanitize(text(e) ?? '') + sanitize(see(e)), format: 1 } })) }, 'reference')
     if (!REFERENCE[kind]) textOnly.push(`${list.length} ${kind}: a kind this module doesn't know → Reference journal "${titled(kind)}"`)
   }
 

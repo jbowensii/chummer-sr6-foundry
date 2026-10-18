@@ -1,9 +1,9 @@
 // shadowrun6-eden vocabulary (scripts/lib/eden.js): invented category strings, Eden's keys only.
 import { describe, expect, test } from 'vitest'
 import {
-  ACCESS_DEVICES, ATTRS, effectOptionKey, effectRoute, missingTargets, OUR_TARGETS, MOR, SKILLS, activationKey, armorSubtype, augmentType, autosoftSubtype, deviceFields, durationKey, edenBook, effectKeys, effectValue,
+  ACCESS_DEVICES, ATTRS, effectOptionKey, effectRoute, missingTargets, OUR_TARGETS, MOR, SKILLS, activationKey, armorSubtype, augmentType, autosoftSubtype, actorChanges, deviceFields, durationKey, edenBook, effectKeys, effectValue,
   electronicsSubtype, gearType, hostChanges, lifestyleKey, martialCategories, modType, normKey, sinQuality, skillKey, softwareType, specKey,
-  spellFields, spiritKey, spriteKey, testSkills, vehicleType, vehicleVtype, weaponType,
+  spellFields, spiritKey, spriteKey, testSkills, vehicleType, vehicleVtype, weaponChanges, weaponType,
 } from '../scripts/lib/eden.js'
 
 describe('keys', () => {
@@ -223,8 +223,8 @@ describe('books, effects', () => {
       'derived:physical-monitor': ['system.physical.mod'], 'derived:stun-monitor': ['system.stun.mod'], 'derived:overflow': ['system.overflow.mod'],
       'derived:composure': ['system.derived.composure.mod'], 'derived:judge-intentions': ['system.derived.judge_intentions.mod'],
       'derived:memory': ['system.derived.memory.mod'], 'derived:lift': ['system.derived.lift_carry.mod'],
-      'matrix:attack': ['system.persona.device.mod.a'], 'matrix:sleaze': ['system.persona.device.mod.s'],
-      'matrix:data-processing': ['system.persona.device.mod.d'], 'matrix:firewall': ['system.persona.device.mod.f'],
+      'matrix:attack': ['system.persona.used.a'], 'matrix:sleaze': ['system.persona.used.s'],
+      'matrix:data-processing': ['system.persona.used.d'], 'matrix:firewall': ['system.persona.used.f'],
       'test:defense': ['system.defensepool.physical.mod'], 'test:damage-resistance': ['system.defensepool.damage_physical.mod'],
       'test:toxin-resistance': ['system.defensepool.toxin.mod'], 'derived:matrix-defense': ['system.defenserating.matrix.mod'], 'derived:unarmed-ar': ['system.attackrating.physical.mod'],
       'test:defense-astral': ['system.defensepool.astral.mod'], 'test:defense-spell-direct': ['system.defensepool.spells_direct.mod'],
@@ -238,13 +238,45 @@ describe('books, effects', () => {
     expect(testSkills('physical')).toEqual(['athletics', 'close_combat', 'exotic_weapons', 'firearms', 'piloting', 'stealth'])
     expect(testSkills('attr-cha')).toEqual(['con', 'influence'])
     expect(testSkills('magic')).toEqual(['astral', 'conjuring', 'enchanting', 'sorcery'])
-    // no Eden field: none (drain and fading resistance: Eden's template has no pool.mod for them, a string add would concatenate)
-    for (const t of ['test:drain-resistance', 'test:fading-resistance', 'limb-attr:agi', 'derived:unarmed-dv', 'derived:unarmed-damage', 'skill:basket-weaving', 'skill:choice', 'attr:choice', 'attr-max:agi', 'derived:matrix-monitor', 'derived:movement',
+    // drain and fading resistance: Eden makes those pools after the effects run, so a NUMBER added to the missing mod is stored as it is
+    expect(keys('test:drain-resistance')).toEqual(['system.defensepool.drain.mod'])
+    expect(keys('test:fading-resistance')).toEqual(['system.defensepool.fading.mod'])
+    // Eden's Unarmed is a gear item: its AR is the actor's physical AR mod, its DV and Physical damage module traits; a sense is a vision mode; movement is three traits
+    expect(keys('derived:unarmed-dv')).toEqual(['traits.unarmedDv'])
+    expect(effectKeys({ target: 'derived:unarmed-damage', op: 'set' })).toEqual(['traits.unarmedPhysical'])
+    expect(effectKeys({ target: 'sense:low-light-vision', op: 'add' })).toEqual(['token.sight.visionMode'])
+    expect(keys('derived:movement')).toEqual(['traits.movementRate', 'traits.movementSprintBase', 'traits.movementSprintMultiplier'])
+    expect(effectKeys({ target: 'derived:movement', op: 'add', when: 'when in flight' })).toEqual([])  // (flight stays a note)
+    // no Eden field: none
+    for (const t of ['derived:unarmed-damage', 'sense:thermographic-vision', 'sense:astral-perception', 'limb-attr:agi', 'skill:basket-weaving', 'skill:choice', 'attr:choice', 'attr-max:agi', 'derived:matrix-monitor',
       'derived:minor-actions', 'derived:major-actions', 'matrix:overwatch', 'test:surprise', 'test:all',
-      'test:spell-combat', 'item:ar', 'action:wrest', 'resource:karma', 'lifestyle:comforts', 'sense:low-light-vision', 'pool:chase',
+      'test:spell-combat', 'item:ar', 'action:wrest', 'resource:karma', 'lifestyle:comforts', 'pool:chase',
       'pricemod:armor', 'skill-max:choice', 'complex-form:static-veil']) expect(keys(t), t).toEqual([])
-    for (const op of ['set', 'edge', 'edge-cost', 'edge-cost-set', 'no-edge', 'no-edge-gain', 'wild-die', 'hits', 'threshold'])
+    for (const op of ['set', 'edge', 'edge-cost', 'edge-cost-set', 'no-edge', 'no-edge-gain', 'wild-die', 'hits', 'threshold', 'threshold-set'])
       expect(effectKeys({ target: 'skill:firearms', op, value: '1' }), op).toEqual([])
+  })
+  test('actorChanges: numbers, never strings; a movement value split three ways; a vision mode and a flag as overrides; a formula: none', () => {
+    const ch = (target, value, op = 'add', extra = {}) => actorChanges({ target, op, value, ...extra }, 3)
+    expect(ch('attr:agi', '2')).toEqual([{ key: 'system.attributes.agi.mod', value: 2, mode: 2 }])
+    expect(ch('test:drain-resistance', 'R')).toEqual([{ key: 'system.defensepool.drain.mod', value: 3, mode: 2 }])
+    expect(ch('derived:movement', '3/6/1')).toEqual([{ key: 'traits.movementRate', value: 3, mode: 2 }, { key: 'traits.movementSprintBase', value: 6, mode: 2 }, { key: 'traits.movementSprintMultiplier', value: 1, mode: 2 }])
+    expect(ch('derived:movement', '10/15/1', 'add', { when: 'flying' })).toEqual([])
+    expect(ch('derived:movement', '10/15')).toEqual([])
+    expect(ch('sense:low-light-vision', '1')).toEqual([{ key: 'token.sight.visionMode', value: 'lightAmplification', mode: 5 }])
+    expect(ch('derived:unarmed-damage', 'P', 'set')).toEqual([{ key: 'traits.unarmedPhysical', value: true, mode: 5 }])
+    expect(ch('derived:unarmed-damage', 'S', 'set')).toEqual([])
+    expect(ch('derived:unarmed-ar', '2,0,0,0,0')).toEqual([{ key: 'system.attackrating.physical.mod', value: 2, mode: 2 }])  // (Eden's Unarmed has one AR)
+    expect(ch('derived:unarmed-ar', '2,1,0,0,0')).toEqual([])
+    expect(ch('derived:unarmed-dv', 'hits')).toEqual([])
+    expect(ch('attr:agi', '1', 'set')).toEqual([])
+  })
+  test('weaponChanges: an attack bonus is the weapon’s dice pool modifier, a wild die its own flag; neither is a skill or for a non-attack skill', () => {
+    const w = (target, op, value = '1', extra = {}) => weaponChanges({ target, op, value, ...extra }, 2)
+    expect(w('test:combat', 'add', 'R')).toEqual([{ key: 'system.modes.dicePoolMod', value: 2, mode: 2 }])
+    expect(w('skill:firearms', 'add', '1')).toEqual([{ key: 'system.modes.dicePoolMod', value: 1, mode: 2 }])
+    expect(w('skill:close-combat', 'wild-die')).toEqual([{ key: 'system.wild', value: true, mode: 5 }])
+    expect(w('test:combat', 'wild-die')).toEqual([{ key: 'system.wild', value: true, mode: 5 }])
+    for (const [t, op, extra] of [['skill:perception', 'add'], ['skill:firearms', 'edge'], ['test:social', 'add'], ['skill:firearms', 'add', { spec: 'Pistols' }]]) expect(w(t, op, '1', extra), t).toEqual([])
   })
   test('an effect value: a number, or so much per rating; a formula or a list: null', () => {
     expect(['2', '-1', '–1', 'R', '-R', 'R*2', '2*R', 'edg/2', '0,1,1,0,0'].map(v => effectValue(v, 3))).toEqual([2, -1, -1, 3, -3, 6, 6, null, null])
@@ -255,29 +287,45 @@ describe('books, effects', () => {
   })
   test('an accessory item:ar effect -> its host attack rating bands', () => {
     expect(hostChanges({ target: 'item:ar', op: 'add', value: '0,1,1,0,0' }))
-      .toEqual([{ key: 'system.attackRating.1', value: '1', mode: 2 }, { key: 'system.attackRating.2', value: '1', mode: 2 }])
-    expect(hostChanges({ target: 'item:ar', op: 'add', value: '-2,0,1' })).toEqual([{ key: 'system.attackRating.0', value: '-2', mode: 2 }, { key: 'system.attackRating.2', value: '1', mode: 2 }])
+      .toEqual([{ key: 'system.attackRating.1', value: 1, mode: 2 }, { key: 'system.attackRating.2', value: 1, mode: 2 }])
+    expect(hostChanges({ target: 'item:ar', op: 'add', value: '-2,0,1' })).toEqual([{ key: 'system.attackRating.0', value: -2, mode: 2 }, { key: 'system.attackRating.2', value: 1, mode: 2 }])
     expect(hostChanges({ target: 'attr:agi', op: 'add', value: '1' })).toEqual([])
+  })
+  test('a matrix: effect on a host that is no access device (a weapon’s or armor’s accessory) is no host change; on a device it is its own attribute', () => {
+    const fw = { target: 'matrix:firewall', op: 'add', value: '1' }
+    expect(hostChanges(fw, 1, { device: false })).toEqual([])
+    expect(hostChanges(fw)).toEqual([{ key: 'system.f', value: 1, mode: 2 }])
+    expect(hostChanges({ target: 'item:dv', op: 'add', value: '1' }, 1, { device: false })).toEqual([{ key: 'system.dmg', value: 1, mode: 2 }])
   })
   test('item:ar on a host whose band is 0 or '-': that band is left out (Eden’s own guard never fires in Foundry 14); a set and a fire mode are not bands', () => {
     const ar = { target: 'item:ar', op: 'add', value: '1,1,1,1,1' }
-    expect(hostChanges(ar, 1, [9, 7, 0, '-', 3]).map(c => c.key)).toEqual(['system.attackRating.0', 'system.attackRating.1', 'system.attackRating.4'])
-    expect(hostChanges(ar, 1, null)).toHaveLength(5)  // (host unknown: all bands)
-    expect(hostChanges({ ...ar, op: 'set' }, 1, [0, 0, 0, 0, 0])).toHaveLength(5)
-    expect(hostChanges({ ...ar, value: '1', when: 'semi-auto' }, 1, [0, 0, 0, 0, 0])).toEqual([{ key: 'system.modes.SA.ar.mod', value: '1', mode: 2 }])
+    expect(hostChanges(ar, 1, { bands: [9, 7, 0, '-', 3] }).map(c => c.key)).toEqual(['system.attackRating.0', 'system.attackRating.1', 'system.attackRating.4'])
+    expect(hostChanges(ar, 1)).toHaveLength(5)  // (host unknown: all bands)
+    expect(hostChanges({ ...ar, op: 'set' }, 1, { bands: [0, 0, 0, 0, 0] })).toHaveLength(5)
+    expect(hostChanges({ ...ar, value: '1', when: 'semi-auto' }, 1, { bands: [0, 0, 0, 0, 0] })).toEqual([{ key: 'system.modes.SA_ar_mod', value: 1, mode: 2 }])
+    // one value alone is every live band, not the first only; x removes a band (override to 0, which Eden shows as a dash)
+    expect(hostChanges({ ...ar, value: '2' }, 1, { bands: [9, 7, 0, 0, 3] }).map(c => [c.key, c.value])).toEqual([['system.attackRating.0', 2], ['system.attackRating.1', 2], ['system.attackRating.4', 2]])
+    expect(hostChanges({ ...ar, value: '-2,x,0,0,0' }, 1, { bands: [9, 7, 0, 0, 0] })).toEqual([{ key: 'system.attackRating.0', value: -2, mode: 2 }, { key: 'system.attackRating.1', value: 0, mode: 5 }])
+    expect(hostChanges({ ...ar, value: 'x' }, 1)).toHaveLength(5)
   })
   test('an add-on’s other item effects -> its host’s fields: fire modes, damage, ammunition, a vehicle’s on- and off-road pairs', () => {
     expect(hostChanges({ target: 'item:ar', op: 'add', value: '1', when: 'semi-auto, burst fire' }))
-      .toEqual([{ key: 'system.modes.SA.ar.mod', value: '1', mode: 2 }, { key: 'system.modes.BF.ar.mod', value: '1', mode: 2 }])
-    expect(hostChanges({ target: 'item:dv', op: 'add', value: '-1' })).toEqual([{ key: 'system.dmg', value: '-1', mode: 2 }])
-    expect(hostChanges({ target: 'item:ammo', op: 'set', value: '1000' })).toEqual([{ key: 'system.ammocap', value: '1000', mode: 5 }])
-    expect(hostChanges({ target: 'item:handling', op: 'add', value: 'R/-R' }, 2)).toEqual([{ key: 'system.handlOn', value: '2', mode: 2 }, { key: 'system.handlOff', value: '-2', mode: 2 }])
-    expect(hostChanges({ target: 'item:handling', op: 'add', value: '-R' }, 2)).toEqual([{ key: 'system.handlOn', value: '-2', mode: 2 }, { key: 'system.handlOff', value: '-2', mode: 2 }])
-    expect(hostChanges({ target: 'item:top-speed', op: 'add', value: '50' })).toEqual([{ key: 'system.tspd', value: '50', mode: 2 }])
+      .toEqual([{ key: 'system.modes.SA_ar_mod', value: 1, mode: 2 }, { key: 'system.modes.BF_ar_mod', value: 1, mode: 2 }])
+    // a single shot has no modifier of Eden's; the boolean mode flags are never written
+    expect(hostChanges({ target: 'item:ar', op: 'add', value: '1', when: 'single shot' })).toEqual([])
+    expect(hostChanges({ target: 'item:ar', op: 'add', value: '1', when: 'semi-auto, burst fire, full auto' }).map(c => c.key)).toEqual(['system.modes.SA_ar_mod', 'system.modes.BF_ar_mod', 'system.modes.FA_ar_mod'])
+    // an attack bonus or a wild die on a weapon host
+    expect(hostChanges({ target: 'test:combat', op: 'add', value: '1' }, 1, { weapon: true })).toEqual([{ key: 'system.modes.dicePoolMod', value: 1, mode: 2 }])
+    expect(hostChanges({ target: 'test:combat', op: 'add', value: '1' })).toEqual([])  // (no weapon host: none)
+    expect(hostChanges({ target: 'item:dv', op: 'add', value: '-1' })).toEqual([{ key: 'system.dmg', value: -1, mode: 2 }])
+    expect(hostChanges({ target: 'item:ammo', op: 'set', value: '1000' })).toEqual([{ key: 'system.ammocap', value: 1000, mode: 5 }])
+    expect(hostChanges({ target: 'item:handling', op: 'add', value: 'R/-R' }, 2)).toEqual([{ key: 'system.handlOn', value: 2, mode: 2 }, { key: 'system.handlOff', value: -2, mode: 2 }])
+    expect(hostChanges({ target: 'item:handling', op: 'add', value: '-R' }, 2)).toEqual([{ key: 'system.handlOn', value: -2, mode: 2 }, { key: 'system.handlOff', value: -2, mode: 2 }])
+    expect(hostChanges({ target: 'item:top-speed', op: 'add', value: '50' })).toEqual([{ key: 'system.tspd', value: 50, mode: 2 }])
     expect(hostChanges({ target: 'item:top-speed', op: 'add', value: '20%' })).toEqual([])  // (a formula: a note)
-    expect(hostChanges({ target: 'matrix:firewall', op: 'add', value: 'R' }, 3)).toEqual([{ key: 'system.f', value: '3', mode: 2 }])
+    expect(hostChanges({ target: 'matrix:firewall', op: 'add', value: 'R' }, 3)).toEqual([{ key: 'system.f', value: 3, mode: 2 }])
     expect(hostChanges({ target: 'item:concealability', op: 'add', value: '1' })).toEqual([])
-    expect(hostChanges({ target: 'item:ar', op: 'add', value: '2,1,-2,0,x' })).toEqual([{ key: 'system.attackRating.0', value: '2', mode: 2 }, { key: 'system.attackRating.1', value: '1', mode: 2 }, { key: 'system.attackRating.2', value: '-2', mode: 2 }])  // (a removed band: a note)
+    expect(hostChanges({ target: 'item:ar', op: 'add', value: '2,1,-2,0,x' })).toEqual([{ key: 'system.attackRating.0', value: 2, mode: 2 }, { key: 'system.attackRating.1', value: 1, mode: 2 }, { key: 'system.attackRating.2', value: -2, mode: 2 }, { key: 'system.attackRating.4', value: 0, mode: 5 }])  // (a removed band: Eden's no band)
   })
   test('every target the importer produces has a route: an actor effect, a host change or a described line, never unknown', () => {
     // the vocabulary of importer/sr6/effects.py (docs/sr6-data-format.md Effects), one of each
@@ -294,8 +342,11 @@ describe('books, effects', () => {
       'lifestyle:necessities', 'resource:contact-points', 'pricemod:armor', 'pricemod:lifestyle', 'pool:chase', 'sense:thermographic-vision', 'action-max:take-aim']
     const routes = Object.fromEntries(targets.map(t => [t, effectRoute({ target: t, op: 'add', value: '1' })]))
     expect(Object.entries(routes).filter(([, r]) => r === 'unknown')).toEqual([])
-    expect(routes['test:drain-resistance']).toBe('note'); expect(routes['test:fading-resistance']).toBe('note'); expect(routes['limb-attr:str']).toBe('note'); expect(routes['derived:unarmed-ar']).toBe('actor')
-    expect(['derived:unarmed-dv', 'derived:unarmed-damage'].map(t => routes[t])).toEqual(['note', 'note'])
+    expect(routes['test:drain-resistance']).toBe('actor'); expect(routes['test:fading-resistance']).toBe('actor'); expect(routes['limb-attr:str']).toBe('note'); expect(routes['derived:unarmed-ar']).toBe('actor')
+    expect(['derived:unarmed-dv', 'derived:movement'].map(t => routes[t])).toEqual(['actor', 'actor'])
+    expect(effectRoute({ target: 'derived:unarmed-damage', op: 'set', value: 'P' })).toBe('actor')
+    expect(effectRoute({ target: 'skill:cracking', op: 'set', value: '3' })).toBe('note')  // (a set: shown)
+    expect(effectRoute({ target: 'test:attr-wil', op: 'add', value: '1' })).toBe('note')  // (no skill is linked to Willpower)
     expect(['test:defense-astral', 'test:defense-spell-direct', 'test:defense-spell-indirect', 'derived:matrix-defense'].map(t => routes[t])).toEqual(['actor', 'actor', 'actor', 'actor'])
     expect(routes['attr:bod']).toBe('actor'); expect(routes['item:dv']).toBe('host'); expect(routes['sense:thermographic-vision']).toBe('note')
     expect(routes['item:top-speed']).toBe('host'); expect(routes['test:spell-illusion']).toBe('note')

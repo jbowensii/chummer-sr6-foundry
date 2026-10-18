@@ -28,7 +28,7 @@ describe('one item per level', () => {
     expect(docs.map(d => [d.name, d.system.rating, d.flags[M].chummerID])).toEqual([
       ['Made-up Boost 1', 1, 'MUS:augmentations:mus.boost.1'], ['Made-up Boost 2', 2, 'MUS:augmentations:mus.boost.2'], ['Made-up Boost 3', 3, 'MUS:augmentations:mus.boost.3']])
     const rea = d => d.effects.flatMap(e => e.changes).filter(c => c.key === 'system.attributes.rea.mod').map(c => c.value)
-    expect(docs.map(rea)).toEqual([['1'], ['2'], ['3']])
+    expect(docs.map(rea)).toEqual([[1], [2], [3]])
   })
 
   test('re-importing adds each level beside an older item of the rated parent (nothing is replaced or deleted)', () => {

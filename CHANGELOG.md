@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.8.0 (2026-10-18)
+
+Owner-approved effect work, 2026-10-18 (every one of the 3,123 effects of a full catalog now has an outcome; the coverage test pins it):
+
+- Attack bonuses a weapon carries (a rocket's +Rating, a guncam's) are the weapon's dice pool modifier (`system.modes.dicePoolMod`), a switchable effect on the weapon (on its host for an accessory), never the runner's skill. A rated runner item's follows the rating. Keep switches and conditions.
+- A wild die a weapon or accessory gives is the weapon's own `system.wild` override.
+- Fire-mode Attack Rating is Eden's flat `system.modes.SA_ar_mod`, `BF_ar_mod`, `FA_ar_mod`; single shot has none, and the mode flags are never written (the old key corrupted them).
+- A single Attack Rating value is every band of the host, skipping bands it doesn't have (when its bands are known); `x` removes a band (Eden's "-").
+- Change values are numbers. Drain and fading resistance now go on `system.defensepool.drain.mod` and `fading.mod`.
+- Unarmed: the actor's physical attack rating mod, a module trait for unarmed DV and one for Physical damage; Eden's Unarmed item reads them (a getter patch).
+- Armor's transferred effects are suppressed while the armor is not worn (live on the toggle).
+- Movement `a/b/c` goes on Eden's walking rate, sprint base and sprint multiplier (flight stays a line). Low-light vision is the token's light amplification vision mode.
+- Spells, complex forms and critter powers: an **Apply to targets** button copies their effects for targets and others to the targeted tokens (net hits or Force asked for), and removes them when sustaining ends or the item is deleted. A GM's client does it for tokens the player doesn't own (the module now uses a socket; it needs a GM online, and checks the sender owns the item and targets or sees the actor). A spell that is not sustained is refused. The effects also go when the item's actor or token is deleted, and a GM's client sweeps effects whose item is gone at start-up.
+- Martial arts styles and techniques carry their effects too. Effects with no Eden field are lines, as before (`derived:essence-hole`, `item:cargo`, `test:attr-<abbr>` with no skill, a `set` of a skill or attribute).
+- Tests: `test/catalog-coverage.test.js` runs a full anonymized catalog (`test/fixtures/catalog-effects.json`, made by `tools/catalog-fixture.mjs`) through the real translate path; `test/eden-runtime.test.js` covers the getter patches and Apply to targets.
+
+- Programs, critter and sprite powers (a being's too) now carry their catalog effects: Active Effects where Eden has a key, described lines otherwise. Ammo types and data structures have no Eden item, so their effects are described lines on their Reference page.
+- A Matrix attribute bonus (`matrix:attack`, `sleaze`, `data-processing`, `firewall`) is an effect on the persona's `system.persona.used` (the numbers Eden's attack/defense rating and initiative read, and itself writes effects on), so it counts at once and on every toggle. Eden rebuilds that stored persona only when an access device is switched, so an import and a Replace now ask Eden to rebuild it once the items exist.
+- A fitted mod's effect meant for others or for a target is a described line ("Others get: ..."), never a change on the host or your own vehicle. The same for a vehicle's mod.
+- A Matrix effect on a weapon's or armor's accessory is a described line: Eden reads a device's attributes only on a Matrix access device, never on a weapon.
+
 ## 0.7.0
 
 Goes with Nova Prime Chummer's export of owned vehicles, drones and critters (BUILDER Q12; `schema/sr6-export.schema.json` takes the purchase's `mount`, `diy`, `vehicle`, `npc` and `critter`). Replace your runners to get them.

@@ -173,10 +173,33 @@ describe('what Eden takes from the book text', () => {
   test('a quality’s effects as Active Effects; a low-confidence one, its test and the rest as text', () => {
     const q = byName(t, 'Lucky Break')
     expect(q.effects).toEqual([
-      { name: 'Lucky Break', transfer: true, disabled: false, changes: [{ key: 'system.attributes.agi.mod', value: '1', mode: 2 },
-        { key: 'system.defenserating.physical.mod', value: '1', mode: 2 }], flags: { 'chummer-sr6-importer': { chummer: true } } }])
+      { name: 'Lucky Break', transfer: true, disabled: false, changes: [{ key: 'system.attributes.agi.mod', value: 1, mode: 2 },
+        { key: 'system.defenserating.physical.mod', value: 1, mode: 2 }], flags: { 'chummer-sr6-importer': { chummer: true } } }])
     expect(q.system.description).toContain('<p>Not applied (unsure): +2 Firearms.</p>')
     expect(q.system.description).toContain('<p>Test: Perception + Intuition (3).</p>')
+  })
+  test('critter powers (a being’s too), sprite powers: their effects as Active Effects where Eden has a key, text otherwise', () => {
+    const fx = [{ target: 'attr:bod', op: 'add', value: '2' }, { target: 'derived:movement', op: 'add', value: '1' }]
+    const power = { id: 'mus.made-up-hide', kind: 'critterpowers', name: 'Made-up Hide', canon: true, attrs: { category: 'Physical', type: 'P' }, parts: [], values: {}, effects: fx }
+    const sprite = { ...power, id: 'mus.made-up-glimmer', name: 'Made-up Glimmer', attrs: { category: 'Sprite powers' } }
+    const beast = { id: 'mus.made-up-beast', kind: 'critters', name: 'Made-up Beast', canon: true, attrs: {}, parts: [], values: {},
+      npc: { kind: 'critter', stats: [], lines: [{ part: 'powers', text: 'Made-up Hide' }], pools: [] } }
+    const x = translateBook({ ...mus, entries: [power, sprite, beast] }, OPTS)
+    const want = name => [{ name, transfer: true, disabled: false, changes: [{ key: 'system.attributes.bod.mod', value: 2, mode: 2 }], flags: { [M]: { chummer: true } } }]
+    expect(x.packs.critterpowers[0].effects).toEqual(want('Made-up Hide'))
+    expect(x.packs.critterpowers[0].system.description).toContain('<p>+1 Movement.</p>')
+    expect(x.packs.spritepowers[0].effects).toEqual(want('Made-up Glimmer'))
+    expect(all(x).find(d => d.type === 'Critter').items.find(i => i.name === 'Made-up Hide').effects).toEqual(want('Made-up Hide'))
+  })
+  test('ammo types and data structures (no Eden item): their effects are described lines on the Reference page', () => {
+    const ammo = { id: 'mus.made-up-slug', kind: 'ammotypes', name: 'Made-up Slug', canon: true, attrs: { category: 'Slugs' }, parts: [], values: {},
+      effects: [{ target: 'item:dv', op: 'add', value: '1' }, { target: 'item:ar', op: 'add', value: '-2' }] }
+    const ds = { id: 'mus.made-up-structure', kind: 'datastructures', name: 'Made-up Structure', canon: true, attrs: {}, parts: [], values: {},
+      effects: [{ target: 'attr:log', op: 'add', value: '1', switch: 'activated' }] }
+    const x = translateBook({ ...mus, entries: [ammo, ds] }, OPTS)
+    const page = name => x.packs.reference.find(j => j.name === name).pages[0].text.content
+    expect(page('Ammunition types')).toContain('<p>+1 Dv.</p><p>-2 Ar.</p>')
+    expect(page('Data structures')).toContain('<p>Activated: +1 Logic.</p>')
   })
   test('a link uses the linked entry’s effects, found in any book of the file (entries)', () => {
     const giver = { id: 'mux.made-up-giver', kind: 'qualities', name: 'Made-up Giver', canon: true, attrs: {}, parts: [], values: {},
@@ -185,7 +208,7 @@ describe('what Eden takes from the book text', () => {
       effects: [{ target: 'derived:memory', op: 'add', value: '1', switch: 'activated' }] }
     const one = translateBook({ ...mux, entries: [giver] }, { ...OPTS, entries: [giver, gift] })
     expect(one.packs.qualities[0].effects).toMatchObject([{ name: 'Activated: Made-up Giver', disabled: true,
-      changes: [{ key: 'system.derived.memory.mod', value: '1', mode: 2 }] }])
+      changes: [{ key: 'system.derived.memory.mod', value: 1, mode: 2 }] }])
     expect(translateBook({ ...mux, entries: [giver] }, OPTS).packs.qualities[0].effects).toBeUndefined()  // not in this import: text only
   })
   test('a weapon accessory -> Eden mod in the Mods & accessories pack, its item:ar effect on the host (not transferred)', () => {
@@ -193,7 +216,7 @@ describe('what Eden takes from the book text', () => {
     expect(t.packs.mods).toContain(sight)
     expect(sight).toMatchObject({ flags: { [M]: { chummerID: 'MUS:gear:mus.made-up-sight' } }, type: 'mod', system: { type: 'accessory_weapon', price: 200, availDef: '2' } })
     expect(sight.effects).toEqual([{ name: 'Made-up Sight', transfer: false, disabled: false,
-      changes: [{ key: 'system.attackRating.1', value: '1', mode: 2 }, { key: 'system.attackRating.2', value: '1', mode: 2 }], flags: { 'chummer-sr6-importer': { chummer: true } } }])
+      changes: [{ key: 'system.attackRating.1', value: 1, mode: 2 }, { key: 'system.attackRating.2', value: 1, mode: 2 }], flags: { 'chummer-sr6-importer': { chummer: true } } }])
   })
   test('a cyberdeck carries Eden’s matrix fields; a vehicle its vtype; a weapon its spec through Eden’s labels', () => {
     expect(byName(t, 'Test Deck').system).toMatchObject({ subtype: 'CYBERDECK', a: 5, s: 4, progSlots: 2, matrix: { deviceRating: 2 } })

@@ -55,6 +55,17 @@
       "Working": "Applying icons…",
       "Done": "Updated {updated} · kept {kept} you chose · {unchanged} already right.",
       "NoIndex": "The module's icon list couldn't be loaded (see the console), so no icons can be applied."
+    },
+    "Targets": {
+      "Apply": "Apply to targets",
+      "None": "Target a token first (T).",
+      "NotSustained": "{name} is not sustained: mark it sustained first, or its effects would stay on the targets for good.",
+      "NoGM": "No GM is online to apply the effects to {name}: wait for one.",
+      "NoEffects": "{name} has no effects for targets.",
+      "Applied": "{name} applied to {n} target(s).",
+      "Ask": "{what} for {name}",
+      "Hits": "Net hits",
+      "Force": "Force"
     }
   }
 }

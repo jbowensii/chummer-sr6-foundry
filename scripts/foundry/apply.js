@@ -41,13 +41,16 @@ export async function uploadPortrait(dataUrl, runnerId, exportedAt, sub = 'portr
 /**
  * One effect from translate.js ({ name, transfer, disabled, changes: [{ key, value, mode }] }) -> ActiveEffect data.
  * Foundry 13: changes at the top level with a numeric mode. Foundry 14: system.changes with a change type (Eden's
- * changes-v14.hbs: key, type, value, phase, priority). ponytail: the 14 shape is pinned by the Quench "effects" batch.
+ * changes-v14.hbs: key, type, value, phase, priority). Mode 2 is an add (the default), 5 an override (a wild die, a vision
+ * mode, the Physical unarmed flag). Values stay numbers (v14's value is any type; v13 stores a string, which Foundry
+ * casts back to the field's type). ponytail: the 14 shape is pinned by the Quench "effects" batch.
  */
+const TYPE = { 2: 'add', 5: 'override' }
 export function effectData(e) {
   const { changes = [], ...rest } = e
   if ((game.release?.generation ?? 13) >= 14)
-    return { ...rest, system: { changes: changes.map(c => ({ key: c.key, type: 'add', value: c.value })) } }
-  return { ...rest, changes: changes.map(c => ({ key: c.key, value: c.value, mode: CONST.ACTIVE_EFFECT_MODES.ADD })) }
+    return { ...rest, system: { changes: changes.map(c => ({ key: c.key, type: TYPE[c.mode] ?? 'add', value: c.value })) } }
+  return { ...rest, changes: changes.map(c => ({ key: c.key, value: c.value, mode: c.mode === 5 ? CONST.ACTIVE_EFFECT_MODES.OVERRIDE : CONST.ACTIVE_EFFECT_MODES.ADD })) }
 }
 // an item from translate.js with its effects as ActiveEffect data (world actors and pack actors alike)
 export const itemData = i => (i.effects ? { ...i, effects: i.effects.map(effectData) } : i)
@@ -64,6 +67,20 @@ export async function dedupeUnarmed(actor) {
   try { await actor.deleteEmbeddedDocuments('Item', extra); return extra.length } catch (e) {
     console.error(`${MODULE_ID} | ${actor.name}: removing a duplicate Unarmed item failed`, e)
     return 0
+  }
+}
+
+/**
+ * Rebuild the actor's stored persona (system.persona.used: its access device's attributes) now the device items exist. Eden
+ * does it itself only when an access device item is updated or deleted (item.mjs _checkPersonaChanges), never on create, so
+ * an imported runner would show 0s until its device was switched. Our Matrix effects are Active Effects on persona.used
+ * (eden.js MATRIX_KEY), counted at every prepare on top of it. Never throws (a failure is logged).
+ */
+export async function refreshPersona(actor) {
+  if (typeof actor?.updatePersona !== 'function') return false
+  try { await actor.updatePersona(); return true } catch (e) {
+    console.error(`${MODULE_ID} | ${actor.name}: updating the Matrix persona failed`, e)
+    return false
   }
 }
 
@@ -267,6 +284,7 @@ export async function applyRunner(t, choice, { portrait, token, exportedAt, fold
       if (!doc) throw new Error(`${t.actor.name}: nothing to replace`)
       await replaceDoc(doc, actor, items, tokenImg)
       await dedupeUnarmed(doc)
+      await refreshPersona(doc)
       notes.push(...await applyOwned(t, doc, doc.folder ?? null))
       return { actor: doc, action: 'replace', notes }
     }
@@ -279,6 +297,7 @@ export async function applyRunner(t, choice, { portrait, token, exportedAt, fold
       prototypeToken: { ...actor.prototypeToken, ...src ? { texture: { src } } : {} } })
     await createItems(created, items)
     await dedupeUnarmed(created)
+    await refreshPersona(created)
     if (choice === 'create') notes.push(...await applyOwned(t, created, root))
     return { actor: created, action: choice === 'new' ? 'new' : 'create', notes }
   } catch (error) {
