@@ -734,7 +734,7 @@
      },
      {
       "part": "attacks",
-      "text": "Spit: DV 2P (made-up acid), 6/5/2/—/—"
+      "text": "Spit: DV 2P (made-up acid), 6/5/2/—/—; Made-up Zap [Cybercombat, DV 2, AR 8]"
      }
     ],
     "pools": [
@@ -946,6 +946,41 @@
         ]
        },
        "dv": "2P (made-up acid)"
+      },
+      "accessories": []
+     },
+     {
+      "kind": "gear",
+      "name": "Made-up Zap",
+      "canon": false,
+      "attrs": {},
+      "parts": [],
+      "values": {
+       "ar": [
+        8,
+        null,
+        null,
+        null,
+        null
+       ]
+      },
+      "uid": "line:attacks:Made-up Zap [Cybercombat, DV 2, AR 8]",
+      "qty": 1,
+      "worn": false,
+      "bonuses": [],
+      "line": {
+       "part": "attacks",
+       "printed": "Made-up Zap [Cybercombat, DV 2, AR 8]",
+       "values": {
+        "ar": [
+         8,
+         null,
+         null,
+         null,
+         null
+        ]
+       },
+       "unread": true
       },
       "accessories": []
      }

@@ -631,7 +631,8 @@ const matchNote = x => {
   const m = x.line?.match
   return m?.how === 'fuzzy' ? `the catalog's ${x.name} by a name ${Math.round(m.score * 100)}% alike`
     : m?.how === 'standard' ? `${x.name}, the catalog's standard item for it (a default pick)`
-      : m?.how === 'ammo' ? `regular ammunition for it, one full load` : ''
+      : m?.how === 'ammo' ? `regular ammunition for it, one full load`
+        : x.line?.unread ? 'an attack Chummer could not read as a weapon (a Matrix action, or a DV it cannot read): roll it from this line' : ''
 }
 /**
  * An NPC's stat-block things (the export's npc.items: Chummer's npc.ts npcThings) as its items: weapons, attacks, armor,
@@ -650,7 +651,14 @@ export function statBlockItems(things, ctx, powerType, str) {
   const noted = x => ({ ...x, note: [`Stat block: ${x.line?.printed ?? x.name}`, matchNote(x)].filter(Boolean).join(' — '),
     accessories: (x.accessories ?? []).map(noted) })
   const byUid = new Map(all(things).map(x => [x.uid, x]))
-  const items = runnerItems({ purchases: things.filter(x => !isPower(x)).map(noted) }, { ...ctx, entries: all(things), rated: true })
+  const items = runnerItems({ purchases: things.filter(x => !isPower(x) && !x.line?.unread).map(noted) }, { ...ctx, entries: all(things), rated: true })
+  // an attack it can't roll: a plain item (no weapon), its printed line its description
+  for (const x of things.filter(x => x.line?.unread)) {
+    const p = noted(x), doc = base(p, 'gear', ctx, [p.note])
+    Object.assign(doc.system, { type: 'TOOLS', subtype: 'TOOLS' })
+    Object.assign(doc.flags[MODULE_ID], { npcLine: x.line.printed, unread: true })
+    items.push(icon(doc, p, ctx))
+  }
   for (const d of items) {
     const x = byUid.get(d.flags[MODULE_ID].id), line = x?.line
     if (!line) continue

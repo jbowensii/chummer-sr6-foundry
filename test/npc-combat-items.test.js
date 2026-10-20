@@ -82,6 +82,11 @@ describe('npc-combat-items: a critter', () => {
     for (const w of weapons(t.items)) expect(w.system.pool ?? 0).toBe(0)
     // natural attacks: no ammunition
     expect(t.items.filter(i => i.system.type === 'AMMUNITION')).toEqual([])
+    // a Cybercombat attack is kept, as an item that is no weapon, its printed line its description
+    const zap = one(t.items, 'Made-up Zap')
+    expect(zap.system).toMatchObject({ type: 'TOOLS', subtype: 'TOOLS' })
+    expect(zap.flags[M]).toMatchObject({ unread: true, npcLine: 'Made-up Zap [Cybercombat, DV 2, AR 8]' })
+    expect(zap.system.description).toContain('could not read as a weapon')
   })
   test('its powers are critter powers under their printed names, the catalog’s fields where it has the power; an optional one says so', () => {
     expect(t.items.filter(i => i.type === 'critterpower').map(i => i.name)).toEqual(['Glimmer', 'Made-up Hide (2)', 'Made-up Howl'])
