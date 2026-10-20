@@ -626,6 +626,13 @@ const intOf = s => (/^\s*-?\d+\s*$/.test(s?.value ?? '') ? Number(s.value) : nul
 
 const PICK_KINDS = new Set(['adeptpowers', 'spells', 'complexforms'])
 const isPower = x => x.kind === 'critterpowers' || PICK_KINDS.has(x.kind)
+// how a stat block thing found its catalog entry, when it isn't by its own name
+const matchNote = x => {
+  const m = x.line?.match
+  return m?.how === 'fuzzy' ? `the catalog's ${x.name} by a name ${Math.round(m.score * 100)}% alike`
+    : m?.how === 'standard' ? `${x.name}, the catalog's standard item for it (a default pick)`
+      : m?.how === 'ammo' ? `regular ammunition for it, one full load` : ''
+}
 /**
  * An NPC's stat-block things (the export's npc.items: Chummer's npc.ts npcThings) as its items: weapons, attacks, armor,
  * gear and augmentations as a runner's purchases are (lineItem; accessories fitted, armor worn so Eden's Defense Rating
@@ -633,19 +640,25 @@ const isPower = x => x.kind === 'critterpowers' || PICK_KINDS.has(x.kind)
  * optional one says so). Each says its printed line, and keeps flags.npcLine (the earlier line items' flag). A weapon
  * takes its DV text as printed. The stat block prints an attack's whole Attack Rating, and Eden adds Strength to a close
  * combat item's close band (item.mjs calculatedAttackRating): that band is stored less the NPC's Strength (str), so the
- * sheet rolls the printed number. Eden's weapon roll then takes its pool from the item's skill (actor.js rollItem).
+ * sheet rolls the printed number. Eden's weapon roll then takes its pool from the item's skill (actor.js rollItem). A
+ * weapon with a magazine comes loaded with regular rounds (Eden refuses to fire one with fewer rounds than it shoots,
+ * RollTypes.js); its spare load is an ammunition item (the export's `<weapon uid>:ammo`). An item found by a name only
+ * alike, or as the standard item of a generic name, says so with its score (flags.match: Chummer's line.match).
  */
 export function statBlockItems(things, ctx, powerType, str) {
   const all = list => list.flatMap(x => [x, ...all(x.accessories ?? [])])
-  const noted = x => ({ ...x, note: `Stat block: ${x.line?.printed ?? x.name}`, accessories: (x.accessories ?? []).map(noted) })
+  const noted = x => ({ ...x, note: [`Stat block: ${x.line?.printed ?? x.name}`, matchNote(x)].filter(Boolean).join(' — '),
+    accessories: (x.accessories ?? []).map(noted) })
   const byUid = new Map(all(things).map(x => [x.uid, x]))
   const items = runnerItems({ purchases: things.filter(x => !isPower(x)).map(noted) }, { ...ctx, entries: all(things), rated: true })
   for (const d of items) {
     const x = byUid.get(d.flags[MODULE_ID].id), line = x?.line
     if (!line) continue
     d.flags[MODULE_ID].npcLine = line.printed
+    if (line.match) d.flags[MODULE_ID].match = line.match
     if (!/^WEAPON_/.test(d.system.type ?? '')) continue
     if (line.dv) d.system.dmgDef = line.dv
+    if (d.system.ammocap > 0) Object.assign(d.system, { ammocount: d.system.ammocap, ammoLoaded: 'regular' })
     if (d.system.skill === 'close_combat' && line.values?.ar?.[0] != null && str != null) d.system.attackRating[0] -= str
   }
   for (const x of things.filter(isPower)) {
@@ -653,6 +666,7 @@ export function statBlockItems(things, ctx, powerType, str) {
     const doc = x.kind === 'critterpowers' ? icon(powerItem(p, powerType, ctx, [optional, p.note]), p, ctx)
       : pickItem({ ...p, pick: x.kind }, ctx)
     doc.flags[MODULE_ID].npcLine = x.line?.printed
+    if (x.line?.match) doc.flags[MODULE_ID].match = x.line.match
     items.push(doc)
   }
   return items

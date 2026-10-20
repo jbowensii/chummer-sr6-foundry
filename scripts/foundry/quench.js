@@ -365,7 +365,7 @@ export function registerQuench(quench) {
       const weaponsOf = a => (Handlebars.helpers.itemsOfWeapontype ? Handlebars.helpers.itemsOfWeapontype(a.items) : a.items.filter(i => i.system.type?.startsWith('WEAPON_')))
 
       it('the grunt’s sheet lists its gun and club as weapons; the gun at the stat block’s numbers', () => {
-        assert.sameMembers(weaponsOf(guard).map(i => i.name), ['Zap Gun', 'Made-up Stick'])
+        assert.sameMembers(weaponsOf(guard).map(i => i.name), ['Zap Gun', 'Made-up Stick', 'Made-up Thunderbus Pistol'])
         const gun = byName(guard, 'Zap Gun')
         assert.isTrue(gun.isWeapon)
         assert.deepEqual(gun.calculatedAttackRating, [10, 8, -1, -1, -1])  // (-1: Eden's "-")
@@ -376,6 +376,13 @@ export function registerQuench(quench) {
         const stick = byName(guard, 'Made-up Stick')
         assert.equal(stick.calculatedAttackRating[0], 7)
         assert.equal(stick.system.pool, 3 + 4)
+      })
+      it('the grunt’s pistol (linked by a name 96% alike) is loaded with regular rounds, so Eden lets it fire; a spare load and a standard commlink come along', () => {
+        const pistol = byName(guard, 'Made-up Thunderbus Pistol')
+        assert.deepEqual(flagOf(pistol).match, { score: 0.96, how: 'fuzzy' })
+        assert.include(pistol.system, { ammocap: 12, ammocount: 12, ammoLoaded: 'regular' })
+        assert.equal(byName(guard, 'Heavy Pistol/SMG')?.system.count, 12)
+        assert.equal(flagOf(byName(guard, 'Made-up Basic Link'))?.match?.how, 'standard')
       })
       it('the grunt’s worn armor is in its Defense Rating; its adept power is an adept power', () => {
         assert.equal(guard.system.defenserating.physical.pool, 4 + 3)

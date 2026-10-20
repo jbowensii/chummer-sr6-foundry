@@ -45,6 +45,22 @@ describe('npc-combat-items: a grunt', () => {
     expect(one(t.items, 'Quick Step 2')).toMatchObject({ type: 'adeptpower', system: { level: 2 } })
     expect(t.items.filter(i => i.type === 'critterpower')).toEqual([])
   })
+  test('a pistol linked by a name 96% alike says so; it comes loaded with regular rounds and one spare load', () => {
+    const pistol = one(t.items, 'Made-up Thunderbus Pistol')
+    expect(pistol.flags[M].match).toEqual({ score: 0.96, how: 'fuzzy' })
+    expect(pistol.system.description).toContain('by a name 96% alike')
+    // Eden refuses to fire fewer rounds than are loaded (RollTypes.js): a full magazine of regular
+    expect(pistol.system).toMatchObject({ ammocap: 12, ammocount: 12, ammoLoaded: 'regular' })
+    const ammo = one(t.items, 'Heavy Pistol/SMG')
+    expect(ammo.system).toMatchObject({ type: 'AMMUNITION', count: 12 })
+    expect(ammo.flags[M].match).toEqual({ score: 1, how: 'ammo' })
+    expect(ammo.system.description).toContain('regular ammunition for it, one full load')
+  })
+  test('a generic “commlink” is the catalog’s standard one, a default pick it says', () => {
+    const link = one(t.items, 'Made-up Basic Link')
+    expect(link.flags[M].match).toEqual({ score: 1, how: 'standard' })
+    expect(link.system.description).toContain('standard item for it (a default pick)')
+  })
   test('the runner-file path finds nothing more in the world’s compendiums (no duplicates); the lines stay in the notes', async () => {
     expect(await npcLineItems(t)).toEqual({ items: [], notes: [] })
     expect(t.actor.system.notes).toContain('Zap Gun [Zapper, DV 4P')
@@ -64,6 +80,8 @@ describe('npc-combat-items: a critter', () => {
     expect(t.actor.system.skills).toMatchObject({ close_combat: { points: 5 }, exotic_weapons: { points: 3 } })
     // Eden's own pool field stays 0, so rollItem works it out from the skill (a Critter prepares no item pools)
     for (const w of weapons(t.items)) expect(w.system.pool ?? 0).toBe(0)
+    // natural attacks: no ammunition
+    expect(t.items.filter(i => i.system.type === 'AMMUNITION')).toEqual([])
   })
   test('its powers are critter powers under their printed names, the catalog’s fields where it has the power; an optional one says so', () => {
     expect(t.items.filter(i => i.type === 'critterpower').map(i => i.name)).toEqual(['Glimmer', 'Made-up Hide (2)', 'Made-up Howl'])

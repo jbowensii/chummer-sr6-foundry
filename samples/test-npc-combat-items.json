@@ -95,7 +95,7 @@
      "kind": "npcs",
      "id": "crb.npc-guard",
      "name": "Made-up Guard",
-     "source": "CRB",
+     "source": "ZZ",
      "page": 10
     },
     "stats": [
@@ -170,11 +170,11 @@
      },
      {
       "part": "weapons",
-      "text": "Zap Gun [Zapper, DV 4P, SA, 10/8/—/—/—, 8(c), w/ Zap Scope] Made-up Stick [Club, DV 3S, 7/—/—/—/—]"
+      "text": "Zap Gun [Zapper, DV 4P, SA, 10/8/—/—/—, 8(c), w/ Zap Scope] Made-up Stick [Club, DV 3S, 7/—/—/—/—] Made-up Thunderbuss Pistol [Heavy Pistol, DV 4P, SA, 10/9/7/—/—, 12(c)]"
      },
      {
       "part": "gear",
-      "text": "Padded Vest (+3), Made-up credstick"
+      "text": "Padded Vest (+3), Made-up credstick, commlink"
      },
      {
       "part": "powers",
@@ -250,7 +250,11 @@
         ],
         "ammo": 8
        },
-       "dv": "4P"
+       "dv": "4P",
+       "match": {
+        "score": 1,
+        "how": "exact"
+       }
       },
       "accessories": [
        {
@@ -277,7 +281,11 @@
         "line": {
          "part": "weapons",
          "printed": "Zap Scope",
-         "values": {}
+         "values": {},
+         "match": {
+          "score": 1,
+          "how": "exact"
+         }
         },
         "accessories": []
        }
@@ -326,6 +334,105 @@
       "accessories": []
      },
      {
+      "id": "zz.thunderbus",
+      "kind": "weapons",
+      "name": "Made-up Thunderbus Pistol",
+      "source": "ZZ",
+      "page": 1,
+      "canon": false,
+      "attrs": {
+       "category": "Heavy pistol",
+       "dv": "3P",
+       "modes": "SA",
+       "ar": "9/9/7/—/—",
+       "ammo": "15(c)",
+       "avail": "2",
+       "cost": "500",
+       "class": "WEAPON_FIREARMS/PISTOLS_HEAVY"
+      },
+      "parts": [],
+      "values": {
+       "cost": 500,
+       "avail": 2,
+       "dv": 4,
+       "stun": false,
+       "ar": [
+        10,
+        9,
+        7,
+        null,
+        null
+       ],
+       "modes": [
+        "SA"
+       ],
+       "ammo": 12
+      },
+      "uid": "line:weapons:Made-up Thunderbuss Pistol [Heavy Pistol, DV 4P, SA, 10/9/7/—/—, 12(c)]",
+      "qty": 1,
+      "worn": false,
+      "bonuses": [],
+      "line": {
+       "part": "weapons",
+       "printed": "Made-up Thunderbuss Pistol [Heavy Pistol, DV 4P, SA, 10/9/7/—/—, 12(c)]",
+       "values": {
+        "dv": 4,
+        "stun": false,
+        "modes": [
+         "SA"
+        ],
+        "ar": [
+         10,
+         9,
+         7,
+         null,
+         null
+        ],
+        "ammo": 12
+       },
+       "dv": "4P",
+       "match": {
+        "score": 0.96,
+        "how": "fuzzy"
+       }
+      },
+      "accessories": []
+     },
+     {
+      "id": "zz.ammo-heavy",
+      "kind": "gear",
+      "name": "Heavy Pistol/SMG",
+      "source": "ZZ",
+      "page": 2,
+      "canon": false,
+      "attrs": {
+       "category": "Ammo by weapon type",
+       "avail": "1",
+       "per": "10 rounds",
+       "cost": "10",
+       "class": "AMMUNITION/AMMUNITION"
+      },
+      "parts": [],
+      "values": {
+       "cost": 10,
+       "avail": 1
+      },
+      "uid": "line:weapons:Made-up Thunderbuss Pistol [Heavy Pistol, DV 4P, SA, 10/9/7/—/—, 12(c)]:ammo",
+      "qty": 12,
+      "worn": false,
+      "bonuses": [],
+      "line": {
+       "part": "weapons",
+       "printed": "Made-up Thunderbuss Pistol [Heavy Pistol, DV 4P, SA, 10/9/7/—/—, 12(c)]",
+       "values": {},
+       "match": {
+        "score": 1,
+        "how": "ammo"
+       }
+      },
+      "accessories": []
+     },
+     {
       "id": "crb.padded-vest",
       "kind": "armor",
       "name": "Padded Vest",
@@ -357,6 +464,10 @@
        "printed": "Padded Vest (+3)",
        "values": {
         "defense": 3
+       },
+       "match": {
+        "score": 1,
+        "how": "exact"
        }
       },
       "accessories": []
@@ -376,6 +487,41 @@
        "part": "gear",
        "printed": "Made-up credstick",
        "values": {}
+      },
+      "accessories": []
+     },
+     {
+      "id": "zz.basic-link",
+      "kind": "electronics",
+      "name": "Made-up Basic Link",
+      "source": "ZZ",
+      "page": 3,
+      "canon": false,
+      "attrs": {
+       "category": "Commlink",
+       "rating": "1",
+       "avail": "1",
+       "cost": "100",
+       "class": "ELECTRONICS/COMMLINK"
+      },
+      "parts": [],
+      "values": {
+       "rating": 1,
+       "cost": 100,
+       "avail": 1
+      },
+      "uid": "line:gear:commlink",
+      "qty": 1,
+      "worn": false,
+      "bonuses": [],
+      "line": {
+       "part": "gear",
+       "printed": "commlink",
+       "values": {},
+       "match": {
+        "score": 1,
+        "how": "standard"
+       }
       },
       "accessories": []
      },
@@ -404,7 +550,11 @@
       "line": {
        "part": "powers",
        "printed": "Quick Step 2",
-       "values": {}
+       "values": {},
+       "match": {
+        "score": 1,
+        "how": "exact"
+       }
       },
       "accessories": []
      }
@@ -622,7 +772,11 @@
       "line": {
        "part": "powers",
        "printed": "Glimmer",
-       "values": {}
+       "values": {},
+       "match": {
+        "score": 1,
+        "how": "exact"
+       }
       },
       "accessories": []
      },
