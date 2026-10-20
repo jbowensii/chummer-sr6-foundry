@@ -1,0 +1,969 @@
+{
+ "format": "chummer-sr6-export",
+ "version": 1,
+ "kind": "runners",
+ "exportedAt": "2026-10-04T09:00:00.000Z",
+ "app": {
+  "name": "Nova Prime Chummer",
+  "version": "0.9.0"
+ },
+ "descriptions": true,
+ "runners": [
+  {
+   "id": "npc-guard",
+   "updatedAt": "2026-10-04T09:00:00.000Z",
+   "exportedAt": "2026-10-04T09:00:00.000Z",
+   "streetName": "Made-up Guard",
+   "realName": "",
+   "finalized": false,
+   "metatype": {
+    "id": "",
+    "name": ""
+   },
+   "magic": {
+    "kind": "mundane",
+    "initiation": 0,
+    "submersion": 0
+   },
+   "portrait": null,
+   "token": null,
+   "attributes": {
+    "bod": {
+     "natural": 1,
+     "augmented": 1
+    },
+    "agi": {
+     "natural": 1,
+     "augmented": 1
+    },
+    "rea": {
+     "natural": 1,
+     "augmented": 1
+    },
+    "str": {
+     "natural": 1,
+     "augmented": 1
+    },
+    "wil": {
+     "natural": 1,
+     "augmented": 1
+    },
+    "log": {
+     "natural": 1,
+     "augmented": 1
+    },
+    "int": {
+     "natural": 1,
+     "augmented": 1
+    },
+    "cha": {
+     "natural": 1,
+     "augmented": 1
+    },
+    "edg": {
+     "natural": 1,
+     "augmented": 1
+    },
+    "mag": {
+     "natural": 0,
+     "augmented": 0
+    },
+    "res": {
+     "natural": 0,
+     "augmented": 0
+    }
+   },
+   "essence": 5,
+   "edge": 1,
+   "skills": [],
+   "knowledge": [],
+   "qualities": [],
+   "picks": [],
+   "martialArts": [],
+   "purchases": [],
+   "contacts": [],
+   "lifestyle": null,
+   "sins": [],
+   "karma": 40,
+   "nuyen": 0,
+   "background": "",
+   "notes": "",
+   "ledger": [],
+   "npc": {
+    "kind": "grunt",
+    "from": {
+     "kind": "npcs",
+     "id": "crb.npc-guard",
+     "name": "Made-up Guard",
+     "source": "CRB",
+     "page": 10
+    },
+    "stats": [
+     {
+      "key": "bod",
+      "label": "BOD",
+      "printed": "4",
+      "value": "4",
+      "ok": true
+     },
+     {
+      "key": "agi",
+      "label": "AGI",
+      "printed": "4",
+      "value": "4",
+      "ok": true
+     },
+     {
+      "key": "rea",
+      "label": "REA",
+      "printed": "3",
+      "value": "3",
+      "ok": true
+     },
+     {
+      "key": "str",
+      "label": "STR",
+      "printed": "3",
+      "value": "3",
+      "ok": true
+     },
+     {
+      "key": "wil",
+      "label": "WIL",
+      "printed": "3",
+      "value": "3",
+      "ok": true
+     },
+     {
+      "key": "log",
+      "label": "LOG",
+      "printed": "2",
+      "value": "2",
+      "ok": true
+     },
+     {
+      "key": "int",
+      "label": "INT",
+      "printed": "3",
+      "value": "3",
+      "ok": true
+     },
+     {
+      "key": "cha",
+      "label": "CHA",
+      "printed": "2",
+      "value": "2",
+      "ok": true
+     },
+     {
+      "key": "edg",
+      "label": "EDG",
+      "printed": "2",
+      "value": "2",
+      "ok": true
+     }
+    ],
+    "lines": [
+     {
+      "part": "skills",
+      "text": "Firearms 4, Close Combat 3"
+     },
+     {
+      "part": "weapons",
+      "text": "Zap Gun [Zapper, DV 4P, SA, 10/8/—/—/—, 8(c), w/ Zap Scope] Made-up Stick [Club, DV 3S, 7/—/—/—/—]"
+     },
+     {
+      "part": "gear",
+      "text": "Padded Vest (+3), Made-up credstick"
+     },
+     {
+      "part": "powers",
+      "text": "Quick Step 2"
+     }
+    ],
+    "pools": [
+     {
+      "name": "Firearms",
+      "rating": 4,
+      "printed": "Firearms 4"
+     },
+     {
+      "name": "Close Combat",
+      "rating": 3,
+      "printed": "Close Combat 3"
+     }
+    ],
+    "items": [
+     {
+      "id": "crb.zap-gun",
+      "kind": "weapons",
+      "name": "Zap Gun",
+      "source": "CRB",
+      "page": 250,
+      "canon": true,
+      "attrs": {
+       "category": "zappers",
+       "dv": "3P",
+       "modes": "SS",
+       "ar": "9/7/—/—/—",
+       "ammo": "8(c)",
+       "avail": "2",
+       "cost": "290"
+      },
+      "parts": [],
+      "values": {
+       "cost": 290,
+       "avail": 2,
+       "dv": 4,
+       "stun": false,
+       "ar": [
+        10,
+        8,
+        null,
+        null,
+        null
+       ],
+       "modes": [
+        "SA"
+       ],
+       "ammo": 8
+      },
+      "uid": "line:weapons:Zap Gun [Zapper, DV 4P, SA, 10/8/—/—/—, 8(c), w/ Zap Scope]",
+      "qty": 1,
+      "worn": false,
+      "bonuses": [],
+      "line": {
+       "part": "weapons",
+       "printed": "Zap Gun [Zapper, DV 4P, SA, 10/8/—/—/—, 8(c), w/ Zap Scope]",
+       "values": {
+        "dv": 4,
+        "stun": false,
+        "modes": [
+         "SA"
+        ],
+        "ar": [
+         10,
+         8,
+         null,
+         null,
+         null
+        ],
+        "ammo": 8
+       },
+       "dv": "4P"
+      },
+      "accessories": [
+       {
+        "id": "crb.zap-scope",
+        "kind": "gear",
+        "name": "Zap Scope",
+        "source": "CRB",
+        "page": 258,
+        "canon": true,
+        "attrs": {
+         "category": "weapon accessories",
+         "avail": "3",
+         "cost": "350"
+        },
+        "parts": [],
+        "values": {
+         "cost": 350,
+         "avail": 3
+        },
+        "uid": "line:weapons:Zap Gun [Zapper, DV 4P, SA, 10/8/—/—/—, 8(c), w/ Zap Scope]:w/Zap Scope",
+        "qty": 1,
+        "worn": false,
+        "bonuses": [],
+        "line": {
+         "part": "weapons",
+         "printed": "Zap Scope",
+         "values": {}
+        },
+        "accessories": []
+       }
+      ]
+     },
+     {
+      "kind": "weapons",
+      "name": "Made-up Stick",
+      "canon": false,
+      "attrs": {
+       "category": "Club",
+       "dv": "3S"
+      },
+      "parts": [],
+      "values": {
+       "dv": 3,
+       "stun": true,
+       "ar": [
+        7,
+        null,
+        null,
+        null,
+        null
+       ]
+      },
+      "uid": "line:weapons:Made-up Stick [Club, DV 3S, 7/—/—/—/—]",
+      "qty": 1,
+      "worn": false,
+      "bonuses": [],
+      "line": {
+       "part": "weapons",
+       "printed": "Made-up Stick [Club, DV 3S, 7/—/—/—/—]",
+       "values": {
+        "dv": 3,
+        "stun": true,
+        "ar": [
+         7,
+         null,
+         null,
+         null,
+         null
+        ]
+       },
+       "dv": "3S"
+      },
+      "accessories": []
+     },
+     {
+      "id": "crb.padded-vest",
+      "kind": "armor",
+      "name": "Padded Vest",
+      "source": "CRB",
+      "page": 264,
+      "canon": true,
+      "attrs": {
+       "category": "armor",
+       "defense": "+2",
+       "social": "–1",
+       "capacity": "6",
+       "avail": "2",
+       "cost": "400"
+      },
+      "parts": [],
+      "values": {
+       "cost": 400,
+       "avail": 2,
+       "capacity": 6,
+       "defense": 3,
+       "social": -1
+      },
+      "uid": "line:gear:Padded Vest (+3)",
+      "qty": 1,
+      "worn": true,
+      "bonuses": [],
+      "line": {
+       "part": "gear",
+       "printed": "Padded Vest (+3)",
+       "values": {
+        "defense": 3
+       }
+      },
+      "accessories": []
+     },
+     {
+      "kind": "gear",
+      "name": "Made-up credstick",
+      "canon": false,
+      "attrs": {},
+      "parts": [],
+      "values": {},
+      "uid": "line:gear:Made-up credstick",
+      "qty": 1,
+      "worn": false,
+      "bonuses": [],
+      "line": {
+       "part": "gear",
+       "printed": "Made-up credstick",
+       "values": {}
+      },
+      "accessories": []
+     },
+     {
+      "id": "crb.quick-step.2",
+      "kind": "adeptpowers",
+      "name": "Quick Step 2",
+      "source": "CRB",
+      "page": 157,
+      "canon": true,
+      "attrs": {
+       "cost": "0.5",
+       "activation": "Minor Action",
+       "family": "crb.quick-step",
+       "level": "2"
+      },
+      "parts": [],
+      "values": {
+       "powerCost": 0.5
+      },
+      "uid": "power:Quick Step 2",
+      "qty": 1,
+      "worn": false,
+      "bonuses": [],
+      "level": 2,
+      "line": {
+       "part": "powers",
+       "printed": "Quick Step 2",
+       "values": {}
+      },
+      "accessories": []
+     }
+    ]
+   }
+  },
+  {
+   "id": "npc-hound",
+   "updatedAt": "2026-10-04T09:00:00.000Z",
+   "exportedAt": "2026-10-04T09:00:00.000Z",
+   "streetName": "Made-up Hound",
+   "realName": "",
+   "finalized": false,
+   "metatype": {
+    "id": "",
+    "name": ""
+   },
+   "magic": {
+    "kind": "mundane",
+    "initiation": 0,
+    "submersion": 0
+   },
+   "portrait": null,
+   "token": null,
+   "attributes": {
+    "bod": {
+     "natural": 1,
+     "augmented": 1
+    },
+    "agi": {
+     "natural": 1,
+     "augmented": 1
+    },
+    "rea": {
+     "natural": 1,
+     "augmented": 1
+    },
+    "str": {
+     "natural": 1,
+     "augmented": 1
+    },
+    "wil": {
+     "natural": 1,
+     "augmented": 1
+    },
+    "log": {
+     "natural": 1,
+     "augmented": 1
+    },
+    "int": {
+     "natural": 1,
+     "augmented": 1
+    },
+    "cha": {
+     "natural": 1,
+     "augmented": 1
+    },
+    "edg": {
+     "natural": 1,
+     "augmented": 1
+    },
+    "mag": {
+     "natural": 0,
+     "augmented": 0
+    },
+    "res": {
+     "natural": 0,
+     "augmented": 0
+    }
+   },
+   "essence": 5,
+   "edge": 1,
+   "skills": [],
+   "knowledge": [],
+   "qualities": [],
+   "picks": [],
+   "martialArts": [],
+   "purchases": [],
+   "contacts": [],
+   "lifestyle": null,
+   "sins": [],
+   "karma": 40,
+   "nuyen": 0,
+   "background": "",
+   "notes": "",
+   "ledger": [],
+   "npc": {
+    "kind": "critter",
+    "from": {
+     "kind": "critters",
+     "id": "crb.npc-hound",
+     "name": "Made-up Hound",
+     "source": "CRB",
+     "page": 10
+    },
+    "stats": [
+     {
+      "key": "bod",
+      "label": "BOD",
+      "printed": "5",
+      "value": "5",
+      "ok": true
+     },
+     {
+      "key": "agi",
+      "label": "AGI",
+      "printed": "4",
+      "value": "4",
+      "ok": true
+     },
+     {
+      "key": "rea",
+      "label": "REA",
+      "printed": "4",
+      "value": "4",
+      "ok": true
+     },
+     {
+      "key": "str",
+      "label": "STR",
+      "printed": "6",
+      "value": "6",
+      "ok": true
+     },
+     {
+      "key": "wil",
+      "label": "WIL",
+      "printed": "2",
+      "value": "2",
+      "ok": true
+     },
+     {
+      "key": "log",
+      "label": "LOG",
+      "printed": "1",
+      "value": "1",
+      "ok": true
+     },
+     {
+      "key": "int",
+      "label": "INT",
+      "printed": "3",
+      "value": "3",
+      "ok": true
+     },
+     {
+      "key": "cha",
+      "label": "CHA",
+      "printed": "1",
+      "value": "1",
+      "ok": true
+     },
+     {
+      "key": "edg",
+      "label": "EDG",
+      "printed": "1",
+      "value": "1",
+      "ok": true
+     }
+    ],
+    "lines": [
+     {
+      "part": "skills",
+      "text": "Close Combat 5, Exotic Weapons 3"
+     },
+     {
+      "part": "powers",
+      "text": "Glimmer, Made-up Hide (2)"
+     },
+     {
+      "part": "optionalPowers",
+      "text": "Made-up Howl"
+     },
+     {
+      "part": "weapons",
+      "text": "Bite [Close Combat, DV 4P, 9/—/—/—/—] Tail Lash [Close Combat, DV 2S (sets Made-up I status), 9/—/—/—/—]"
+     },
+     {
+      "part": "attacks",
+      "text": "Spit: DV 2P (made-up acid), 6/5/2/—/—"
+     }
+    ],
+    "pools": [
+     {
+      "name": "Close Combat",
+      "rating": 5,
+      "printed": "Close Combat 5"
+     },
+     {
+      "name": "Exotic Weapons",
+      "rating": 3,
+      "printed": "Exotic Weapons 3"
+     }
+    ],
+    "items": [
+     {
+      "id": "crb.glimmer",
+      "kind": "critterpowers",
+      "name": "Glimmer",
+      "source": "CRB",
+      "page": 225,
+      "canon": true,
+      "attrs": {
+       "type": "P",
+       "action": "Major",
+       "range": "LOS",
+       "duration": "Instant"
+      },
+      "parts": [],
+      "values": {},
+      "uid": "power:Glimmer",
+      "qty": 1,
+      "worn": false,
+      "bonuses": [],
+      "line": {
+       "part": "powers",
+       "printed": "Glimmer",
+       "values": {}
+      },
+      "accessories": []
+     },
+     {
+      "kind": "critterpowers",
+      "name": "Made-up Hide (2)",
+      "canon": false,
+      "attrs": {},
+      "parts": [],
+      "values": {
+       "rating": 2
+      },
+      "uid": "power:Made-up Hide (2)",
+      "qty": 1,
+      "worn": false,
+      "bonuses": [],
+      "line": {
+       "part": "powers",
+       "printed": "Made-up Hide (2)",
+       "values": {
+        "rating": 2
+       }
+      },
+      "accessories": []
+     },
+     {
+      "kind": "critterpowers",
+      "name": "Made-up Howl",
+      "canon": false,
+      "attrs": {},
+      "parts": [],
+      "values": {},
+      "uid": "power:Made-up Howl",
+      "qty": 1,
+      "worn": false,
+      "bonuses": [],
+      "line": {
+       "part": "optionalPowers",
+       "printed": "Made-up Howl",
+       "values": {}
+      },
+      "accessories": []
+     },
+     {
+      "kind": "weapons",
+      "name": "Bite",
+      "canon": false,
+      "attrs": {
+       "category": "Close Combat",
+       "skill": "Close Combat",
+       "dv": "4P"
+      },
+      "parts": [],
+      "values": {
+       "dv": 4,
+       "stun": false,
+       "ar": [
+        9,
+        null,
+        null,
+        null,
+        null
+       ]
+      },
+      "uid": "line:weapons:Bite [Close Combat, DV 4P, 9/—/—/—/—]",
+      "qty": 1,
+      "worn": false,
+      "bonuses": [],
+      "line": {
+       "part": "weapons",
+       "printed": "Bite [Close Combat, DV 4P, 9/—/—/—/—]",
+       "values": {
+        "dv": 4,
+        "stun": false,
+        "ar": [
+         9,
+         null,
+         null,
+         null,
+         null
+        ]
+       },
+       "dv": "4P"
+      },
+      "accessories": []
+     },
+     {
+      "kind": "weapons",
+      "name": "Tail Lash",
+      "canon": false,
+      "attrs": {
+       "category": "Close Combat",
+       "skill": "Close Combat",
+       "dv": "2S (sets Made-up I status)"
+      },
+      "parts": [],
+      "values": {
+       "dv": 2,
+       "stun": true,
+       "ar": [
+        9,
+        null,
+        null,
+        null,
+        null
+       ]
+      },
+      "uid": "line:weapons:Tail Lash [Close Combat, DV 2S (sets Made-up I status), 9/—/—/—/—]",
+      "qty": 1,
+      "worn": false,
+      "bonuses": [],
+      "line": {
+       "part": "weapons",
+       "printed": "Tail Lash [Close Combat, DV 2S (sets Made-up I status), 9/—/—/—/—]",
+       "values": {
+        "dv": 2,
+        "stun": true,
+        "ar": [
+         9,
+         null,
+         null,
+         null,
+         null
+        ]
+       },
+       "dv": "2S (sets Made-up I status)"
+      },
+      "accessories": []
+     },
+     {
+      "kind": "weapons",
+      "name": "Spit",
+      "canon": false,
+      "attrs": {
+       "category": "Exotic Weapons",
+       "skill": "Exotic Weapons",
+       "dv": "2P (made-up acid)"
+      },
+      "parts": [],
+      "values": {
+       "dv": 2,
+       "stun": false,
+       "ar": [
+        6,
+        5,
+        2,
+        null,
+        null
+       ]
+      },
+      "uid": "line:attacks:Spit: DV 2P (made-up acid), 6/5/2/—/—",
+      "qty": 1,
+      "worn": false,
+      "bonuses": [],
+      "line": {
+       "part": "attacks",
+       "printed": "Spit: DV 2P (made-up acid), 6/5/2/—/—",
+       "values": {
+        "dv": 2,
+        "stun": false,
+        "ar": [
+         6,
+         5,
+         2,
+         null,
+         null
+        ]
+       },
+       "dv": "2P (made-up acid)"
+      },
+      "accessories": []
+     }
+    ]
+   }
+  },
+  {
+   "id": "npc-gust",
+   "updatedAt": "2026-10-04T09:00:00.000Z",
+   "exportedAt": "2026-10-04T09:00:00.000Z",
+   "streetName": "Spirit of Made-up Air",
+   "realName": "",
+   "finalized": false,
+   "metatype": {
+    "id": "",
+    "name": ""
+   },
+   "magic": {
+    "kind": "mundane",
+    "initiation": 0,
+    "submersion": 0
+   },
+   "portrait": null,
+   "token": null,
+   "attributes": {
+    "bod": {
+     "natural": 1,
+     "augmented": 1
+    },
+    "agi": {
+     "natural": 1,
+     "augmented": 1
+    },
+    "rea": {
+     "natural": 1,
+     "augmented": 1
+    },
+    "str": {
+     "natural": 1,
+     "augmented": 1
+    },
+    "wil": {
+     "natural": 1,
+     "augmented": 1
+    },
+    "log": {
+     "natural": 1,
+     "augmented": 1
+    },
+    "int": {
+     "natural": 1,
+     "augmented": 1
+    },
+    "cha": {
+     "natural": 1,
+     "augmented": 1
+    },
+    "edg": {
+     "natural": 1,
+     "augmented": 1
+    },
+    "mag": {
+     "natural": 0,
+     "augmented": 0
+    },
+    "res": {
+     "natural": 0,
+     "augmented": 0
+    }
+   },
+   "essence": 5,
+   "edge": 1,
+   "skills": [],
+   "knowledge": [],
+   "qualities": [],
+   "picks": [],
+   "martialArts": [],
+   "purchases": [],
+   "contacts": [],
+   "lifestyle": null,
+   "sins": [],
+   "karma": 40,
+   "nuyen": 0,
+   "background": "",
+   "notes": "",
+   "ledger": [],
+   "npc": {
+    "kind": "spirit",
+    "rating": 4,
+    "from": {
+     "kind": "spirits",
+     "id": "crb.npc-gust",
+     "name": "Spirit of Made-up Air",
+     "source": "CRB",
+     "page": 10
+    },
+    "stats": [
+     {
+      "key": "bod",
+      "label": "BOD",
+      "printed": "F",
+      "value": "4",
+      "ok": true
+     },
+     {
+      "key": "agi",
+      "label": "AGI",
+      "printed": "F+2",
+      "value": "6",
+      "ok": true
+     },
+     {
+      "key": "str",
+      "label": "STR",
+      "printed": "F-1",
+      "value": "3",
+      "ok": true
+     }
+    ],
+    "lines": [
+     {
+      "part": "attacks",
+      "text": "Gust [DV (F)P, Attack Ratings (F x 2)/(F x 2) – 2/—/—/—]"
+     }
+    ],
+    "pools": [],
+    "items": [
+     {
+      "kind": "weapons",
+      "name": "Gust",
+      "canon": false,
+      "attrs": {
+       "category": "Exotic Weapons",
+       "skill": "Exotic Weapons",
+       "dv": "(F)P"
+      },
+      "parts": [],
+      "values": {
+       "dv": 4,
+       "stun": false,
+       "ar": [
+        8,
+        6,
+        null,
+        null,
+        null
+       ]
+      },
+      "uid": "line:attacks:Gust [DV (F)P, Attack Ratings (F x 2)/(F x 2) – 2/—/—/—]",
+      "qty": 1,
+      "worn": false,
+      "bonuses": [],
+      "line": {
+       "part": "attacks",
+       "printed": "Gust [DV (F)P, Attack Ratings (F x 2)/(F x 2) – 2/—/—/—]",
+       "values": {
+        "dv": 4,
+        "stun": false,
+        "ar": [
+         8,
+         6,
+         null,
+         null,
+         null
+        ]
+       },
+       "dv": "(F)P"
+      },
+      "accessories": []
+     }
+    ]
+   }
+  }
+ ]
+}

@@ -253,9 +253,10 @@ export function translateBook(book, { audit, exportedAt, appVersion, description
   // A being's gear, weapon and augmentation lines as this book's items (lib/npc-lines.js): matched by name in the book,
   // the stat block's own values kept over the entry's, its "w/" accessories with it (a mod says what it's fitted to: a
   // pack actor's items get their ids only when written). Unmatched: the line stays text; tied: text and a report line.
+  // (a file with npc.items: beingActor made them)
   const thingItems = (being, npc) => {
     const out = []
-    for (const th of npcThings(npc)) {
+    for (const th of Array.isArray(npc.items) ? [] : npcThings(npc)) {
       const r = matchThing(th.name, entries.filter(x => ITEM_KINDS.includes(x.kind)), LINE_KINDS[th.part], being.page)
       if (r?.candidates) textOnly.push(`${being.name}: ${thingTie(th, r.candidates)}`)
       if (!r?.entry) continue

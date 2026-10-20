@@ -25,11 +25,11 @@ const WEAPONS = [
   [/light machine|\blmg/, 'WEAPON_FIREARMS', 'LMG', 'firearms'], [/medium machine|\bmmg/, 'WEAPON_FIREARMS', 'MMG', 'firearms'],
   [/heavy machine|\bhmg/, 'WEAPON_FIREARMS', 'HMG', 'firearms'], [/rifle/, 'WEAPON_FIREARMS', 'RIFLE_HUNTING', 'firearms'],
   [/blade|sword|knife/, 'WEAPON_CLOSE_COMBAT', 'BLADES', 'close_combat'], [/club|baton|staff/, 'WEAPON_CLOSE_COMBAT', 'CLUBS', 'close_combat'],
-  [/whip/, 'WEAPON_CLOSE_COMBAT', 'WHIPS', 'close_combat'], [/unarmed/, 'WEAPON_CLOSE_COMBAT', 'UNARMED', 'close_combat'],
+  [/whip/, 'WEAPON_CLOSE_COMBAT', 'WHIPS', 'close_combat'], [/unarmed|natural/, 'WEAPON_CLOSE_COMBAT', 'UNARMED', 'close_combat'],
   [/crossbow/, 'WEAPON_RANGED', 'CROSSBOWS', 'athletics'], [/\bbow/, 'WEAPON_RANGED', 'BOWS', 'athletics'],
   [/flame|thrower\b/, 'WEAPON_SPECIAL', 'THROWERS', 'exotic_weapons'], [/grenade|throw/, 'WEAPON_RANGED', 'THROWING', 'athletics'],
   [/launcher|rocket|missile/, 'WEAPON_SPECIAL', 'LAUNCHERS', 'engineering'], [/dart/, 'WEAPON_SPECIAL', 'DART', 'exotic_weapons'],
-  [/melee|close/, 'WEAPON_CLOSE_COMBAT', 'OTHER_CLOSE', 'close_combat'],
+  [/melee|close/, 'WEAPON_CLOSE_COMBAT', 'OTHER_CLOSE', 'close_combat'], [/exotic/, 'WEAPON_SPECIAL', 'OTHER_SPECIAL', 'exotic_weapons'],
 ]
 export function weaponType(category) {
   const { hit: [, type, subtype, skill], known } = first(WEAPONS, category, [null, 'WEAPON_SPECIAL', 'OTHER_SPECIAL', 'exotic_weapons'])

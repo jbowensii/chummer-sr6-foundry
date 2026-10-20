@@ -17,6 +17,7 @@ const TEST_FOLDER = 'Chummer SR6 Importer tests'
 const SAMPLE = `modules/${MODULE_ID}/samples/test-runners.json`
 const BOOKS = `modules/${MODULE_ID}/samples/test-books.json`
 const COMPENDIUM = `modules/${MODULE_ID}/samples/test-compendium.json`
+const NPC_COMBAT = `modules/${MODULE_ID}/samples/test-npc-combat-items.json`
 const PREFIX = 'sr6test-'  // world packs these tests make: world.sr6test-chummer-sr6-<type> (and a stand-in 0.3 pack, world.sr6test-sr6-mus-weapons)
 const flagOf = d => d?.flags?.[MODULE_ID]
 const HOSTILE = () => CONST.TOKEN_DISPOSITIONS.HOSTILE
@@ -336,6 +337,71 @@ export function registerQuench(quench) {
           assert.include(a.prototypeToken, { actorLink: false, disposition: HOSTILE() }, a.name)
         }
         assert.include(grunt.system.notes, 'Grunt, Professional Rating 3')
+      })
+    })
+  })
+
+  // npc-combat-items: the stat block's things (npc.items, samples/test-npc-combat-items.json from Chummer's exporter) as
+  // the items Eden's sheet rolls: listed as weapons (helper.js itemsOfWeapontype), and what its WeaponRoll reads
+  // (RollTypes.js: the item's skill; item.mjs calculatedAttackRating and calculatedDamage; actor.js _getSkillPool, which
+  // rollItem uses when the item's pool is 0, as a Critter's always is) at the printed numbers.
+  batch('npc combat items', ({ describe, it, assert, before, after }) => {
+    describe('npc-combat-items: an imported grunt, critter and spirit fight with their stat block’s things', function () {
+      this.timeout(30000)
+      let tag, folder, guard, hound, gust, WeaponRoll
+      before(async function () {
+        const res = readExport(await (await fetch(NPC_COMBAT)).text())
+        if (!res.ok) throw new Error(res.reason)
+        tag = `quench-${foundry.utils.randomID()}-`
+        for (const r of res.file.runners) r.id = tag + r.id
+        folder = await makeFolder()
+        const made = []
+        for (const r of res.file.runners) made.push(await importRunner(res.file, r, 'create', folder))
+        for (const r of made) assert.equal(r.action, 'create', r.error?.message)
+        ;[guard, hound, gust] = made.map(r => r.actor)
+        try { ({ WeaponRoll } = await import(foundry.utils.getRoute('systems/shadowrun6-eden/module/dice/RollTypes.js'))) } catch { WeaponRoll = null }
+      })
+      after(() => cleanUp(tag, folder))
+      const weaponsOf = a => (Handlebars.helpers.itemsOfWeapontype ? Handlebars.helpers.itemsOfWeapontype(a.items) : a.items.filter(i => i.system.type?.startsWith('WEAPON_')))
+
+      it('the grunt’s sheet lists its gun and club as weapons; the gun at the stat block’s numbers', () => {
+        assert.sameMembers(weaponsOf(guard).map(i => i.name), ['Zap Gun', 'Made-up Stick'])
+        const gun = byName(guard, 'Zap Gun')
+        assert.isTrue(gun.isWeapon)
+        assert.deepEqual(gun.calculatedAttackRating, [10, 8, -1, -1, -1])  // (-1: Eden's "-")
+        assert.equal(gun.calculatedDamage, 4)
+        assert.isTrue(byName(guard, 'Zap Scope')?.type === 'mod')
+      })
+      it('the grunt’s club rolls Close Combat + Agility at its printed AR 7 (Eden adds Strength back)', () => {
+        const stick = byName(guard, 'Made-up Stick')
+        assert.equal(stick.calculatedAttackRating[0], 7)
+        assert.equal(stick.system.pool, 3 + 4)
+      })
+      it('the grunt’s worn armor is in its Defense Rating; its adept power is an adept power', () => {
+        assert.equal(guard.system.defenserating.physical.pool, 4 + 3)
+        assert.equal(byName(guard, 'Quick Step 2')?.type, 'adeptpower')
+      })
+      it('the critter’s natural attacks are its weapons at the printed AR and DV; its pool is Close Combat + Agility', () => {
+        assert.sameMembers(weaponsOf(hound).map(i => i.name), ['Bite', 'Tail Lash', 'Spit'])
+        const bite = byName(hound, 'Bite')
+        assert.equal(bite.calculatedAttackRating[0], 9)
+        assert.equal(bite.calculatedDamage, 4)
+        assert.equal(bite.system.pool, 0)
+        assert.equal(hound._getSkillPool(bite.system.skill, bite.system.skillSpec), 5 + 4)
+        assert.deepEqual(byName(hound, 'Spit').calculatedAttackRating.slice(0, 3), [6, 5, 2])
+        assert.sameMembers(itemsOf(hound, 'critterpower').map(i => i.name), ['Glimmer', 'Made-up Hide (2)', 'Made-up Howl'])
+      })
+      it('Eden’s own WeaponRoll takes the bite: Close Combat, Physical damage', function () {
+        if (!WeaponRoll) this.skip()
+        const roll = new WeaponRoll(hound, byName(hound, 'Bite'))
+        assert.equal(roll.skillId, 'close_combat')
+        assert.equal(roll.monitor, 'physical')
+        assert.equal(new WeaponRoll(hound, byName(hound, 'Tail Lash')).monitor, 'stun')
+      })
+      it('the spirit’s attack is worked out at its Force 4', () => {
+        const g = byName(gust, 'Gust')
+        assert.equal(g.calculatedDamage, 4)
+        assert.deepEqual(g.calculatedAttackRating.slice(0, 2), [8, 6])
       })
     })
   })

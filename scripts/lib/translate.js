@@ -624,6 +624,40 @@ export function splitTop(s) {
 }
 const intOf = s => (/^\s*-?\d+\s*$/.test(s?.value ?? '') ? Number(s.value) : null)
 
+const PICK_KINDS = new Set(['adeptpowers', 'spells', 'complexforms'])
+const isPower = x => x.kind === 'critterpowers' || PICK_KINDS.has(x.kind)
+/**
+ * An NPC's stat-block things (the export's npc.items: Chummer's npc.ts npcThings) as its items: weapons, attacks, armor,
+ * gear and augmentations as a runner's purchases are (lineItem; accessories fitted, armor worn so Eden's Defense Rating
+ * counts it), powers as critter (or sprite) powers, adept powers, spells or complex forms under their printed names (an
+ * optional one says so). Each says its printed line, and keeps flags.npcLine (the earlier line items' flag). A weapon
+ * takes its DV text as printed. The stat block prints an attack's whole Attack Rating, and Eden adds Strength to a close
+ * combat item's close band (item.mjs calculatedAttackRating): that band is stored less the NPC's Strength (str), so the
+ * sheet rolls the printed number. Eden's weapon roll then takes its pool from the item's skill (actor.js rollItem).
+ */
+export function statBlockItems(things, ctx, powerType, str) {
+  const all = list => list.flatMap(x => [x, ...all(x.accessories ?? [])])
+  const noted = x => ({ ...x, note: `Stat block: ${x.line?.printed ?? x.name}`, accessories: (x.accessories ?? []).map(noted) })
+  const byUid = new Map(all(things).map(x => [x.uid, x]))
+  const items = runnerItems({ purchases: things.filter(x => !isPower(x)).map(noted) }, { ...ctx, entries: all(things), rated: true })
+  for (const d of items) {
+    const x = byUid.get(d.flags[MODULE_ID].id), line = x?.line
+    if (!line) continue
+    d.flags[MODULE_ID].npcLine = line.printed
+    if (!/^WEAPON_/.test(d.system.type ?? '')) continue
+    if (line.dv) d.system.dmgDef = line.dv
+    if (d.system.skill === 'close_combat' && line.values?.ar?.[0] != null && str != null) d.system.attackRating[0] -= str
+  }
+  for (const x of things.filter(isPower)) {
+    const p = noted({ ...x, name: x.line?.printed ?? x.name }), optional = x.line?.part === 'optionalPowers' && 'Optional power.'
+    const doc = x.kind === 'critterpowers' ? icon(powerItem(p, powerType, ctx, [optional, p.note]), p, ctx)
+      : pickItem({ ...p, pick: x.kind }, ctx)
+    doc.flags[MODULE_ID].npcLine = x.line?.printed
+    items.push(doc)
+  }
+  return items
+}
+
 /**
  * An NPC block (C1's runner.npc, or a book being's entry.npc) -> Eden actor data; book beings use it too (books.js).
  * flags: the actor's flags ({ [MODULE_ID]: { id, exportedAt, appVersion, … } }); powers: { [normKey(name)]: entry } of the
@@ -664,7 +698,9 @@ export function beingActor(npc, { name, flags, sanitize = escapeText, icons = nu
 
   // powers as items (a sprite's are sprite powers); a critter power's fields from the file's entry when it has one
   const powerType = npc.kind === 'sprite' ? 'spritepower' : 'critterpower'
-  for (const part of ['powers', 'optionalPowers']) for (const l of (npc.lines ?? []).filter(l => l.part === part)) for (const p of splitTop(l.text)) {
+  // a file with the stat block's things as items (Chummer 0.17's npc.items): those; an older file: its powers lines
+  if (Array.isArray(npc.items)) items.push(...statBlockItems(npc.items, ctx, powerType, int('str')))
+  else for (const part of ['powers', 'optionalPowers']) for (const l of (npc.lines ?? []).filter(l => l.part === part)) for (const p of splitTop(l.text)) {
     const e = powers[normKey(p)] ?? powers[normKey(p.replace(/\s*\(.*$/, ''))]
     const optional = part === 'optionalPowers' && 'Optional power.'
     const doc = e ? powerItem({ ...e, name: p, uid: `power:${p}` }, powerType, ctx, [optional])
@@ -698,8 +734,8 @@ export function translateNpc(r, { exportedAt, appVersion, sanitize = escapeText,
   s.description = sanitize(r.background)
   s.notes = sanitize(r.notes) + s.notes + sanitize(own.join('\n\n'))
   if (r.npc.kind === 'grunt' && r.metatype?.name) s.metatype = r.metatype.name
-  // npc: its stat block's lines and where it came from, for its gear and weapon items from the world's compendiums
-  // (foundry/apply.js npcLineItems)
+  // npc: an older file's stat block lines and where it came from, for its gear and weapon items from the world's
+  // compendiums (foundry/apply.js npcLineItems); a file with npc.items has them already (beingActor)
   return { actor: b.actor, items: [...b.items, ...items], textOnly: [...b.lines, ...own].map(t => `${name}: ${t}`),
-    npc: { lines: r.npc.lines ?? [], from: r.npc.from ?? null } }
+    npc: { lines: Array.isArray(r.npc.items) ? [] : r.npc.lines ?? [], from: r.npc.from ?? null } }
 }
