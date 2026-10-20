@@ -558,6 +558,12 @@
       },
       "accessories": []
      }
+    ],
+    "corrections": [
+     "Made-up Thunderbuss Pistol → Made-up Thunderbus Pistol (fuzzy, 0.96)",
+     "Added: Heavy Pistol/SMG (regular ammo) ×12 for Made-up Thunderbus Pistol",
+     "commlink → Made-up Basic Link (standard item)",
+     "Not in the catalog, built from the stat block: Made-up Stick, Made-up credstick"
     ]
    }
   },
@@ -984,6 +990,10 @@
       },
       "accessories": []
      }
+    ],
+    "corrections": [
+     "Kept, not rollable: Made-up Zap [Cybercombat, DV 2, AR 8]",
+     "Not in the catalog, built from the stat block: Made-up Hide (2), Made-up Howl, Bite, Tail Lash, Spit"
     ]
    }
   },
@@ -1151,6 +1161,9 @@
       },
       "accessories": []
      }
+    ],
+    "corrections": [
+     "Not in the catalog, built from the stat block: Gust"
     ]
    }
   }

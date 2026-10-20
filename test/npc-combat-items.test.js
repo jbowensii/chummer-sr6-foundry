@@ -61,6 +61,15 @@ describe('npc-combat-items: a grunt', () => {
     expect(link.flags[M].match).toEqual({ score: 1, how: 'standard' })
     expect(link.system.description).toContain('standard item for it (a default pick)')
   })
+  test('its notes list the corrections, one each (Chummer works them out on each export: an import writes them afresh)', () => {
+    const notes = t.actor.system.notes
+    expect(notes).toContain('<h3>Corrections</h3>')
+    for (const line of guardR.npc.corrections) expect(notes).toContain(line.replace(/&/g, '&amp;'))
+    expect(notes).toContain('Made-up Thunderbuss Pistol → Made-up Thunderbus Pistol (fuzzy, 0.96)')
+    expect(notes).toContain('Added: Heavy Pistol/SMG (regular ammo) ×12 for Made-up Thunderbus Pistol')
+    // the same file again: the same notes, nothing appended
+    expect(translateRunner(guardR, OPTS).actor.system.notes).toBe(notes)
+  })
   test('the runner-file path finds nothing more in the world’s compendiums (no duplicates); the lines stay in the notes', async () => {
     expect(await npcLineItems(t)).toEqual({ items: [], notes: [] })
     expect(t.actor.system.notes).toContain('Zap Gun [Zapper, DV 4P')

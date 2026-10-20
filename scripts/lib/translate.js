@@ -738,7 +738,11 @@ export function beingActor(npc, { name, flags, sanitize = escapeText, icons = nu
     ...(npc.lines ?? []).map(l => `${PART_LABELS[l.part] ?? l.part}: ${l.text}`),
     ...(npc.pools?.length ? [`Dice pools: ${npc.pools.map(pool).join(', ')}`] : []),
     ...(from ? [`${from.name}: ${from.source} p.${from.page}`] : [])]
-  system.notes = '<h3>NPC</h3>' + sanitize(block.join('\n\n')) + (lines.length ? '<h3>From Chummer</h3>' + sanitize(lines.join('\n\n')) : '')
+  // the corrections Chummer made matching the stat block to the catalog (npc.corrections, worked out on each export: an
+  // import writes them afresh, never twice)
+  const fixes = (npc.corrections ?? []).filter(t => typeof t === 'string' && t)
+  system.notes = '<h3>NPC</h3>' + sanitize(block.join('\n\n')) + (fixes.length ? '<h3>Corrections</h3>' + sanitize(fixes.join('\n\n')) : '')
+    + (lines.length ? '<h3>From Chummer</h3>' + sanitize(lines.join('\n\n')) : '')
   const actor = { name, type, flags: { [MODULE_ID]: { ...f, npc: { kind: npc.kind, rating: npc.rating ?? null } } },
     prototypeToken: { actorLink: false, disposition: -1 }, system }
   // the kind's default icon as image and token (an uploaded portrait or token replaces it); no flags.icon: Apply icons never touches actors

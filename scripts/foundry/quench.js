@@ -383,6 +383,8 @@ export function registerQuench(quench) {
         assert.include(pistol.system, { ammocap: 12, ammocount: 12, ammoLoaded: 'regular' })
         assert.equal(byName(guard, 'Heavy Pistol/SMG')?.system.count, 12)
         assert.equal(flagOf(byName(guard, 'Made-up Basic Link'))?.match?.how, 'standard')
+        assert.include(guard.system.notes, 'Corrections')
+        assert.include(guard.system.notes, 'Made-up Thunderbuss Pistol → Made-up Thunderbus Pistol (fuzzy, 0.96)')
       })
       it('the grunt’s worn armor is in its Defense Rating; its adept power is an adept power', () => {
         assert.equal(guard.system.defenserating.physical.pool, 4 + 3)
