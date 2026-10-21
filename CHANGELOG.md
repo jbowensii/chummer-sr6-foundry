@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.10.0 (2026-10-21)
+
+Ammunition materials (Nova Prime Chummer app PR #101):
+
+- An ammunition line can carry a material (Bestial Nature p. 36: copper and common metals ×2, silver ×5, gold ×10 the price). The item's description gets a "Material: silver (×5 the price): …" line with what it does against a critter's Allergy or Vulnerability (core rulebook pp. 225–229), since Eden has no material field. Exports without a material import as before.
+
 ## 0.9.0 (2026-10-20)
 
 NPCs and critters can fight (Nova Prime Chummer app PR #96):
