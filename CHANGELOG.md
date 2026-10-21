@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.9.0 (2026-10-20)
+
+NPCs and critters can fight (Nova Prime Chummer app PR #96):
+
+- An imported NPC or critter carries its stat block as Eden items: every weapon and natural attack is a rollable weapon (Eden's normal weapon roll from the sheet), plus its armor, gear, augmentations, powers and spells. Close-combat Attack Rating is stored without Strength, since Eden adds it, so the sheet shows the printed value.
+- Weapons arrive loaded with regular rounds, plus a spare load as an ammunition item (Eden won't fire an empty weapon). A Force-formula damage value (`F/2P`) is worked out at the critter's Force.
+- An attack Chummer can't make rollable (Cybercombat, an unreadable damage value) is kept as a note item with its printed line, never dropped.
+- Items link to the catalog by exact name, else by a close guess (75% or better), else the standard item of their kind; each item records how it was matched and its score.
+- The actor's notes get a **Corrections** section listing every guess, standard stand-in, added ammo and unlinked item, rebuilt on each import. The NPC's Spells line has its own label.
+- Re-importing replaces the items in place. Older export files without the new item list import as before.
+
 ## 0.8.0 (2026-10-18)
 
 Owner-approved effect work, 2026-10-18 (every one of the 3,123 effects of a full catalog now has an outcome; the coverage test pins it):
