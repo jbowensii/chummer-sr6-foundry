@@ -117,6 +117,17 @@ describe('npc-combat-items: a critter', () => {
   })
 })
 
+test('npc-combat-items: a spells line (Chummer’s spells part): Eden spell items, a printed one kept; the notes label it', () => {
+  const spell = (printed, extra = {}) => ({ uid: `line:spells:${printed}`, kind: 'spells', name: printed, canon: false, attrs: {}, parts: [], values: {},
+    qty: 1, worn: false, bonuses: [], accessories: [], line: { part: 'spells', printed, values: {} }, ...extra })
+  const block = { ...guardR.npc, lines: [{ part: 'spells', text: 'Made-up Glow Ward, Made-up Hex' }],
+    items: [spell('Made-up Glow Ward', { id: 'zz.glow-ward', source: 'ZZ', page: 1, attrs: { category: 'manipulation' }, line: { part: 'spells', printed: 'Made-up Glow Ward', values: {}, match: { score: 1, how: 'exact' } } }),
+      spell('Made-up Hex')], corrections: [] }
+  const t = translateRunner({ ...guardR, npc: block }, OPTS)
+  expect(t.items.filter(i => i.type === 'spell').map(i => [i.name, i.flags[M].catalogId])).toEqual([['Made-up Glow Ward', 'zz.glow-ward'], ['Made-up Hex', null]])
+  expect(t.actor.system.notes).toContain('Spells: Made-up Glow Ward, Made-up Hex')
+})
+
 test('npc-combat-items: the sample is a valid export (the schema’s npc.items)', () => {
   const check = new Ajv2020({ strict: false, validateFormats: false }).compile(JSON.parse(readFileSync('schema/sr6-export.schema.json', 'utf8')))
   expect(check(file), JSON.stringify(check.errors)).toBe(true)

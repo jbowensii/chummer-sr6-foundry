@@ -604,7 +604,7 @@ export function translateRunner(r, opts) {
 // NPCs (Chummer's src/sr6/engine/npc.ts): kind -> [Eden actor type, headline label, rating label].
 const KINDS = { grunt: ['NPC', 'Grunt', 'Professional Rating'], critter: ['Critter', 'Critter'], spirit: ['Spirit', 'Spirit', 'Force'],
   sprite: ['sprite', 'Sprite', 'Level'] }
-const PART_LABELS = { skills: 'Skills', powers: 'Powers', optionalPowers: 'Optional powers', weaknesses: 'Weaknesses', attacks: 'Attacks',
+const PART_LABELS = { skills: 'Skills', powers: 'Powers', optionalPowers: 'Optional powers', spells: 'Spells', weaknesses: 'Weaknesses', attacks: 'Attacks',
   augmentations: 'Augmentations', gear: 'Gear', weapons: 'Weapons' }
 /** "Grunt, Professional Rating 3 · Made-up Crew", "Spirit, Force 4", "Critter" (as Chummer's npcHeadline). */
 export function npcHeadline(n) {
