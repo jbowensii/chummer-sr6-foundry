@@ -215,9 +215,11 @@ const unknown = (ctx, x, what) => ctx.say(`${x.name}: ${what}`)
  * One purchase -> Eden item data (gear or focus); accessories are the caller's. ctx: { exportedAt, appVersion, sanitize, say(line) }.
  * Every gear item carries price/avail as Chummer's numbers and as printed, the count and the rating.
  */
+// ammunition of a material (Chummer's purchase.material: silver rounds, Bestial Nature p. 36): Eden has no field for it
+const materialText = p => p.material && `Material: ${p.material.name} (×${p.material.times} the price): ${p.material.effect}.`
 export function lineItem(p, ctx) {
   const a = p.attrs ?? {}, v = p.values ?? {}, rating = v.rating
-  const extra = [p.grade && `Grade: ${p.grade}`, a.slots && `Mod slots: ${a.slots}`, p.note, ...effectLines(p, ctx)]
+  const extra = [p.grade && `Grade: ${p.grade}`, a.slots && `Mod slots: ${a.slots}`, materialText(p), p.note, ...effectLines(p, ctx)]
   let gear
   switch (p.kind) {
     case 'weapons': {
@@ -288,7 +290,7 @@ const NOT_DEVICE = new Set(['weapon_mod', 'accessory_weapon', 'armor_mod'])
 export function modItem(x, ctx, type) {
   const a = x.attrs ?? {}, v = x.values ?? {}
   const mctx = { ...ctx, mod: true, device: !NOT_DEVICE.has(type), weapon: /^(?:weapon_mod|accessory_weapon)$/.test(type) }
-  const doc = dataModelSource(base(x, 'mod', ctx, [a.slots && `Mod slots: ${a.slots}`, x.note,
+  const doc = dataModelSource(base(x, 'mod', ctx, [a.slots && `Mod slots: ${a.slots}`, materialText(x), x.note,
     x.bonuses?.length && `On its host: ${bonusText(x.bonuses)}`, ...effectLines(x, mctx)]))
   Object.assign(doc.system, { type, rating: Math.max(0, num(v.rating)), price: Math.max(0, num(v.cost)), availDef: a.avail ?? '' })
   const out = groupEffects(readEffects(x, mctx).rows, x.name)  // (scope host: not transferred, Eden applies a fitted mod's effects to its host)

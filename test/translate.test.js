@@ -560,3 +560,14 @@ describe('effect words', () => {
     expect(effectText({ target: 'test:toxin-resistance', op: 'threshold', value: '-1' })).toBe('Threshold -1 on Toxin Resistance tests.')
   })
 })
+
+test('ammo-material: ammunition of a material says so in its description, on a line and on a fitted ammunition type', () => {
+  const material = { id: 'zz.glow-slugs-moonstone', name: 'moonstone', times: 7, effect: 'a target with an Allergy or Vulnerability to moonstone suffers it' }
+  const ammo = { uid: 'a1', kind: 'gear', name: 'Made-up Slugs', canon: true, attrs: { category: 'Ammo by weapon type' }, parts: [], values: { cost: 147 }, qty: 1, bonuses: [], accessories: [], material }
+  const doc = lineItem(ammo, ctx())
+  expect(doc.system.description).toContain('Material: moonstone (×7 the price): a target with an Allergy or Vulnerability to moonstone suffers it.')
+  expect(doc.system.price).toBe(147)
+  const type = modItem({ ...ammo, uid: 't1', kind: 'ammotypes', name: 'Made-up Fizz', attrs: { category: 'Ammo type' } }, ctx(), 'accessory_weapon')
+  expect(type.system.description).toContain('Material: moonstone (×7 the price)')
+  expect(lineItem({ ...ammo, material: undefined }, ctx()).system.description).not.toContain('Material:')
+})
