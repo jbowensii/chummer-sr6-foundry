@@ -381,7 +381,7 @@ export function registerQuench(quench) {
         const pistol = byName(guard, 'Made-up Thunderbus Pistol')
         assert.deepEqual(flagOf(pistol).match, { score: 0.96, how: 'fuzzy' })
         assert.include(pistol.system, { ammocap: 12, ammocount: 12, ammoLoaded: 'regular' })
-        assert.equal(byName(guard, 'Heavy Pistol/SMG')?.system.count, 12)
+        assert.isUndefined(byName(guard, 'Heavy Pistol/SMG'))  // (this sample's ammo item is one load: all of it is in the weapon)
         assert.equal(flagOf(byName(guard, 'Made-up Basic Link'))?.match?.how, 'standard')
         assert.include(guard.system.notes, 'Corrections')
         assert.include(guard.system.notes, 'Made-up Thunderbuss Pistol → Made-up Thunderbus Pistol (fuzzy, 0.96)')
