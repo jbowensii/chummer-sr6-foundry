@@ -272,7 +272,7 @@ export function lineItem(p, ctx) {
   }
   const doc = base(p, 'gear', ctx, extra), qty = p.qty ?? 1
   Object.assign(doc.system, gear, { price: num(v.cost), priceDef: a.cost ?? '', avail: num(v.avail), availDef: a.avail ?? '',
-    count: qty, countable: qty > 1, needsRating: rating != null, rating: num(rating), notes: p.note ?? '' })
+    count: qty, countable: qty > 1, needsRating: rating != null, rating: num(rating), notes: ctx.sanitize(p.note ?? '') })
   return icon(withEffects(doc, p, ctx), p, ctx)
 }
 function focus(p, ctx, extra) {
@@ -631,13 +631,14 @@ const intOf = s => (/^\s*-?\d+\s*$/.test(s?.value ?? '') ? Number(s.value) : nul
 const PICK_KINDS = new Set(['adeptpowers', 'spells', 'complexforms'])
 const isPower = x => x.kind === 'critterpowers' || PICK_KINDS.has(x.kind) || !!x.pick
 // how a stat block thing found its catalog entry, when it isn't by its own name
-const AMMO_UID = /:ammo(#\d+)?$/
-const matchNote = (x, weapon) => {
+// the app's two-load ammunition (0.20.0): the ammo item's qty is every round owned; before it, one spare load
+const oldAmmo = v => { const n = String(v ?? '').split('.').map(Number); return n.length >= 2 && n.every(Number.isFinite) && (n[0] < 1 && n[1] < 20) }
+const matchNote = (x, ammo) => {
   const m = x.line?.match
   return m?.how === 'fuzzy' ? `the catalog's ${x.name} by a name ${Math.round(m.score * 100)}% alike`
     : m?.how === 'standard' ? `${x.name}, the catalog's standard item for it (a default pick)`
-      : m?.how === 'ammo' ? (/:ammo$/.test(x.uid) ? `ammunition for ${weapon ?? 'its weapon'}: what it carries beyond the one load in the weapon`
-        : `a spare magazine, clip or loader for ${weapon ?? 'its weapon'} (gear, not a weapon)`)
+      : m?.how === 'ammo' ? (ammo?.stack ? `ammunition for ${ammo.weapon.name}: what it carries beyond the one load in the weapon`
+        : `a spare magazine, clip or loader for ${ammo?.weapon.name ?? 'its weapon'} (gear, not a weapon)`)
         : x.line?.unread ? 'an attack Chummer could not read as a weapon (a Matrix action, or a DV it cannot read): roll it from this line' : ''
 }
 /**
@@ -655,7 +656,15 @@ const matchNote = (x, weapon) => {
 export function statBlockItems(things, ctx, powerType, str) {
   const all = list => list.flatMap(x => [x, ...all(x.accessories ?? [])])
   const byUid = new Map(all(things).map(x => [x.uid, x]))
-  const noted = x => ({ ...x, note: [`Stat block: ${x.note ?? x.line?.printed ?? x.name}`, matchNote(x, byUid.get(x.uid?.replace(AMMO_UID, ''))?.name)].filter(Boolean).join(' — '),
+  // ammo pairs with its weapon by order: the line.match.how 'ammo' items after a weapon are its stack, then its container
+  // (uids come from one shared counter, so they can't be parsed)
+  const ammoRole = new Map(), stackOf = new Map()
+  let last = null, n = 0
+  for (const x of things) {
+    if (x.line?.match?.how !== 'ammo') { last = x.kind === 'weapons' ? x : null; n = 0; continue }
+    if (last && ++n <= 2) { ammoRole.set(x.uid, { weapon: last, stack: n === 1 }); if (n === 1) stackOf.set(last.uid, x) }
+  }
+  const noted = x => ({ ...x, note: [`Stat block: ${x.note ?? x.line?.printed ?? x.name}`, matchNote(x, ammoRole.get(x.uid))].filter(Boolean).join(' — '),
     accessories: (x.accessories ?? []).map(noted) })
   const items = runnerItems({ purchases: things.filter(x => !isPower(x) && !x.line?.unread).map(noted) }, { ...ctx, entries: all(things), rated: true })
   // an attack it can't roll: a plain item (no weapon), its printed line its description
@@ -675,21 +684,23 @@ export function statBlockItems(things, ctx, powerType, str) {
     if (d.system.ammocap > 0) {
       // one load into the weapon from the ammo stack (qty = the rounds it owns); the rest stays as the spare. No stack
       // (the stat block prints its own ammunition): the weapon just comes loaded.
-      const stack = items.find(i => i.flags[MODULE_ID].id === `${x.uid}:ammo`), owned = stack ? stack.system.count : d.system.ammocap
+      const stackThing = oldAmmo(ctx.appVersion) ? null : stackOf.get(x.uid)
+      const stack = stackThing && items.find(i => i.flags[MODULE_ID].id === stackThing.uid), owned = stack ? stack.system.count : d.system.ammocap
       const load = Math.min(d.system.ammocap, owned)
       Object.assign(d.system, { ammocount: load, ammoLoaded: 'regular' })
       if (stack) {
         Object.assign(stack.system, { count: owned - load, countable: owned - load > 1 })
         // an ammunition type on the stack applies to every round of it, the weapon's load too
-        const type = byUid.get(x.uid + ':ammo')?.accessories?.find(a => a.kind === 'ammotypes')
+        const type = stackThing.accessories?.find(a => a.kind === 'ammotypes')
         if (type) d.system.description += ctx.sanitize(`Loaded with ${type.name} ammunition.`)
       }
     }
     if (d.system.skill === 'close_combat' && line.values?.ar?.[0] != null && str != null) d.system.attackRating[0] -= str
   }
   // a stack loaded entirely into its weapon leaves no spare
-  const spent = new Set(items.filter(i => /:ammo$/.test(i.flags[MODULE_ID].id ?? '') && i.system.count <= 0).map(i => i.flags[MODULE_ID].id))
-  items.splice(0, items.length, ...items.filter(i => !spent.has(i.flags[MODULE_ID].id) && !spent.has(i.flags[MODULE_ID].host)))
+  // (with its fitted ammunition type)
+  const spent = new Set([...stackOf.values()].filter(t => items.some(i => i.flags[MODULE_ID].id === t.uid && i.system.count <= 0)).flatMap(t => all([t]).map(a => a.uid)))
+  items.splice(0, items.length, ...items.filter(i => !spent.has(i.flags[MODULE_ID].id)))
   for (const x of things.filter(isPower)) {
     const p = noted({ ...x, name: x.pick ? x.name : x.line?.printed ?? x.name }), optional = x.line?.part === 'optionalPowers' && 'Optional power.'
     const doc = x.kind === 'critterpowers' ? icon(powerItem(p, powerType, ctx, [optional, p.note]), p, ctx)

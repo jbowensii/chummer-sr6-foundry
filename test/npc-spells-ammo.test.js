@@ -7,7 +7,7 @@ import { MODULE_ID as M } from '../scripts/lib/constants.js'
 import { translateRunner } from '../scripts/lib/translate.js'
 
 const file = JSON.parse(readFileSync('samples/test-npc-combat-items.json', 'utf8'))
-const OPTS = { exportedAt: file.exportedAt, appVersion: file.app.version }
+const OPTS = { exportedAt: file.exportedAt, appVersion: '0.20.0' }  // (the app's two-load ammunition)
 const guard = file.runners[0]
 const pistol = guard.npc.items.find(i => i.id === 'zz.thunderbus')
 const spare = { score: 1, how: 'ammo' }
@@ -18,7 +18,7 @@ const clipOf = w => ({ id: 'zz.clip', kind: 'gear', name: 'Made-up Spare Clip', 
   parts: [], values: { cost: 5, avail: 1 }, uid: `${w.uid}:ammo#2`, qty: 1, worn: false, bonuses: [], line: { part: 'weapons', printed: w.line.printed, values: {}, match: spare }, accessories: [] })
 const gel = { id: 'zz.gel', kind: 'ammotypes', name: 'Made-up Gel', source: 'ZZ', page: 3, canon: false, attrs: { category: 'Ammo type' }, parts: [], values: {}, uid: 'gel',
   qty: 1, worn: false, bonuses: [], line: { part: 'weapons', printed: 'gel', values: {}, match: { score: 1, how: 'exact' } }, accessories: [] }
-const run = (items, magic) => translateRunner({ ...guard, npc: { ...guard.npc, items, corrections: [], ...(magic ? { magic } : {}) } }, OPTS)
+const run = (items, magic, opts = OPTS) => translateRunner({ ...guard, npc: { ...guard.npc, items, corrections: [], ...(magic ? { magic } : {}) } }, opts)
 const named = (t, n) => t.items.filter(i => i.name === n)
 
 describe('npc ammo: one load in the weapon, the rest is the spare', () => {
@@ -49,8 +49,22 @@ describe('npc ammo: one load in the weapon, the rest is the spare', () => {
     expect(named(t, 'Made-up Bow')[0].system).toMatchObject({ ammocap: 1, ammocount: 1 })
     expect(named(t, 'Heavy Pistol/SMG')[0].system.count).toBe(19)
   })
-  test('a stack that is exactly one load leaves no spare', () => {
-    expect(named(run([pistol, ammoOf(pistol, 12)]), 'Heavy Pistol/SMG')).toEqual([])
+  test('a stack that is exactly one load leaves no spare, nor its fitted ammunition type', () => {
+    const t = run([pistol, ammoOf(pistol, 12, [gel])])
+    expect(named(t, 'Heavy Pistol/SMG')).toEqual([])
+    expect(named(t, 'Made-up Gel')).toEqual([])
+  })
+  test('two identical weapon lines (uids from one shared counter) each get their own load and spare, paired by order', () => {
+    const two = { ...pistol, uid: `${pistol.uid}#2` }
+    const t = run([pistol, { ...ammoOf(pistol, 36), uid: 'a1' }, { ...clipOf(pistol), uid: 'a2' }, two, { ...ammoOf(two, 30), uid: 'a3' }, { ...clipOf(two), uid: 'a4' }])
+    expect(named(t, 'Made-up Thunderbus Pistol').map(g => g.system.ammocount)).toEqual([12, 12])
+    expect(named(t, 'Heavy Pistol/SMG').map(a => a.system.count)).toEqual([24, 18])
+    expect(named(t, 'Made-up Spare Clip')).toHaveLength(2)
+  })
+  test('an older export (app before 0.20.0): one spare load as qty is kept whole beside the full weapon', () => {
+    const t = run([pistol, ammoOf(pistol, 12)], null, { ...OPTS, appVersion: '0.19.0' })
+    expect(named(t, 'Made-up Thunderbus Pistol')[0].system).toMatchObject({ ammocount: 12, ammoLoaded: 'regular' })
+    expect(named(t, 'Heavy Pistol/SMG')[0].system.count).toBe(12)
   })
   test('a weapon with printed ammunition of its own gets no ammo item and comes loaded', () => {
     const t = run([pistol])

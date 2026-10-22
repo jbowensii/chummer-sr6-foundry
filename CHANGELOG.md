@@ -7,6 +7,7 @@ NPC spells, a caster's tradition and ammunition loads (Nova Prime Chummer app PR
 - An NPC's spells and rituals come in as the same Eden spell and ritual items a player runner's do (the catalog's name, fields and description), with the printed text and Force (`Glow Ward (F6)`) added to the item's description. A spell the catalog lacks is a plain spell named as printed.
 - A caster NPC gets its tradition and drain attribute on the sheet, the way a runner does, and a Tradition section in its notes. When two traditions tie, the notes list them all and the first is the one set. An NPC with no magic block gets nothing invented.
 - Ammunition: a ranged weapon is loaded with one load only, and the rest of the rounds the NPC owns stay as the spare ammunition item (before, the weapon was filled and a whole load was added on top, three loads in all). A stack that is exactly one load leaves no spare item. A spare clip, speed loader or spare magazine arrives as plain gear, never a rollable weapon. The ammo item's description now says what it is. An ammunition type (gel, APDS) is added as a fitted item on the stack, and the weapon's description says it is loaded with it. A weapon whose stat block prints its own ammunition gets none added and still comes loaded.
+- Ammo is paired with its weapon by order, so a repeated weapon line gets its own load and spare. Exports from an app older than 0.20.0 (one spare load) import as before: weapon full, the spare kept whole.
 - NPC weapons roll as before.
 
 ## 0.10.0 (2026-10-21)

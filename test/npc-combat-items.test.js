@@ -51,8 +51,10 @@ describe('npc-combat-items: a grunt', () => {
     expect(pistol.system.description).toContain('by a name 96% alike')
     // Eden refuses to fire fewer rounds than are loaded (RollTypes.js): a full magazine of regular
     expect(pistol.system).toMatchObject({ ammocap: 12, ammocount: 12, ammoLoaded: 'regular' })
-    // this older file's ammo item holds one load (12): all of it goes into the weapon, no spare is left (see npc-spells-ammo.test.js)
-    expect(named(t.items, 'Heavy Pistol/SMG')).toEqual([])
+    const ammo = one(t.items, 'Heavy Pistol/SMG')
+    expect(ammo.system).toMatchObject({ type: 'AMMUNITION', count: 12 })
+    expect(ammo.flags[M].match).toEqual({ score: 1, how: 'ammo' })
+    expect(ammo.system.description).toContain('ammunition for Made-up Thunderbus Pistol')
   })
   test('a generic “commlink” is the catalog’s standard one, a default pick it says', () => {
     const link = one(t.items, 'Made-up Basic Link')
