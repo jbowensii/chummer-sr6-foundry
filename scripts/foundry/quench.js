@@ -362,7 +362,8 @@ export function registerQuench(quench) {
         try { ({ WeaponRoll } = await import(foundry.utils.getRoute('systems/shadowrun6-eden/module/dice/RollTypes.js'))) } catch { WeaponRoll = null }
       })
       after(() => cleanUp(tag, folder))
-      const weaponsOf = a => (Handlebars.helpers.itemsOfWeapontype ? Handlebars.helpers.itemsOfWeapontype(a.items) : a.items.filter(i => i.system.type?.startsWith('WEAPON_')))
+      // Eden gives every actor its own Unarmed item; the stat block's weapons are the rest
+      const weaponsOf = a => (Handlebars.helpers.itemsOfWeapontype ? Handlebars.helpers.itemsOfWeapontype(a.items) : a.items.filter(i => i.system.type?.startsWith('WEAPON_'))).filter(i => !edenUnarmed(i))
 
       it('the grunt’s sheet lists its gun and club as weapons; the gun at the stat block’s numbers', () => {
         assert.sameMembers(weaponsOf(guard).map(i => i.name), ['Zap Gun', 'Made-up Stick', 'Made-up Thunderbus Pistol'])
