@@ -54,7 +54,7 @@ describe('npc-combat-items: a grunt', () => {
     const ammo = one(t.items, 'Heavy Pistol/SMG')
     expect(ammo.system).toMatchObject({ type: 'AMMUNITION', count: 12 })
     expect(ammo.flags[M].match).toEqual({ score: 1, how: 'ammo' })
-    expect(ammo.system.description).toContain('regular ammunition for it, one full load')
+    expect(ammo.system.description).toContain('ammunition for Made-up Thunderbus Pistol')
   })
   test('a generic “commlink” is the catalog’s standard one, a default pick it says', () => {
     const link = one(t.items, 'Made-up Basic Link')

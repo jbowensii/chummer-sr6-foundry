@@ -264,13 +264,15 @@ export function lineItem(p, ctx) {
       break
     }
     case 'programs': return programItem(p, ctx)
+    // an ammunition type fitted to an ammo stack (npc ammo): Eden has no ammo-type item, so it is a gear note on the stack
+    case 'ammotypes': gear = { type: 'TOOLS', subtype: 'TOOLS' }; break
     default:
       unknown(ctx, p, `kind ${p.kind} not known → gear TOOLS`)
       gear = { type: 'TOOLS', subtype: 'TOOLS' }
   }
   const doc = base(p, 'gear', ctx, extra), qty = p.qty ?? 1
   Object.assign(doc.system, gear, { price: num(v.cost), priceDef: a.cost ?? '', avail: num(v.avail), availDef: a.avail ?? '',
-    count: qty, countable: qty > 1, needsRating: rating != null, rating: num(rating), notes: p.note ?? '' })
+    count: qty, countable: qty > 1, needsRating: rating != null, rating: num(rating), notes: ctx.sanitize(p.note ?? '') })
   return icon(withEffects(doc, p, ctx), p, ctx)
 }
 function focus(p, ctx, extra) {
@@ -307,7 +309,7 @@ const RITUAL_FEATURES = ['anchored', 'material_link', 'minion', 'spell', 'spotte
 export function pickItem(x, ctx) {
   const a = x.attrs ?? {}, v = x.values ?? {}
   const type = { spells: 'spell', rituals: 'ritual', adeptpowers: 'adeptpower', complexforms: 'complexform', metamagics: 'metamagic', echoes: 'echo' }[x.pick]
-  const doc = base(x, type, ctx, effectLines(x, ctx))
+  const doc = base(x, type, ctx, [x.note, ...effectLines(x, ctx)])
   if (type === 'spell') {
     Object.assign(doc.system, spellFields(a, v))
     if (!SPELL_CATEGORIES.includes(String(a.category ?? '').toLowerCase())) unknown(ctx, x, `spell category "${a.category ?? ''}" not known → health`)
@@ -627,13 +629,17 @@ export function splitTop(s) {
 const intOf = s => (/^\s*-?\d+\s*$/.test(s?.value ?? '') ? Number(s.value) : null)
 
 const PICK_KINDS = new Set(['adeptpowers', 'spells', 'complexforms'])
-const isPower = x => x.kind === 'critterpowers' || PICK_KINDS.has(x.kind)
+const isPower = x => x.kind === 'critterpowers' || PICK_KINDS.has(x.kind) || !!x.pick
 // how a stat block thing found its catalog entry, when it isn't by its own name
-const matchNote = x => {
+// the app's two-load ammunition (0.20.0): the ammo item's qty is every round owned; before it, one spare load.
+// (an unreadable or missing version counts as a new, 0.20.0+, export)
+const oldAmmo = v => { const n = String(v ?? '').split('.').map(Number); return n.length >= 2 && n.every(Number.isFinite) && (n[0] < 1 && n[1] < 20) }
+const matchNote = (x, ammo, old) => {
   const m = x.line?.match
   return m?.how === 'fuzzy' ? `the catalog's ${x.name} by a name ${Math.round(m.score * 100)}% alike`
     : m?.how === 'standard' ? `${x.name}, the catalog's standard item for it (a default pick)`
-      : m?.how === 'ammo' ? `regular ammunition for it, one full load`
+      : m?.how === 'ammo' ? (ammo?.stack ? (old ? `a spare load of ammunition for ${ammo.weapon.name}` : `ammunition for ${ammo.weapon.name}: what it carries beyond the one load in the weapon`)
+        : `a spare magazine, clip or loader for ${ammo?.weapon.name ?? 'its weapon'} (gear, not a weapon)`)
         : x.line?.unread ? 'an attack Chummer could not read as a weapon (a Matrix action, or a DV it cannot read): roll it from this line' : ''
 }
 /**
@@ -645,14 +651,26 @@ const matchNote = x => {
  * combat item's close band (item.mjs calculatedAttackRating): that band is stored less the NPC's Strength (str), so the
  * sheet rolls the printed number. Eden's weapon roll then takes its pool from the item's skill (actor.js rollItem). A
  * weapon with a magazine comes loaded with regular rounds (Eden refuses to fire one with fewer rounds than it shoots,
- * RollTypes.js); its spare load is an ammunition item (the export's `<weapon uid>:ammo`). An item found by a name only
+ * RollTypes.js). The export's ammo items follow their weapon: first its ammo stack (qty: every round owned, or tanks for a
+ * tank-fed weapon), then its container (gear: a spare clip, speed loader or magazine). One load is taken from the stack
+ * into the weapon (a tank fills a tank-fed weapon to its capacity) and the rest stays as the spare ammunition item, no item
+ * when none is left; an ammunition type fitted to the stack is noted on the weapon. A weapon with no stack just comes
+ * loaded. An export from an app before 0.20.0 (oldAmmo) carried one whole spare load: the weapon is filled and the stack kept. An item found by a name only
  * alike, or as the standard item of a generic name, says so with its score (flags.match: Chummer's line.match).
  */
 export function statBlockItems(things, ctx, powerType, str) {
   const all = list => list.flatMap(x => [x, ...all(x.accessories ?? [])])
-  const noted = x => ({ ...x, note: [`Stat block: ${x.line?.printed ?? x.name}`, matchNote(x)].filter(Boolean).join(' — '),
-    accessories: (x.accessories ?? []).map(noted) })
   const byUid = new Map(all(things).map(x => [x.uid, x]))
+  // ammo pairs with its weapon by order: the line.match.how 'ammo' items after a weapon are its stack, then its container
+  // (uids come from one shared counter, so they can't be parsed)
+  const ammoRole = new Map(), stackOf = new Map()
+  let last = null, n = 0
+  for (const x of things) {
+    if (x.line?.match?.how !== 'ammo') { last = x.kind === 'weapons' ? x : null; n = 0; continue }
+    if (last && ++n <= 2) { ammoRole.set(x.uid, { weapon: last, stack: n === 1 }); if (n === 1) stackOf.set(last.uid, x) }
+  }
+  const noted = x => ({ ...x, note: [`Stat block: ${x.note ?? x.line?.printed ?? x.name}`, matchNote(x, ammoRole.get(x.uid), oldAmmo(ctx.appVersion))].filter(Boolean).join(' — '),
+    accessories: (x.accessories ?? []).map(noted) })
   const items = runnerItems({ purchases: things.filter(x => !isPower(x) && !x.line?.unread).map(noted) }, { ...ctx, entries: all(things), rated: true })
   // an attack it can't roll: a plain item (no weapon), its printed line its description
   for (const x of things.filter(x => x.line?.unread)) {
@@ -668,13 +686,34 @@ export function statBlockItems(things, ctx, powerType, str) {
     if (line.match) d.flags[MODULE_ID].match = line.match
     if (!/^WEAPON_/.test(d.system.type ?? '')) continue
     if (line.dv) d.system.dmgDef = line.dv
-    if (d.system.ammocap > 0) Object.assign(d.system, { ammocount: d.system.ammocap, ammoLoaded: 'regular' })
+    if (d.system.ammocap > 0) {
+      // one load into the weapon from the ammo stack (qty = the rounds it owns); the rest stays as the spare. No stack
+      // (the stat block prints its own ammunition): the weapon just comes loaded.
+      const stackThing = oldAmmo(ctx.appVersion) ? null : stackOf.get(x.uid)
+      const stack = stackThing && items.find(i => i.flags[MODULE_ID].id === stackThing.uid), owned = stack ? stack.system.count : d.system.ammocap
+      // a tank-fed weapon (ammo "20(tanks)"): the stack counts tanks, and one tank fills the weapon
+      const tanks = /\(tank/i.test(`${x.attrs?.ammo ?? ''} ${x.line?.printed ?? ''}`)
+      const load = tanks ? (owned > 0 ? d.system.ammocap : 0) : Math.min(d.system.ammocap, owned), used = tanks ? Math.min(1, owned) : load
+      Object.assign(d.system, { ammocount: load, ammoLoaded: 'regular' })
+      if (stack) {
+        Object.assign(stack.system, { count: owned - used, countable: owned - used > 1 })
+        // an ammunition type on the stack applies to every round of it, the weapon's load too
+        const type = stackThing.accessories?.find(a => a.kind === 'ammotypes')
+        if (type) d.system.description += ctx.sanitize(`Loaded with ${type.name} ammunition.`)
+      }
+    }
     if (d.system.skill === 'close_combat' && line.values?.ar?.[0] != null && str != null) d.system.attackRating[0] -= str
   }
+  // a stack loaded entirely into its weapon leaves no spare
+  // (with its fitted ammunition type)
+  const spent = new Set([...stackOf.values()].filter(t => items.some(i => i.flags[MODULE_ID].id === t.uid && i.system.count <= 0)).flatMap(t => all([t]).map(a => a.uid)))
+  items.splice(0, items.length, ...items.filter(i => !spent.has(i.flags[MODULE_ID].id)))
   for (const x of things.filter(isPower)) {
-    const p = noted({ ...x, name: x.line?.printed ?? x.name }), optional = x.line?.part === 'optionalPowers' && 'Optional power.'
-    const doc = x.kind === 'critterpowers' ? icon(powerItem(p, powerType, ctx, [optional, p.note]), p, ctx)
-      : pickItem({ ...p, pick: x.kind }, ctx)
+    const p = noted({ ...x, name: x.pick ? x.name : x.line?.printed ?? x.name }), optional = x.line?.part === 'optionalPowers' && 'Optional power.'
+    // line.detail: the power's parameters as printed (shown unless the printed line already has them)
+    const detail = x.line?.detail && !String(x.line.printed ?? '').includes(x.line.detail) && `Detail: ${x.line.detail}`
+    const doc = x.kind === 'critterpowers' ? icon(powerItem(p, powerType, ctx, [optional, p.note, detail]), p, ctx)
+      : pickItem({ ...p, note: [p.note, detail].filter(Boolean).join(' — '), pick: x.pick ?? x.kind }, ctx)
     doc.flags[MODULE_ID].npcLine = x.line?.printed
     if (x.line?.match) doc.flags[MODULE_ID].match = x.line.match
     items.push(doc)
@@ -743,7 +782,16 @@ export function beingActor(npc, { name, flags, sanitize = escapeText, icons = nu
   // the corrections Chummer made matching the stat block to the catalog (npc.corrections, worked out on each export: an
   // import writes them afresh, never twice)
   const fixes = (npc.corrections ?? []).filter(t => typeof t === 'string' && t)
+  // a caster's tradition and drain attribute (the export's npc.magic), as a runner's magic sets them; absent: nothing set
+  const mg = npc.magic, tradition = typeof mg?.tradition === 'string' && mg.tradition
+  if (tradition) {
+    if (ATTRS.includes(mg.drainAttr)) system.tradition = { name: tradition, attribute: mg.drainAttr }
+    else ctx.say(`Tradition ${tradition}: drain attribute ${mg.drainAttr} not a shadowrun6-eden attribute → tradition not set`)
+  }
+  const ties = (mg?.traditions ?? []).map(t => t.name).filter(Boolean)
+  const traditionNote = tradition && `Tradition: ${ties.length > 1 ? ties.join(' or ') : tradition}${ATTRS.includes(mg.drainAttr) ? `, drain attribute ${mg.drainAttr.toUpperCase()}` : ''}${mg.drain != null ? `, drain pool ${mg.drain}` : ''}`
   system.notes = '<h3>NPC</h3>' + sanitize(block.join('\n\n')) + (fixes.length ? '<h3>Corrections</h3>' + sanitize(fixes.join('\n\n')) : '')
+    + (traditionNote ? '<h3>Tradition</h3>' + sanitize(traditionNote) : '')
     + (lines.length ? '<h3>From Chummer</h3>' + sanitize(lines.join('\n\n')) : '')
   const actor = { name, type, flags: { [MODULE_ID]: { ...f, npc: { kind: npc.kind, rating: npc.rating ?? null } } },
     prototypeToken: { actorLink: false, disposition: -1 }, system }
