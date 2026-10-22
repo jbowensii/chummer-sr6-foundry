@@ -631,13 +631,14 @@ const intOf = s => (/^\s*-?\d+\s*$/.test(s?.value ?? '') ? Number(s.value) : nul
 const PICK_KINDS = new Set(['adeptpowers', 'spells', 'complexforms'])
 const isPower = x => x.kind === 'critterpowers' || PICK_KINDS.has(x.kind) || !!x.pick
 // how a stat block thing found its catalog entry, when it isn't by its own name
-// the app's two-load ammunition (0.20.0): the ammo item's qty is every round owned; before it, one spare load
+// the app's two-load ammunition (0.20.0): the ammo item's qty is every round owned; before it, one spare load.
+// (an unreadable or missing version counts as a new, 0.20.0+, export)
 const oldAmmo = v => { const n = String(v ?? '').split('.').map(Number); return n.length >= 2 && n.every(Number.isFinite) && (n[0] < 1 && n[1] < 20) }
-const matchNote = (x, ammo) => {
+const matchNote = (x, ammo, old) => {
   const m = x.line?.match
   return m?.how === 'fuzzy' ? `the catalog's ${x.name} by a name ${Math.round(m.score * 100)}% alike`
     : m?.how === 'standard' ? `${x.name}, the catalog's standard item for it (a default pick)`
-      : m?.how === 'ammo' ? (ammo?.stack ? `ammunition for ${ammo.weapon.name}: what it carries beyond the one load in the weapon`
+      : m?.how === 'ammo' ? (ammo?.stack ? (old ? `a spare load of ammunition for ${ammo.weapon.name}` : `ammunition for ${ammo.weapon.name}: what it carries beyond the one load in the weapon`)
         : `a spare magazine, clip or loader for ${ammo?.weapon.name ?? 'its weapon'} (gear, not a weapon)`)
         : x.line?.unread ? 'an attack Chummer could not read as a weapon (a Matrix action, or a DV it cannot read): roll it from this line' : ''
 }
@@ -650,7 +651,11 @@ const matchNote = (x, ammo) => {
  * combat item's close band (item.mjs calculatedAttackRating): that band is stored less the NPC's Strength (str), so the
  * sheet rolls the printed number. Eden's weapon roll then takes its pool from the item's skill (actor.js rollItem). A
  * weapon with a magazine comes loaded with regular rounds (Eden refuses to fire one with fewer rounds than it shoots,
- * RollTypes.js); its spare load is an ammunition item (the export's `<weapon uid>:ammo`). An item found by a name only
+ * RollTypes.js). The export's ammo items follow their weapon: first its ammo stack (qty: every round owned, or tanks for a
+ * tank-fed weapon), then its container (gear: a spare clip, speed loader or magazine). One load is taken from the stack
+ * into the weapon (a tank fills a tank-fed weapon to its capacity) and the rest stays as the spare ammunition item, no item
+ * when none is left; an ammunition type fitted to the stack is noted on the weapon. A weapon with no stack just comes
+ * loaded. An export from an app before 0.20.0 (oldAmmo) carried one whole spare load: the weapon is filled and the stack kept. An item found by a name only
  * alike, or as the standard item of a generic name, says so with its score (flags.match: Chummer's line.match).
  */
 export function statBlockItems(things, ctx, powerType, str) {
@@ -664,7 +669,7 @@ export function statBlockItems(things, ctx, powerType, str) {
     if (x.line?.match?.how !== 'ammo') { last = x.kind === 'weapons' ? x : null; n = 0; continue }
     if (last && ++n <= 2) { ammoRole.set(x.uid, { weapon: last, stack: n === 1 }); if (n === 1) stackOf.set(last.uid, x) }
   }
-  const noted = x => ({ ...x, note: [`Stat block: ${x.note ?? x.line?.printed ?? x.name}`, matchNote(x, ammoRole.get(x.uid))].filter(Boolean).join(' — '),
+  const noted = x => ({ ...x, note: [`Stat block: ${x.note ?? x.line?.printed ?? x.name}`, matchNote(x, ammoRole.get(x.uid), oldAmmo(ctx.appVersion))].filter(Boolean).join(' — '),
     accessories: (x.accessories ?? []).map(noted) })
   const items = runnerItems({ purchases: things.filter(x => !isPower(x) && !x.line?.unread).map(noted) }, { ...ctx, entries: all(things), rated: true })
   // an attack it can't roll: a plain item (no weapon), its printed line its description
@@ -686,10 +691,12 @@ export function statBlockItems(things, ctx, powerType, str) {
       // (the stat block prints its own ammunition): the weapon just comes loaded.
       const stackThing = oldAmmo(ctx.appVersion) ? null : stackOf.get(x.uid)
       const stack = stackThing && items.find(i => i.flags[MODULE_ID].id === stackThing.uid), owned = stack ? stack.system.count : d.system.ammocap
-      const load = Math.min(d.system.ammocap, owned)
+      // a tank-fed weapon (ammo "20(tanks)"): the stack counts tanks, and one tank fills the weapon
+      const tanks = /\(tank/i.test(`${x.attrs?.ammo ?? ''} ${x.line?.printed ?? ''}`)
+      const load = tanks ? (owned > 0 ? d.system.ammocap : 0) : Math.min(d.system.ammocap, owned), used = tanks ? Math.min(1, owned) : load
       Object.assign(d.system, { ammocount: load, ammoLoaded: 'regular' })
       if (stack) {
-        Object.assign(stack.system, { count: owned - load, countable: owned - load > 1 })
+        Object.assign(stack.system, { count: owned - used, countable: owned - used > 1 })
         // an ammunition type on the stack applies to every round of it, the weapon's load too
         const type = stackThing.accessories?.find(a => a.kind === 'ammotypes')
         if (type) d.system.description += ctx.sanitize(`Loaded with ${type.name} ammunition.`)

@@ -56,6 +56,14 @@ describe('npc ammo: one load in the weapon, the rest is the spare', () => {
     expect(named(t, 'Made-up Bow')[0].system).toMatchObject({ ammocap: 1, ammocount: 1 })
     expect(named(t, 'Heavy Pistol/SMG')[0].system.count).toBe(19)
   })
+  test('a tank-fed weapon (20 tanks-ammo, a stack of 2 tanks): one tank fills it, one tank is spare, the container is kept', () => {
+    const inferno = { ...pistol, uid: 'inf', name: 'Made-up Inferno', id: 'zz.inferno', attrs: { ...pistol.attrs, ammo: '20(tanks)', category: 'Flamethrowers' }, values: { ...pistol.values, ammo: 20 },
+      line: { ...pistol.line, printed: 'Made-up Inferno [Flamethrower, DV 4P, 20(tanks)]' } }
+    const t = run([inferno, { ...ammoOf(inferno, 2), name: 'Fuel tank (small)', uid: 'f1' }, { ...clipOf(inferno), uid: 'f2' }])
+    expect(named(t, 'Made-up Inferno')[0].system).toMatchObject({ ammocap: 20, ammocount: 20 })
+    expect(named(t, 'Fuel tank (small)')[0].system.count).toBe(1)
+    expect(named(t, 'Made-up Spare Clip')).toHaveLength(1)
+  })
   test('a stack that is exactly one load leaves no spare, nor its fitted ammunition type', () => {
     const t = run([pistol, ammoOf(pistol, 12, [gel])])
     expect(named(t, 'Heavy Pistol/SMG')).toEqual([])
@@ -72,6 +80,7 @@ describe('npc ammo: one load in the weapon, the rest is the spare', () => {
     const t = run([pistol, ammoOf(pistol, 12)], null, { ...OPTS, appVersion: '0.19.0' })
     expect(named(t, 'Made-up Thunderbus Pistol')[0].system).toMatchObject({ ammocount: 12, ammoLoaded: 'regular' })
     expect(named(t, 'Heavy Pistol/SMG')[0].system.count).toBe(12)
+    expect(named(t, 'Heavy Pistol/SMG')[0].system.description).toContain('a spare load of ammunition for Made-up Thunderbus Pistol')
   })
   test('a weapon with printed ammunition of its own gets no ammo item and comes loaded', () => {
     const t = run([pistol])
