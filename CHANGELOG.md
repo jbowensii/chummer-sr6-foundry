@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.11.1 (2026-10-22)
+
+- Quench: the NPC combat-items test no longer counts Eden's own Unarmed item (Eden gives every actor one) among the stat block's weapons. Test only; the importer is unchanged. First live Quench run of 0.11.0: 61/62, the one failure was this test.
+
 ## 0.11.0 (2026-10-21)
 
 NPC spells, a caster's tradition and ammunition loads (Nova Prime Chummer app PRs #149 and #150):
