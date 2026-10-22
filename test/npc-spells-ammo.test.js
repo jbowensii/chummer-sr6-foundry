@@ -2,6 +2,7 @@
 // a caster's tradition and drain attribute are set as a runner's are; a ranged weapon is loaded with ONE load from its ammo
 // stack (the export's qty = every round owned), the rest stays as the spare, its container is gear. Invented fixtures.
 import { readFileSync } from 'node:fs'
+import Ajv2020 from 'ajv/dist/2020.js'
 import { describe, expect, test } from 'vitest'
 import { MODULE_ID as M } from '../scripts/lib/constants.js'
 import { translateRunner } from '../scripts/lib/translate.js'
@@ -18,7 +19,13 @@ const clipOf = w => ({ id: 'zz.clip', kind: 'gear', name: 'Made-up Spare Clip', 
   parts: [], values: { cost: 5, avail: 1 }, uid: `${w.uid}:ammo#2`, qty: 1, worn: false, bonuses: [], line: { part: 'weapons', printed: w.line.printed, values: {}, match: spare }, accessories: [] })
 const gel = { id: 'zz.gel', kind: 'ammotypes', name: 'Made-up Gel', source: 'ZZ', page: 3, canon: false, attrs: { category: 'Ammo type' }, parts: [], values: {}, uid: 'gel',
   qty: 1, worn: false, bonuses: [], line: { part: 'weapons', printed: 'gel', values: {}, match: { score: 1, how: 'exact' } }, accessories: [] }
-const run = (items, magic, opts = OPTS) => translateRunner({ ...guard, npc: { ...guard.npc, items, corrections: [], ...(magic ? { magic } : {}) } }, opts)
+// every fixture is checked against the app's schema (schema/sr6-export.schema.json, a copy of the app's)
+const check = new Ajv2020({ strict: false, validateFormats: false }).compile(JSON.parse(readFileSync('schema/sr6-export.schema.json', 'utf8')))
+const run = (items, magic, opts = OPTS, valid = true) => {
+  const runner = { ...guard, npc: { ...guard.npc, items, corrections: [], ...(magic ? { magic } : {}) } }
+  if (valid) expect(check({ ...file, runners: [runner] }), JSON.stringify(check.errors?.slice(0, 3))).toBe(true)
+  return translateRunner(runner, opts)
+}
 const named = (t, n) => t.items.filter(i => i.name === n)
 
 describe('npc ammo: one load in the weapon, the rest is the spare', () => {
@@ -114,8 +121,19 @@ describe('npc caster magic: the tradition and drain attribute', () => {
     expect(t.actor.system.notes).not.toContain('<h3>Tradition</h3>')
   })
   test('a drain attribute Eden lacks sets no tradition, and says so', () => {
-    const t = run([], { tradition: 'Made-up Odd', drainAttr: 'zzz', drain: 5, traditions: [] })
+    const t = run([], { tradition: 'Made-up Odd', drainAttr: 'zzz', drain: 5, traditions: [] }, OPTS, false)  // (a value the schema forbids: a guard on bad input)
     expect(t.actor.system.tradition).toBeUndefined()
     expect(t.actor.system.notes).toContain('drain attribute zzz not a shadowrun6-eden attribute')
+  })
+})
+
+describe('npc powers: line.detail', () => {
+  const power = (printed, detail) => ({ uid: `power:${printed}`, kind: 'critterpowers', name: 'Made-up Immunity', canon: false, attrs: {}, parts: [], values: {}, qty: 1, worn: false,
+    bonuses: [], accessories: [], line: { part: 'powers', printed, values: {}, detail } })
+  test('shown in the power’s description when the printed text lacks it', () => {
+    expect(run([power('Made-up Immunity', 'Cold, Fire')]).items.find(i => i.type === 'critterpower').system.description).toContain('Detail: Cold, Fire')
+  })
+  test('not repeated when the printed text has it', () => {
+    expect(run([power('Made-up Immunity (Cold, Fire)', 'Cold, Fire')]).items.find(i => i.type === 'critterpower').system.description).not.toContain('Detail:')
   })
 })

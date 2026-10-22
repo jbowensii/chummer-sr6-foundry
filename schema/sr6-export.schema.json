@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:chummer-sr6:export:1",
-  "title": "Chummer SR6 export v1",
-  "description": "Shadowrun 6 runners, NPCs or book data from Chummer Anarchy 2.0 (docs/sr6-export-format.md). Every number in values is Chummer’s own; attrs and parts keep the entry as printed. The envelope, book and NPC block allow extra properties so later minor additions stay readable; the runner, items, purchases and values are closed (unevaluatedProperties false where a def extends item).",
+  "title": "SR6 export v1",
+  "description": "Shadowrun 6 runners, NPCs or book data from Nova Prime Chummer (docs/sr6-export-format.md). Every number in values is Chummer’s own; attrs and parts keep the entry as printed. The envelope, book and NPC block allow extra properties so later minor additions stay readable; the runner, items, purchases and values are closed (unevaluatedProperties false where a def extends item).",
   "type": "object",
   "required": [
     "format",
@@ -341,8 +341,7 @@
           "description": "A spell's or complex form's: on its caster (while sustained) or its target(s) (never counted on the caster).",
           "enum": [
             "caster",
-            "target",
-            "others"
+            "target"
           ]
         }
       },
@@ -431,7 +430,7 @@
           "type": "string"
         },
         "effects": {
-          "description": "What the entry's printed text and tables say it does (the catalog's <effect>, docs/sr6-data-format.md Effects): target attr:<abbr>, attr-max:<abbr>, skill:<id>, skill-max:<id>, test:<type>, derived:<name>, matrix:<name>, item:<field>, action:<name>, complex-form:<name>, lifestyle:<name>, resource:<name>, pricemod:<what>, pool:chase or sense:<name>; op add, set, edge, edge-cost, edge-cost-set, no-edge, no-edge-gain, wild-die, hits or threshold; value as printed (a number, R or R*N per rating, hits per net hit, N a native language, 20% a percent, R/-R on- and off-road, a formula; item:ar five comma-separated bands, or one value with the fire modes in when); low: read with low confidence (shown, never applied); switch: how it is turned on (a switchable one counts in the bracketed total); when: the condition's words; spec: the specialization it is limited to; affects: a spell's or complex form's, on its caster or its target(s).",
+          "description": "What the entry's printed text and tables say it does (the catalog's <effect>, docs/sr6-data-format/kinds.md Effects): target attr:<abbr>, attr-max:<abbr>, skill:<id>, test:<type>, derived:<name>, matrix:<name>, item:<field>, action:<name>, lifestyle:<name> or resource:<name>; op add, set, edge, edge-cost, edge-cost-set, no-edge, no-edge-gain, wild-die, hits, threshold or threshold-set (its new threshold); value as printed (a number, R or R*N per rating, item:ar five comma-separated bands, a formula such as str/2+1 or rank:con, shown, never applied); low: read with low confidence (shown, never applied); switch: how it is turned on (a switchable one counts in the bracketed total); when: the condition's words; spec: the specialization it is limited to; affects: a spell's or complex form's, on its caster or its target(s).",
           "type": "array",
           "items": {
             "type": "object",
@@ -456,7 +455,8 @@
                   "no-edge-gain",
                   "wild-die",
                   "hits",
-                  "threshold"
+                  "threshold",
+                  "threshold-set"
                 ]
               },
               "value": {
@@ -491,8 +491,8 @@
                 "type": "string"
               },
               "gen": {
-                "description": "cl6: a hand-written Commlink6 override, not the book reader's.",
-                "const": "cl6"
+                "description": "cl6: a hand-written Commlink6 override; book: a hand-written correction of what the book says that no reader rule expresses; neither is the book reader's own.",
+                "enum": ["cl6", "book"]
               }
             }
           }
@@ -619,7 +619,7 @@
           }
         },
         "mount": {
-          "description": "A weapon fitted to a vehicle or drone: the uid of the weapon mount (a sibling accessory) it sits in.",
+          "description": "A weapon fitted to a vehicle or drone: the uid of the weapon mount (a sibling accessory) it sits in, or builtin:<n> for the vehicle's built-in mount vehicle.builtin[n].",
           "type": "string"
         },
         "diy": {
@@ -743,6 +743,33 @@
                 "number",
                 "array"
               ]
+            },
+            "trained": {
+              "description": "Each trained command and special training by name (Wild Life pp. 181-183): taught after the critter was bought (+500/+750 nuyen, p. 180) or with the purchase (+1 Body in its price, p. 183).",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "what",
+                  "name",
+                  "taught"
+                ],
+                "properties": {
+                  "what": {
+                    "enum": [
+                      "command",
+                      "training"
+                    ]
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "taught": {
+                    "type": "boolean"
+                  }
+                }
+              }
             },
             "qualities": {
               "type": "array",
@@ -1064,10 +1091,64 @@
           }
         },
         "corrections": {
-          "description": "What its items correct in the stat block, one line each, for its notes: a guessed (fuzzy) link with its score, a standard item standing in, ammunition added, an attack kept that can't be rolled, what has no catalog entry (absent in files written before it was added).",
+          "description": "What its items correct in the stat block, one line each, for its notes: a guessed (fuzzy) link with its score, a standard item standing in, ammunition added, an attack kept that can't be rolled, what has no catalog entry, then a caster's tradition (absent in files written before it was added).",
           "type": "array",
           "items": {
             "type": "string"
+          }
+        },
+        "magic": {
+          "description": "A caster's tradition (an NPC whose spells line prints a spell): of the catalog's traditions with a drain attribute (their drain), the one whose drain pool (Willpower + that attribute, from the NPC's stats, augmented) is largest; drainAttr is the one to set on the sheet; traditions lists each tradition with that pool (more than one on a tie), the first the one set. Absent for a non-caster, when its stats can't be read or no tradition has a drain attribute.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "tradition",
+            "drainAttr",
+            "drain",
+            "traditions"
+          ],
+          "properties": {
+            "tradition": {
+              "type": "string"
+            },
+            "drainAttr": {
+              "enum": [
+                "log",
+                "int",
+                "cha"
+              ]
+            },
+            "drain": {
+              "type": "number"
+            },
+            "traditions": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "name",
+                  "drainAttr"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "drainAttr": {
+                    "enum": [
+                      "log",
+                      "int",
+                      "cha"
+                    ]
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -1085,6 +1166,10 @@
         "line"
       ],
       "properties": {
+        "grade": {
+          "description": "An augmentation's grade as the stat block prints it (alpha, beta, gamma, delta); its cost, availability and Essence are priced with it.",
+          "type": "string"
+        },
         "uid": {
           "type": "string"
         },
@@ -1103,6 +1188,17 @@
         "level": {
           "description": "An adept power's level.",
           "type": "number"
+        },
+        "pick": {
+          "description": "A spell or ritual on the spells line: the pick it would be on a runner (its item as a runner's spell pick has it: catalog name, values, description when sent).",
+          "enum": [
+            "spells",
+            "rituals"
+          ]
+        },
+        "note": {
+          "description": "A spell's printed text (its parameters and Force as the stat block prints them, `Fireball (F6)`).",
+          "type": "string"
         },
         "line": {
           "description": "The thing as printed, its line's part, the numbers it prints (at the NPC's rating where they use its Force) and its DV as printed.",
@@ -1152,6 +1248,10 @@
             "unread": {
               "description": "An attack printed with stats the app can't roll (a Cybercombat one, a DV it can't read): an item that is no weapon.",
               "const": true
+            },
+            "detail": {
+              "description": "A power's parameters as printed, apart from its name and rating: `Cold, Fire, Toxins` of `Immunity (Cold, Fire, Toxins)`.",
+              "type": "string"
             }
           }
         },

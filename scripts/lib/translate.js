@@ -703,8 +703,10 @@ export function statBlockItems(things, ctx, powerType, str) {
   items.splice(0, items.length, ...items.filter(i => !spent.has(i.flags[MODULE_ID].id)))
   for (const x of things.filter(isPower)) {
     const p = noted({ ...x, name: x.pick ? x.name : x.line?.printed ?? x.name }), optional = x.line?.part === 'optionalPowers' && 'Optional power.'
-    const doc = x.kind === 'critterpowers' ? icon(powerItem(p, powerType, ctx, [optional, p.note]), p, ctx)
-      : pickItem({ ...p, pick: x.pick ?? x.kind }, ctx)
+    // line.detail: the power's parameters as printed (shown unless the printed line already has them)
+    const detail = x.line?.detail && !String(x.line.printed ?? '').includes(x.line.detail) && `Detail: ${x.line.detail}`
+    const doc = x.kind === 'critterpowers' ? icon(powerItem(p, powerType, ctx, [optional, p.note, detail]), p, ctx)
+      : pickItem({ ...p, note: [p.note, detail].filter(Boolean).join(' — '), pick: x.pick ?? x.kind }, ctx)
     doc.flags[MODULE_ID].npcLine = x.line?.printed
     if (x.line?.match) doc.flags[MODULE_ID].match = x.line.match
     items.push(doc)
