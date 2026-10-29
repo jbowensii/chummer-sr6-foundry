@@ -8,6 +8,7 @@ Conditions and situational switches (Nova Prime Chummer app 0.34.0 export):
 - A situational bonus (`switch: "conditional"`, a prose `when`) stays a disabled Active Effect the player toggles. If the export marks it `on` (1, or a count N for a `per ...` effect), it is created enabled with its value times `on`. The export's `derived` numbers are not used for these, so nothing counts twice.
 - Qualities carry `bonuses` now: they are handled exactly as an item's (same code path).
 - The bundled schema accepts `bonus.on`.
+- The POLYGLOT rule marker (`rules`) is carried as a flag and a description line on the item, with the language rank cost it implies (`scripts/lib/rules.js`).
 - New `scripts/lib/when.js` and `test/when.test.js`; one new Quench check that no effect name shows a machine condition.
 
 - The Traditions reference journal is grouped by Drain attribute: plain header pages Logic-Based, Charisma-Based, Intuition-Based (in that order), each tradition's page nested under its header and sorted by name. A tradition with no or an unknown drain goes under a final Other header; an empty group gets no header. Headers have stable chummerIDs (`<book>:traditions:group.log`), so a re-import updates them in place; tradition pages keep theirs.
