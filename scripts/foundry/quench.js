@@ -569,9 +569,11 @@ export function registerQuench(quench) {
       it('kinds Eden has no document for are Reference journals, a page per entry (a tradition, a grade, an action)', async () => {
         const journals = (await pack('reference').getDocuments()).filter(j => flagOf(j).source === 'MUS')
         const trad = journals.find(j => j.name === 'Traditions')
-        assert.lengthOf(trad.pages.contents, 1)
-        assert.include(trad.pages.contents[0].text.content, 'invented tradition')
-        assert.equal(trad.pages.contents[0].flags['chummer-sr6-importer'].chummerID, 'MUS:traditions:mus.made-up-path')
+        const pages = trad.pages.contents.sort((a, b) => a.sort - b.sort)
+        assert.deepEqual(pages.map(p => p.name), ['Intuition-Based', 'Made-up Path'])
+        assert.equal(pages[0].flags['chummer-sr6-importer'].chummerID, 'MUS:traditions:group.int')
+        assert.include(pages[1].text.content, 'invented tradition')
+        assert.equal(pages[1].flags['chummer-sr6-importer'].chummerID, 'MUS:traditions:mus.made-up-path')
         assert.includeMembers(journals.map(j => j.name), ['Augmentation grades', 'Actions', 'Mentor spirits', 'Metatypes'])
       })
       it('re-importing one book updates its entries in place across the merged packs (same _id, nothing new, user image, GM entry and page kept, locked again) and leaves the other book’s alone', async () => {

@@ -531,7 +531,7 @@
      "source": "MUS",
      "page": 10,
      "canon": true,
-     "attrs": {},
+     "attrs": { "drain": "int" },
      "parts": [],
      "values": {},
      "description": "An invented tradition."

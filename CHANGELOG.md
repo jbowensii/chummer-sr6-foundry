@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.12.0 (2026-10-29)
+
+- The Traditions reference journal is grouped by Drain attribute: plain header pages Logic-Based, Charisma-Based, Intuition-Based (in that order), each tradition's page nested under its header and sorted by name. A tradition with no or an unknown drain goes under a final Other header; an empty group gets no header. Headers have stable chummerIDs (`<book>:traditions:group.log`), so a re-import updates them in place; tradition pages keep theirs.
+
 ## 0.11.1 (2026-10-22)
 
 - Quench: the NPC combat-items test no longer counts Eden's own Unarmed item (Eden gives every actor one) among the stat block's weapons. Test only; the importer is unchanged. First live Quench run of 0.11.0: 61/62, the one failure was this test.
