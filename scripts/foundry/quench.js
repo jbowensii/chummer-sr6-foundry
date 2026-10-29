@@ -115,6 +115,9 @@ export function registerQuench(quench) {
         assert.isNotEmpty(fx)
         for (const e of fx) assert.isTrue(e.flags?.['chummer-sr6-importer']?.chummer, e.name)
       })
+      it('no effect shows a machine condition (attr:str>=6, a role): the actor decides those', () => {
+        for (const e of ours(mara).flatMap(i => [...i.effects])) assert.notMatch(e.name, /attr:[a-z]{3}[<>]=/, e.name)
+      })
       const owned = (type, uid) => game.actors.find(x => x.type === type && flagOf(x)?.runner === runner.id && flagOf(x)?.id === uid)
       it('its vehicle is an Eden Vehicle actor that belongs to it, in "<runner> vehicles"', () => {
         const bike = owned('Vehicle', 'v1')

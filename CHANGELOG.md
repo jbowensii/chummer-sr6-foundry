@@ -2,6 +2,14 @@
 
 ## 0.12.0 (2026-10-29)
 
+Conditions and situational switches (Nova Prime Chummer app 0.34.0 export):
+
+- An effect or bonus whose `when` is the app's machine grammar (`attr:str>=6` / `attr:str<=2`, a metatype name or its parent's, a role adept / magician / mystic adept / technomancer) is decided from the actor: if it holds, it is a plain always-on Active Effect; if not, it is a disabled one. The grammar string is never shown as a name or a note (a failed condition leaves no note at all). Attributes are counted augmented. Any other `when` stays a situational switch. Metatype names are recognised from a built-in list of the SR6 metatypes (the export carries no list); a name not on it stays a switch unless it is the runner's own. `metatype.parent`, when an export carries it, is honoured.
+- A situational bonus (`switch: "conditional"`, a prose `when`) stays a disabled Active Effect the player toggles. If the export marks it `on` (1, or a count N for a `per ...` effect), it is created enabled with its value times `on`. The export's `derived` numbers are not used for these, so nothing counts twice.
+- Qualities carry `bonuses` now: they are handled exactly as an item's (same code path).
+- The bundled schema accepts `bonus.on`.
+- New `scripts/lib/when.js` and `test/when.test.js`; one new Quench check that no effect name shows a machine condition.
+
 - The Traditions reference journal is grouped by Drain attribute: plain header pages Logic-Based, Charisma-Based, Intuition-Based (in that order), each tradition's page nested under its header and sorted by name. A tradition with no or an unknown drain goes under a final Other header; an empty group gets no header. Headers have stable chummerIDs (`<book>:traditions:group.log`), so a re-import updates them in place; tradition pages keep theirs.
 
 ## 0.11.1 (2026-10-22)
