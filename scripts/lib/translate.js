@@ -2,6 +2,7 @@
 // Raw inputs only (attribute bases, skill points, items with their fields): Eden derives pools, monitors, initiative and essence.
 import { chummerFlags } from './chummer-id.js'
 import { MODULE_ID } from './constants.js'
+import { ruleLines } from './rules.js'
 import { iconFor, itemIconKey, npcIconKey, withIcon } from './icons.js'
 import {
   ACCESS_DEVICES, ATTRS, MOR, SKILLS, SPELL_CATEGORIES, activationKey, armorSubtype, augmentType, autosoftSubtype, deviceFields, durationKey, edenBook,
@@ -333,7 +334,8 @@ export function pickItem(x, ctx) {
 const karmaLine = (a = {}) => a.karma && `Karma: ${a.karma}${a.karmaMax && a.karmaMax !== a.karma ? `–${a.karmaMax}` : ''}`
 /** A quality ({ positive, free?, level?, note? } on a runner; a book's entry sets positive from attrs.kind) -> Eden item data. */
 export function qualityItem(q, ctx) {
-  const doc = base(q, 'quality', ctx, [q.free && 'Metatype trait.', karmaLine(q.attrs), ...effectLines(q, ctx)])
+  const doc = base(q, 'quality', ctx, [q.free && 'Metatype trait.', karmaLine(q.attrs), ...ruleLines(q.rules), ...effectLines(q, ctx)])
+  if (q.rules?.length) doc.flags[MODULE_ID].rules = [...q.rules]  // (lib/rules.js: read in play)
   Object.assign(doc.system, { category: q.positive ? 'ADVANTAGE' : 'DISADVANTAGE', level: yes(q.attrs?.perLevel), value: num(q.level), explain: q.note ?? '' })
   return icon(withEffects(doc, q, ctx), q, ctx)
 }
