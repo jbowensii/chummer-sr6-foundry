@@ -323,13 +323,27 @@ export function translateBook(book, { audit, exportedAt, appVersion, description
   }
   // the kinds Eden has no document for: a Reference journal each, a page per entry. A page holds no Active Effect, so an
   // entry's effects (an ammo type's modifiers, a data structure's bonus) are described lines on it (effectLines with ctx.host).
+  // the Drain attribute groups of a tradition, in the app's order (nova-prime-chummer src/sr6/catalog/domain/traditions.ts GROUPS)
+  const DRAIN_GROUPS = [['log', 'Logic-Based'], ['cha', 'Charisma-Based'], ['int', 'Intuition-Based'], ['other', 'Other']]
   const esc = v => String(v ?? '')
   const stats = e => [...Object.entries(e.attrs ?? {}).map(([k, v]) => `${k}: ${esc(v)}`), ...(e.parts ?? []).filter(x => x.text).map(x => `${x.tag}: ${x.text}`)]
   for (const [kind, list] of Object.entries(skipped)) {
+    // traditions are grouped under a plain header page per Drain attribute (level 1, entries level 2), by name; no/unknown drain: Other.
+    // A header's chummerID (<src>:traditions:group.log) is stable, so a re-import updates it in place.
+    let pages = list.map(e => ({ e, level: 1 }))
+    if (kind === 'traditions') {
+      const byName = (a, b) => (a.name || a.id).localeCompare(b.name || b.id)
+      pages = DRAIN_GROUPS.flatMap(([key, label]) => {
+        const drain = e => { const d = String(e.attrs?.drain ?? '').trim().toLowerCase(); return DRAIN_GROUPS.some(([k]) => k === d) ? d : 'other' }
+        const g = list.filter(e => drain(e) === key).sort(byName)
+        return g.length ? [{ e: { id: `group.${key}`, name: label, kind, page: g[0].page }, level: 1, header: true }, ...g.map(e => ({ e, level: 2 }))] : []
+      })
+    }
     add({ kind }, { name: REFERENCE[kind] ?? titled(kind), flags: { [MODULE_ID]: bookFlags({ id: kind, page: list[0].page }, 'reference') },
-      pages: list.map((e, i) => ({ name: e.name || e.id, type: 'text', sort: (i + 1) * SORT, title: { show: true, level: 1 },
+      pages: pages.map(({ e, level, header }, i) => ({ name: e.name || e.id, type: 'text', sort: (i + 1) * SORT, title: { show: true, level },
         flags: { [MODULE_ID]: bookFlags(e) },
-        text: { content: sanitize(stats(e).join('\n\n')) + sanitize(effectLines(e, { ...ctx, host: true }).join('\n\n')) + sanitize(text(e) ?? '') + sanitize(see(e)), format: 1 } })) }, 'reference')
+        ...(header ? { text: { content: '', format: 1 } } : {}),
+        ...(header ? {} : { text: { content: sanitize(stats(e).join('\n\n')) + sanitize(effectLines(e, { ...ctx, host: true }).join('\n\n')) + sanitize(text(e) ?? '') + sanitize(see(e)), format: 1 } }) })) }, 'reference')
     if (!REFERENCE[kind]) textOnly.push(`${list.length} ${kind}: a kind this module doesn't know → Reference journal "${titled(kind)}"`)
   }
 

@@ -129,9 +129,16 @@ describe('a book', () => {
   test('a tradition -> a page of the Traditions reference journal (Eden has no tradition item)', () => {
     const j = t.packs.reference.find(x => x.name === 'Traditions')
     expect(j.flags[M].chummerID).toBe('MUS:reference:traditions')
-    expect(j.pages).toHaveLength(1)
-    expect(j.pages[0]).toMatchObject({ name: 'Made-up Path', type: 'text', flags: { [M]: { id: 'mus.made-up-path', page: 10, chummerID: 'MUS:traditions:mus.made-up-path' } } })
-    expect(j.pages[0].text.content).toContain('<p>An invented tradition.</p>')
+    expect(j.pages.map(p => p.name)).toEqual(['Intuition-Based', 'Made-up Path'])
+    expect(j.pages[0]).toMatchObject({ title: { level: 1 }, flags: { [M]: { chummerID: 'MUS:traditions:group.int' } } })
+    expect(j.pages[1]).toMatchObject({ type: 'text', title: { level: 2 }, flags: { [M]: { id: 'mus.made-up-path', page: 10, chummerID: 'MUS:traditions:mus.made-up-path' } } })
+    expect(j.pages[1].text.content).toContain('<p>An invented tradition.</p>')
+  })
+  test('traditions group by Drain attribute: Logic, Charisma, Intuition, then Other; by name inside', () => {
+    const tr = (id, name, drain) => ({ ...mus.entries.find(e => e.id === 'mus.made-up-path'), id, name, attrs: drain ? { drain } : {} })
+    const book = { ...mus, entries: [tr('t.z', 'Zed', 'int'), tr('t.b', 'Bee', 'log'), tr('t.a', 'Ay', 'log'), tr('t.n', 'Nada'), tr('t.c', 'Cee', 'cha'), tr('t.x', 'Odd', 'zzz')] }
+    const j = translateBook(book, OPTS).packs.reference.find(x => x.name === 'Traditions')
+    expect(j.pages.map(p => p.name)).toEqual(['Logic-Based', 'Ay', 'Bee', 'Charisma-Based', 'Cee', 'Intuition-Based', 'Zed', 'Other', 'Nada', 'Odd'])
     expect(t.packs).not.toHaveProperty('traditions')
   })
   test('text Eden has no field for: a quality’s karma range, a mod’s slots, a weakness', () => {

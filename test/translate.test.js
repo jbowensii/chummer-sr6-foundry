@@ -571,3 +571,18 @@ test('ammo-material: ammunition of a material says so in its description, on a l
   expect(type.system.description).toContain('Material: moonstone (×7 the price)')
   expect(lineItem({ ...ammo, material: undefined }, ctx()).system.description).not.toContain('Material:')
 })
+
+describe('Polyglot (RULE marker)', () => {
+  test('a quality with rules gets the flag and a description line; a Polyglot actor pays the discounted language rank', async () => {
+    const { hasRule, languageRankCost, languageMaxRank } = await import('../scripts/lib/rules.js')
+    const q = qualityItem({ id: 'swc.polyglot', name: 'Polyglot', positive: true, attrs: {}, rules: ['POLYGLOT'] }, ctx())
+    expect(q.flags['chummer-sr6-importer'].rules).toEqual(['POLYGLOT'])
+    expect(q.system.description).toContain('language ranks cost 1 Karma less')
+    expect(hasRule([q], 'POLYGLOT')).toBe(true)
+    expect(languageRankCost([q], 3)).toBe(2)
+    expect(languageRankCost([q], 1)).toBe(1)
+    expect(languageMaxRank([q], 3)).toBe(4)
+    expect(languageRankCost([], 3)).toBe(3)
+    expect(languageMaxRank([], 3)).toBe(3)
+  })
+})

@@ -2,6 +2,8 @@
 // Raw inputs only (attribute bases, skill points, items with their fields): Eden derives pools, monitors, initiative and essence.
 import { chummerFlags } from './chummer-id.js'
 import { MODULE_ID } from './constants.js'
+import { ruleLines } from './rules.js'
+import { decide, isMachineWhen, whenFacts, whenHolds } from './when.js'
 import { iconFor, itemIconKey, npcIconKey, withIcon } from './icons.js'
 import {
   ACCESS_DEVICES, ATTRS, MOR, SKILLS, SPELL_CATEGORIES, activationKey, armorSubtype, augmentType, autosoftSubtype, deviceFields, durationKey, edenBook,
@@ -32,9 +34,10 @@ const BONUS_KEY = b => (b.target === 'initDice' ? 'system.initiative.physical.di
   : b.target === 'defense' ? 'system.defenserating.physical.mod' : MONITOR[b.target]
   ?? (b.target === 'skill' ? (skillOf(b) ? `system.skills.${skillOf(b)}.modifier` : null)
     : ATTRS.includes(b.target) ? `system.attributes.${b.target}.mod` : null))
-const howOf = x => ({ switch: x.switch, when: x.when, spec: x.spec, affects: x.affects, gen: x.gen })
-const bonusRows = bonuses => (bonuses ?? []).flatMap(b => { const key = BONUS_KEY(b); return key ? [{ key, value: num(b.value), ...howOf(b) }] : [] })
-export const bonusChanges = bonuses => bonusRows(bonuses).map(r => ({ key: r.key, value: r.value, mode: 2 }))
+// (on: a situational bonus the player had switched on, 1 or a count: enabled, times it; off: its machine condition fails, lib/when.js)
+const howOf = (x, facts) => { const d = decide(x, facts); return { switch: d.switch, when: d.when, spec: d.spec, affects: d.affects, gen: d.gen, on: d.on, off: d.off } }
+const bonusRows = (bonuses, facts) => (bonuses ?? []).flatMap(b => { const key = BONUS_KEY(b); return key ? [{ key, value: num(b.value) * (b.on > 0 ? b.on : 1), ...howOf(b, facts) }] : [] })
+export const bonusChanges = (bonuses, facts) => bonusRows(bonuses, facts).map(r => ({ key: r.key, value: r.value, mode: 2 }))
 const BONUS_LABEL = { initDice: 'Initiative dice', defense: 'Defense Rating' }
 const bonusText = bonuses => (bonuses ?? []).map(b => `${b.target === 'skill' ? b.name ?? b.id : BONUS_LABEL[b.target] ?? String(b.target).toUpperCase()} ${num(b.value) >= 0 ? '+' : ''}${num(b.value)}`).join(', ')
 /** The flag that marks an Active Effect as this module's: a re-import or Replace swaps only these, never a user's own. */
@@ -100,11 +103,11 @@ function readEffects(x, ctx = {}) {
     const seen = out => ctx.audit?.set(e, { id: x.id, kind: x.kind, out })
     if ((Array.isArray(x.bonuses) && inBonuses(e) && !e.low) || (x.kind === 'armor' && e.target === 'derived:defense')) { seen('covered'); continue }
     const p = plan(x, e, ctx, rating)
-    if (!p) { seen('note'); notes.push(effectText(e)); continue }
+    if (!p) { seen('note'); const d = decide(e, ctx.facts); if (!d.off) notes.push(effectText(d)); continue }  // (a machine condition that fails: nothing to say)
     seen(p.scope)
     // perRating: exactly R, once, on one change (groupEffects: Eden's @item.system.rating when the item can carry it)
     const perRating = times === 1 && String(e.value).trim() === 'R'
-    rows.push(...p.changes.map(c => ({ ...c, value: typeof c.value === 'number' ? c.value * times : c.value, scope: p.scope, perRating, prompt: p.prompt, ...howOf(e) })))
+    rows.push(...p.changes.map(c => ({ ...c, value: typeof c.value === 'number' ? c.value * times : c.value, scope: p.scope, perRating, prompt: p.prompt, ...howOf(e, ctx.facts) })))
   }
   return { rows, notes }
 }
@@ -124,14 +127,14 @@ const SWITCH = { wireless: 'Wireless', activated: 'Activated', sustained: 'Susta
 function groupEffects(rows, name, ctx = {}) {
   const out = new Map()
   for (const r of rows) {
-    const scope = r.scope ?? 'actor', target = scope === 'target' || r.affects === 'target', on = !target && !r.switch && !r.when && !r.spec && r.affects !== 'caster'
+    const scope = r.scope ?? 'actor', target = scope === 'target' || r.affects === 'target', live = r.on > 0, off = !!r.off && !target, on = !target && !r.switch && !r.when && !r.spec && r.affects !== 'caster' && !off
     if (on && ctx.stored?.includes(r.key)) continue
     const cl6 = r.gen === 'cl6'
-    const label = (target ? `${r.affects === 'others' ? 'Others get' : 'On the target'}: ${name}` : on ? name
+    const label = (target ? `${r.affects === 'others' ? 'Others get' : 'On the target'}: ${name}` : on || off ? name
       : `${SWITCH[r.switch] ?? (r.affects === 'caster' ? 'Sustained' : 'Conditional')}: ${name}${r.spec ? ` (${r.spec})` : ''}${r.when ? ` (${r.when})` : ''}`) + (cl6 ? ' (CommLink6)' : '')
-    const id = `${scope}|${label}`
+    const id = `${scope}|${label}|${off ? 'off' : live ? 'on' : ''}`
     if (!out.has(id)) {
-      const e = ours({ name: label, transfer: scope === 'actor' && !target, disabled: !on, changes: [] })
+      const e = ours({ name: label, transfer: scope === 'actor' && !target, disabled: !on && !live, changes: [] })
       const flags = { ...e.flags[MODULE_ID], ...cl6 ? { gen: 'cl6' } : {}, ...scope === 'target' ? { forTargets: true } : {} }  // (a new object: OUR_EFFECT is shared)
       e.flags = { ...e.flags, [MODULE_ID]: flags }
       out.set(id, e)
@@ -161,7 +164,7 @@ const signed = v => (minus(v) || v.includes(',') || /%$/.test(value(v)) ? value(
 /** One effect as words: "Wireless: +1 Reaction.", "Edge boosts and actions on Firearms tests cost 1 less.", "Low Light Vision." */
 export function effectText(e) {
   const v = String(e.value ?? ''), t = `${named(e.target)}${e.spec ? ` (${e.spec})` : ''}`, tests = `${t} tests`
-  if (String(e.target).startsWith('sense:')) return `${e.low ? 'Not applied (unsure): ' : ''}${t}${e.when ? ` (${e.when})` : ''}.`
+  if (String(e.target).startsWith('sense:')) return `${e.low ? 'Not applied (unsure): ' : ''}${t}${e.when && !isMachineWhen(e.when) ? ` (${e.when})` : ''}.`
   const text = { set: `${t} ${value(v)}`, edge: `${signed(v)} Edge on ${tests}`,
     'edge-cost': `Edge boosts and actions on ${tests} cost ${v.replace(/^[-–−]/, '')} ${minus(v) ? 'less' : 'more'}`,
     'edge-cost-set': `${tests} cost ${v} Edge`, 'no-edge': `No Edge spent on ${tests}`, 'no-edge-gain': `No Edge gained on ${tests}`,
@@ -170,11 +173,11 @@ export function effectText(e) {
     ?? (/^rank:/.test(v) ? `+${value(v)} to ${t}` : null)
     ?? `${signed(v)} ${String(e.target).startsWith('test:') ? tests : t}`
   const how = e.affects === 'target' ? 'On the target: ' : e.affects === 'others' ? 'Others get: ' : SWITCH[e.switch] && e.switch !== 'conditional' ? `${SWITCH[e.switch]}: ` : ''
-  return `${e.low ? 'Not applied (unsure): ' : ''}${how}${text}${e.when ? ` (${e.when})` : ''}.`
+  return `${e.low ? 'Not applied (unsure): ' : ''}${how}${text}${e.when && !isMachineWhen(e.when) ? ` (${e.when})` : ''}.`
 }
-const linkText = l => `${l.rel === 'as' ? 'Works as' : 'Grants'} ${l.name}${l.level ? ` ${l.level}` : ''}${l.when ? ` (${l.when})` : ''}.`
+const linkText = (l, facts) => `${l.rel === 'as' ? 'Works as' : 'Grants'} ${l.name}${l.level ? ` ${l.level}` : ''}${l.when && !isMachineWhen(l.when) && whenHolds(l.when, facts) === undefined ? ` (${l.when})` : ''}.`
 /** The text lines for what Eden can't hold of the entry's effects, its links, and the tests the entry calls for. */
-export const effectLines = (x, ctx = {}) => [...readEffects(x, ctx).notes, ...(x.links ?? []).map(linkText),
+export const effectLines = (x, ctx = {}) => [...readEffects(x, ctx).notes, ...(x.links ?? []).map(l => linkText(l, ctx.facts)),
   ...(x.tests ?? []).map(t => `Test: ${named(t.skill)} + ${named(t.attr)}${Number.isFinite(t.threshold) ? ` (${t.threshold})` : ''}.`)]
 
 const ref = x => (x.source ? `Chummer: ${x.source}${x.page ? ` p.${x.page}` : ''}` : 'Chummer: custom item')
@@ -199,7 +202,7 @@ export function base(x, type, ctx, extra = []) {
 // ctx.rated (a runner's items): a gear or focus item with a rating (Eden's template.json gear and focus have system.rating) follows it
 export const withEffects = (doc, x, ctx = {}) => {
   const perRating = !!ctx.rated && ['gear', 'focus'].includes(doc.type) && doc.system.rating > 0
-  const effects = groupEffects([...ctx.host ? [] : bonusRows(x.bonuses), ...readEffects(x, ctx).rows], x.name, { ...ctx, perRating })
+  const effects = groupEffects([...ctx.host ? [] : bonusRows(x.bonuses, ctx.facts), ...readEffects(x, ctx).rows], x.name, { ...ctx, perRating })
   if (effects.length) doc.effects = effects
   return doc
 }
@@ -333,7 +336,8 @@ export function pickItem(x, ctx) {
 const karmaLine = (a = {}) => a.karma && `Karma: ${a.karma}${a.karmaMax && a.karmaMax !== a.karma ? `–${a.karmaMax}` : ''}`
 /** A quality ({ positive, free?, level?, note? } on a runner; a book's entry sets positive from attrs.kind) -> Eden item data. */
 export function qualityItem(q, ctx) {
-  const doc = base(q, 'quality', ctx, [q.free && 'Metatype trait.', karmaLine(q.attrs), ...effectLines(q, ctx)])
+  const doc = base(q, 'quality', ctx, [q.free && 'Metatype trait.', karmaLine(q.attrs), ...ruleLines(q.rules), ...effectLines(q, ctx)])
+  if (q.rules?.length) doc.flags[MODULE_ID].rules = [...q.rules]  // (lib/rules.js: read in play)
   Object.assign(doc.system, { category: q.positive ? 'ADVANTAGE' : 'DISADVANTAGE', level: yes(q.attrs?.perLevel), value: num(q.level), explain: q.note ?? '' })
   return icon(withEffects(doc, q, ctx), q, ctx)
 }
@@ -546,7 +550,7 @@ export function translateRunner(r, opts) {
   const { exportedAt, appVersion, sanitize = escapeText, icons = null, specs = {}, complexForms = {} } = opts
   const name = r.streetName || r.realName || 'Runner', lines = []
   // stored: the always-on monitor boxes Chummer counted, which the actor holds (below), so not an effect too
-  const ctx = { exportedAt, appVersion, sanitize, icons: iconSet(icons), specs, complexForms, say: t => lines.push(t), entries: runnerEntries(r), rated: true,
+  const ctx = { facts: whenFacts(r), exportedAt, appVersion, sanitize, icons: iconSet(icons), specs, complexForms, say: t => lines.push(t), entries: runnerEntries(r), rated: true,
     stored: r.derived?.monitorBonus ? [MONITOR.physical, MONITOR.stun] : [] }
   const flag = id => ({ [MODULE_ID]: { id, exportedAt, appVersion } })
 
