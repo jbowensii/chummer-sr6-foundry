@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.12.1 (2026-10-30)
+
+- Release fix: module.json download link now points at this release (0.12.0 was tagged with the 0.11.1 link and never published). Same code as 0.12.0.
+
 ## 0.12.0 (2026-10-29)
 
 Conditions and situational switches (Nova Prime Chummer app 0.34.0 export):
