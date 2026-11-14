@@ -114,15 +114,15 @@ describe('npc spells: the runner’s spell item, plus the printed note', () => {
 
 describe('npc caster magic: the tradition and drain attribute', () => {
   test('set as a runner’s are, with a note', () => {
-    const t = run([], { tradition: 'Made-up Hermetic', drainAttr: 'log', drain: 9, traditions: [{ id: 'zz.h', name: 'Made-up Hermetic', drainAttr: 'log' }] })
-    expect(t.actor.system.tradition).toEqual({ name: 'Made-up Hermetic', attribute: 'log' })
-    expect(t.actor.system.notes).toContain('<h3>Tradition</h3><p>Tradition: Made-up Hermetic, drain attribute LOG, drain pool 9')
+    const t = run([], { tradition: 'Logic-Based Tradition', drainAttr: 'log', drain: 9, traditions: [{ id: 'logic-based', name: 'Logic-Based Tradition', drainAttr: 'log' }] })
+    expect(t.actor.system.tradition).toEqual({ name: 'Logic-Based Tradition', attribute: 'log' })
+    expect(t.actor.system.notes).toContain('<h3>Tradition</h3><p>Tradition: Logic-Based Tradition, drain attribute LOG, drain pool 9')
   })
   test('a tie lists every tradition, the first one set', () => {
-    const t = run([], { tradition: 'Made-up Hermetic', drainAttr: 'log', drain: 9,
-      traditions: [{ id: 'a', name: 'Made-up Hermetic', drainAttr: 'log' }, { id: 'b', name: 'Made-up Shamanic', drainAttr: 'cha' }] })
-    expect(t.actor.system.tradition.name).toBe('Made-up Hermetic')
-    expect(t.actor.system.notes).toContain('Tradition: Made-up Hermetic or Made-up Shamanic')
+    const t = run([], { tradition: 'Logic-Based Tradition', drainAttr: 'log', drain: 9,
+      traditions: [{ id: 'logic-based', name: 'Logic-Based Tradition', drainAttr: 'log' }, { id: 'charisma-based', name: 'Charisma-Based Tradition', drainAttr: 'cha' }] })
+    expect(t.actor.system.tradition.name).toBe('Logic-Based Tradition')
+    expect(t.actor.system.notes).toContain('Tradition: Logic-Based Tradition or Charisma-Based Tradition')
   })
   test('no magic: nothing invented', () => {
     const t = run([])

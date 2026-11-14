@@ -8,6 +8,8 @@ import { createIconsApp, loadIconIndex } from './foundry/icons.js'
 import { MODULE_ID } from './lib/constants.js'
 import { registerQuench } from './foundry/quench.js'
 import { registerTargets } from './foundry/targets.js'
+// 0.14 panels on Eden's sheets (ammunition, club, pools, animal form): self-contained, one call at init
+import { registerPanels } from './foundry/panels.js'
 
 let ImportApp = null
 let icons = null  // icons/index.json, loaded once at init; null = no icons
@@ -55,3 +57,4 @@ Hooks.once('ready', () => { registerEffectTargets(); registerTargets(); addButto
 // own classes, which exist by now: Unarmed's getters read the actor's unarmed effects, an unworn armor's effects are suppressed
 Hooks.once('setup', () => { guardEdenItemHooks(); patchEdenUnarmed(); patchArmorSuppression() })
 Hooks.on('quenchReady', quench => registerQuench(quench))
+Hooks.once('init', registerPanels)

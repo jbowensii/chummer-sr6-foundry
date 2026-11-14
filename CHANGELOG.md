@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.14.0 (2026-11-14)
+
+Panels on Eden's own sheets for the new export fields, rolled with Eden's own rolls. Needs a Nova Prime Chummer export with `ammoTypes`, `meleeAlternate`, `dronePools`, `derived.rigging`, `design`/`approved` and `animalForm`. The import side, planned as 0.13.0, ships here too:
+
+Import (the 0.13.0 content):
+
+- A ranged weapon line's ammunition types (`values.ammoTypes`: each type's final DV, Attack Ratings and stun with it loaded) are stored on the weapon, along with its plain values (the line's `values.dv`/`ar`) and a baseline. Eden's stats stay the plain ones until a type is picked.
+- A firearm with Melee Hardening keeps its club alternate (`values.meleeAlternate`). A drone keeps its own pools (`values.dronePools`, autonomous and RCC). The runner keeps the rigger's pools (`derived.rigging`) and a shifter's animal form (`animalForm`, including its weapons' `ar` when the export has it). A weapon or cyberware line bought from a saved item design keeps the design id, plus the approval when a GM approved it. All of these live in the module's flags. Eden's own drone mode is left alone.
+- Re-import now deletes any key of ours that the new export no longer has. Foundry merges an update, so before this a revoked approval or a removed club stayed behind. This covers the runner, its items, and its vehicles, drones and critters. A weapon's ammunition choice is kept while that type still exists (it is switched again on the new numbers). Otherwise the choice and the stats go back to standard together. Damage, ammunition count, item ids, other modules' flags and the user's own effects all stay.
+- The bundled export schema is the app's current one: qualities carry `bonuses`, and an NPC's tradition is one of the three drain-based ones. The test fixtures follow it.
+
+Panels and rolls (0.14.0):
+
+- Weapon rows (combat tab, vehicle sheet) get an ammunition picker that changes the weapon's stored DV, stun and Attack Ratings, plus a roll button. Each band moves by the type's difference from standard, a "-" band stays "-", and a change made by hand on the sheet survives a switch. For these weapons Eden's own ammunition selector is hidden (item sheet and roll dialog) and Eden's `ammoLoaded` stays regular, so the ammunition only counts once. Other weapons are unchanged.
+- A Melee Hardening firearm's club (3S, AR 4, Close Combat with Clubs) shows on its row and rolls as a full Eden weapon attack, with defense and damage. The roll uses an unsaved item, so the firearm and its rounds are never touched.
+- A design badge (approved or not) shows on the item's row.
+- The rigger's pools show on the Vehicles tab and a drone's pools on its sheet, both marked as imported snapshots. Drone pools roll without wound modifiers.
+- A new Animal form tab shows the form's attributes and natural weapons. Each weapon rolls as a full Eden weapon attack with the exported Attack Rating.
+- Controls appear only on an editable sheet, and roll buttons only for an owner. Everything that comes from a file goes in as plain text.
+- New files: `scripts/lib/ammo.js`, `scripts/foundry/panels.js`, `scripts/foundry/rolls.js`, `styles/panels.css`. Tests: `test/panels-fields.test.js`, plus a re-import test in `test/apply.test.js` (its fake now merges like Foundry). New Quench batch: `panels`.
+
 ## 0.12.1 (2026-10-30)
 
 - Release fix: module.json download link now points at this release (0.12.0 was tagged with the 0.11.1 link and never published). Same code as 0.12.0.

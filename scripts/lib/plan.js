@@ -120,3 +120,15 @@ export function planItems(existing, incoming) {
   const remove = [...old.values()].filter(o => !used.has(id(o))).map(id)
   return { update, create, remove }
 }
+
+/**
+ * Our flags for a Replace update. Foundry merges an update into what the document has, so a key of ours the new export
+ * no longer writes (a revoked approval, a removed club alternate, an animal form gone) would stay: each one is deleted
+ * explicitly. del(obj, key) marks key for deletion (foundry/apply.js: Foundry 14's ForcedDeletion, else 13's `-=key`).
+ * Everything in our namespace is the importer's; other modules' flags are never touched (they are not in this object).
+ */
+export function oursWithDeletions(oldOurs, fresh, del = (o, k) => { o[`-=${k}`] = null }) {
+  const out = { ...fresh }
+  for (const k of Object.keys(oldOurs ?? {})) if (!k.startsWith('-=') && !(k in out)) del(out, k)
+  return out
+}

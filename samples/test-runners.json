@@ -190,7 +190,17 @@
      "uid": "q1",
      "positive": true,
      "level": 1,
-     "free": false
+     "free": false,
+     "bonuses": [
+      {
+       "target": "agi",
+       "value": 1
+      },
+      {
+       "target": "defense",
+       "value": 1
+      }
+     ]
     },
     {
      "id": "mur.night-eyes",
@@ -210,7 +220,8 @@
      "uid": "q2",
      "positive": true,
      "level": 1,
-     "free": true
+     "free": true,
+     "bonuses": []
     },
     {
      "id": "mur.made-up-debt",
@@ -233,7 +244,8 @@
      "positive": false,
      "level": 2,
      "free": false,
-     "note": "Owes a made-up fixer."
+     "note": "Owes a made-up fixer.",
+     "bonuses": []
     },
     {
      "id": "mur.made-up-tough",
@@ -255,7 +267,8 @@
      "uid": "q4",
      "positive": true,
      "level": 1,
-     "free": false
+     "free": false,
+     "bonuses": []
     }
    ],
    "picks": [

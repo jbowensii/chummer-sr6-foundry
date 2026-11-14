@@ -4,7 +4,8 @@ import { missingTargets, normKey } from '../lib/eden.js'
 import { INDEX_FIELDS, resolveEntry, tieLine } from '../lib/chummer-id.js'
 import { LINE_KINDS, matchThing, npcThings, overrideStats, thingTie } from '../lib/npc-lines.js'
 import { typeKey, typeOfPack } from '../lib/books.js'
-import { fitUpdates, isOurEffect, keepItemArt, newVersionName, planItems, replaceUpdate, tokenUpdate } from '../lib/plan.js'
+import { fitUpdates, isOurEffect, keepItemArt, newVersionName, oursWithDeletions, planItems, replaceUpdate, tokenUpdate } from '../lib/plan.js'
+import { reconcileAmmo } from '../lib/ammo.js'
 
 export const FOLDER = 'Chummer SR6'
 export const NPC_FOLDER = 'Chummer SR6 NPCs'  // NPCs from a runners file (flags npc)
@@ -208,13 +209,22 @@ async function createItems(doc, items) {
 // items the file no longer has deleted; the user's own items never touched. Art the user chose stays (keepItemArt).
 // Then every fitted mod and program is pointed at its host again. If deleting the dropped items fails, the items this
 // call created are removed again. Throws on failure.
+// Foundry 14 deletes a key with a ForcedDeletion operator; 13 with the `-=key: null` form (deprecated in 14)
+const delKey = (o, k) => { const FD = globalThis.foundry?.data?.operators?.ForcedDeletion; if (FD) o[k] = FD.create(); else o[`-=${k}`] = null }
 async function replaceDoc(doc, actor, items, token) {
   const fresh = keepItemArt(doc.items, items)
   const { update, create, remove } = planItems([...doc.items], fresh)
-  await doc.update({ ...replaceUpdate(actor, doc.name, doc.img), ...tokenUpdate(doc, token ?? actor.img) })
-  if (update.length) await doc.updateEmbeddedDocuments('Item', update.map(({ old, item }) => ({ _id: old.id, name: item.name,
-    ...item.img ? { img: item.img } : {}, system: item.system, flags: { ...old.flags, [MODULE_ID]: item.flags[MODULE_ID] },
-    ...item._stats?.compendiumSource ? { '_stats.compendiumSource': item._stats.compendiumSource } : {} })))
+  const au = replaceUpdate(actor, doc.name, doc.img)
+  au.flags[MODULE_ID] = oursWithDeletions(flagOf(doc), au.flags[MODULE_ID], delKey)
+  await doc.update({ ...au, ...tokenUpdate(doc, token ?? actor.img) })
+  // each item's flags of ours: the new ones, an ammunition choice kept while its type still exists (lib/ammo.js), and the
+  // keys the export dropped deleted
+  if (update.length) await doc.updateEmbeddedDocuments('Item', update.map(({ old, item }) => {
+    const r = reconcileAmmo(flagOf(old), item)
+    return { _id: old.id, name: item.name, ...item.img ? { img: item.img } : {}, system: r.system,
+      flags: { ...old.flags, [MODULE_ID]: oursWithDeletions(flagOf(old), r.flags, delKey) },
+      ...item._stats?.compendiumSource ? { '_stats.compendiumSource': item._stats.compendiumSource } : {} }
+  }))
   for (const { old, item } of update) {
     const live = doc.items.get(old.id) ?? old
     const ourOld = [...live.effects ?? []].filter(isOurEffect).map(e => e.id ?? e._id)

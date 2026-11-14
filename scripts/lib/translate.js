@@ -5,6 +5,7 @@ import { MODULE_ID } from './constants.js'
 import { ruleLines } from './rules.js'
 import { decide, isMachineWhen, whenFacts, whenHolds } from './when.js'
 import { iconFor, itemIconKey, npcIconKey, withIcon } from './icons.js'
+import { ammoFlags } from './ammo.js'
 import {
   ACCESS_DEVICES, ATTRS, MOR, SKILLS, SPELL_CATEGORIES, activationKey, armorSubtype, augmentType, autosoftSubtype, deviceFields, durationKey, edenBook,
   actorChanges, electronicsSubtype, gearType, hostChanges, lifestyleKey, martialCategories, modType, normKey, rangeKey, sinQuality, skillKey,
@@ -276,7 +277,17 @@ export function lineItem(p, ctx) {
   const doc = base(p, 'gear', ctx, extra), qty = p.qty ?? 1
   Object.assign(doc.system, gear, { price: num(v.cost), priceDef: a.cost ?? '', avail: num(v.avail), availDef: a.avail ?? '',
     count: qty, countable: qty > 1, needsRating: rating != null, rating: num(rating), notes: ctx.sanitize(p.note ?? '') })
+  exportExtras(doc, p)
   return icon(withEffects(doc, p, ctx), p, ctx)
+}
+// 0.13 export fields on a line, all in our flags (foundry/panels.js reads them): a ranged weapon's ammunition types (the
+// plain values and baseline with them, lib/ammo.js), a Melee Hardening club alternate, a design and its GM approval
+// (approved only when true, so a revoked approval is a key the re-import removes)
+function exportExtras(doc, p) {
+  const f = doc.flags[MODULE_ID], v = p.values ?? {}
+  if (p.kind === 'weapons' && v.ammoTypes?.length) Object.assign(f, ammoFlags(v))
+  if (p.kind === 'weapons' && v.meleeAlternate) f.meleeAlternate = structuredClone(v.meleeAlternate)
+  if (p.design) { f.design = String(p.design); if (p.approved === true) f.approved = true }
 }
 function focus(p, ctx, extra) {
   const doc = base(p, 'focus', ctx, extra)
@@ -431,7 +442,8 @@ export function vehicleActor(p, ctx) {
     b.slotShifts?.length && `Mod slots shifted: ${b.slotShifts.map(x => `2 ${x.from} for 1 ${x.to}`).join(', ')}.`,
     b.seatsRemoved && `${plural(b.seatsRemoved, 'seat')} taken out for cargo.`, b.design && 'Bought from a Designer design.']
   const actor = { name: p.name, type: 'Vehicle', img: g.img,
-    flags: { [MODULE_ID]: { ...g.flags[MODULE_ID] } },
+    // a drone's own pools (autonomous, or slaved to the runner's RCC): a snapshot from the export, shown on its sheet
+    flags: { [MODULE_ID]: { ...g.flags[MODULE_ID], ...p.values?.dronePools?.length ? { dronePools: structuredClone(p.values.dronePools) } : {} } },
     system: { handlOn: s.handlOn, handlOff: s.handlOff, accOn: s.accOn, accOff: s.accOff, spdiOn: s.spdiOn, spdiOff: s.spdiOff,
       tspd: s.tspd, bod: s.bod, arm: s.arm, pil: s.pil, sen: s.sen, sea: s.sea, vtype: ACTOR_VTYPE[s.vtype] ?? 'ground_craft',
       vehicle: { opMode: drone ? 'autonomous' : 'manual' }, description: s.description, notes: ctx.sanitize(notes.filter(Boolean).join('\n\n')) } }
@@ -579,7 +591,10 @@ export function translateRunner(r, opts) {
   const m = r.magic ?? {}
   const actor = {
     // the full career ledger in our flags (Eden ignores them), for a ledger tab later
-    name, type: 'Player', flags: { [MODULE_ID]: { ...flag(r.id)[MODULE_ID], ledger: structuredClone(r.ledger ?? []) } }, prototypeToken: { actorLink: true },
+    // rigging: the rigger's own pools (by hand, jumped in); animalForm: a shifter's animal form. Snapshots for the panels
+    name, type: 'Player', flags: { [MODULE_ID]: { ...flag(r.id)[MODULE_ID], ledger: structuredClone(r.ledger ?? []),
+      ...d?.rigging && (d.rigging.driving?.length || d.rigging.jumpedIn?.length) ? { rigging: structuredClone(d.rigging) } : {},
+      ...r.animalForm ? { animalForm: structuredClone(r.animalForm) } : {} } }, prototypeToken: { actorLink: true },
     system: {
       name: r.realName ?? '', gender: r.gender ?? '', metatype: r.metatype?.name ?? '', mortype: MOR[m.kind] ?? 'mundane',
       // karma: what the runner has now; karma_total: what it has earned in play (the ledger's earn entries)
