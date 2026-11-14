@@ -210,6 +210,112 @@
         "ammo": {
           "type": "number"
         },
+        "printed": {
+          "description": "A weapon line's stats as the catalog prints them, before its fittings (dv, ar, modes and ammo are with them: the always-on effects and the ones switched on).",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "dv": {
+              "type": "number"
+            },
+            "ar": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "modes": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "ammo": {
+              "type": "number"
+            }
+          }
+        },
+        "arOn": {
+          "description": "A weapon line's Attack Ratings with every switched fitting on (wireless, conditional): the bracketed total.",
+          "type": "array",
+          "items": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        },
+        "recoil": {
+          "description": "A weapon line's Attack Rating adjustment per firing mode (CRB p. 110, less what its fittings reduce).",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "SA": {
+              "type": "number"
+            },
+            "BF": {
+              "type": "number"
+            },
+            "FA": {
+              "type": "number"
+            }
+          }
+        },
+        "concealability": {
+          "description": "What a weapon line's fittings move its Concealability threshold by.",
+          "type": "number"
+        },
+        "attackPool": {
+          "description": "Dice a weapon line's fittings add to its attack tests.",
+          "type": "number"
+        },
+        "ammoTypes": {
+          "description": "A ranged weapon line's DV and Attack Ratings with each ammunition type the runner owns loaded (CRB p. 262); stun for Gel / Stick-n-Shock.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "name", "ar"],
+            "properties": {
+              "id": { "type": "string" },
+              "name": { "type": "string" },
+              "dv": { "type": "number" },
+              "ar": { "type": "array", "items": { "type": ["number", "null"] } },
+              "stun": { "const": true }
+            }
+          }
+        },
+        "meleeAlternate": {
+          "description": "A firearm with Melee Hardening used as a club (Firing Squad p. 61): DV, stun, Attack Ratings, skill and specialization.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["dv", "stun", "ar", "skill", "spec"],
+          "properties": {
+            "dv": { "type": "number" },
+            "stun": { "const": true },
+            "ar": { "type": "array", "items": { "type": ["number", "null"] } },
+            "skill": { "type": "string" },
+            "spec": { "type": "string" }
+          }
+        },
+        "dronePools": {
+          "description": "A drone line's dice pools when it acts on its own (autonomous) or slaved to the runner's RCC (rcc): each autosoft's rating + Pilot or Sensor (CRB p. 201).",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["mode", "test", "autosoft", "pool"],
+            "properties": {
+              "mode": { "enum": ["autonomous", "rcc"] },
+              "test": { "type": "string" },
+              "autosoft": { "type": "string" },
+              "pool": { "type": "number" }
+            }
+          }
+        },
         "defense": {
           "type": "number"
         },
@@ -345,7 +451,7 @@
           ]
         },
         "on": {
-          "description": "A situational effect (a prose `when`) the player switched on: 1, or the count of a `per ...` one; value is per step, the total is value * on. Absent: off or not situational. derived already holds the switched-on ones; a reader mirrors the switch (an Active Effect on while `on`, times `on`).",
+          "description": "A situational effect (a prose `when`) the player switched on: 1, or the count of a `per ...` one; value is per step, the total is value * on. Absent: off (in derivedOn's totals only) or not situational. derived already holds the switched-on ones; a reader mirrors the switch (an Active Effect on while `on`, times `on`).",
           "type": "integer",
           "minimum": 1
         }
@@ -497,7 +603,10 @@
               },
               "gen": {
                 "description": "cl6: a hand-written Commlink6 override; book: a hand-written correction of what the book says that no reader rule expresses; neither is the book reader's own.",
-                "enum": ["cl6", "book"]
+                "enum": [
+                  "cl6",
+                  "book"
+                ]
               }
             }
           }
@@ -505,7 +614,9 @@
         "rules": {
           "description": "The creation-cost RULE refs the entry carries (POLYGLOT: language ranks cost 1 Karma less, never below 1, up to rank 4), for a reader that applies them in play.",
           "type": "array",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         },
         "links": {
           "description": "Another entry this one grants (rel grants) or works as (rel as), by its printed name (and kind and id when the book tells): a reader uses that entry's effects.",
@@ -634,6 +745,14 @@
         },
         "diy": {
           "description": "A vehicle mod the player installed (half its nuyen price).",
+          "const": true
+        },
+        "design": {
+          "description": "A weapon or cyberware line bought from a saved item design (the item builders): the design's id.",
+          "type": "string"
+        },
+        "approved": {
+          "description": "That design was made or approved by a GM.",
           "const": true
         },
         "material": {
@@ -888,7 +1007,8 @@
         "uid",
         "positive",
         "level",
-        "free"
+        "free",
+        "bonuses"
       ],
       "properties": {
         "uid": {
@@ -905,6 +1025,12 @@
         },
         "note": {
           "type": "string"
+        },
+        "bonuses": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/bonus"
+          }
         }
       }
     },
@@ -1108,7 +1234,7 @@
           }
         },
         "magic": {
-          "description": "A caster's tradition (an NPC whose spells line prints a spell): of the catalog's traditions with a drain attribute (their drain), the one whose drain pool (Willpower + that attribute, from the NPC's stats, augmented) is largest; drainAttr is the one to set on the sheet; traditions lists each tradition with that pool (more than one on a tie), the first the one set. Absent for a non-caster, when its stats can't be read or no tradition has a drain attribute.",
+          "description": "A caster's tradition (an NPC whose spells line prints a spell): of Willpower + Logic, + Charisma and + Intuition from the NPC's stats (augmented), the largest, as the Logic-, Charisma- or Intuition-Based Tradition (ids logic-based, charisma-based, intuition-based); never a catalog tradition. drainAttr is the one to set on the sheet; traditions lists each with that pool (every tied one on a tie: two or all three), the first the one set; tradition is their names joined by ' or '. Absent for a non-caster, or when Willpower or all three drain attributes can't be read.",
           "type": "object",
           "additionalProperties": false,
           "required": [
@@ -1144,10 +1270,18 @@
                 ],
                 "properties": {
                   "id": {
-                    "type": "string"
+                    "enum": [
+                      "logic-based",
+                      "charisma-based",
+                      "intuition-based"
+                    ]
                   },
                   "name": {
-                    "type": "string"
+                    "enum": [
+                      "Logic-Based Tradition",
+                      "Charisma-Based Tradition",
+                      "Intuition-Based Tradition"
+                    ]
                   },
                   "drainAttr": {
                     "enum": [
@@ -1395,6 +1529,9 @@
               "type": "string"
             },
             "name": {
+              "type": "string"
+            },
+            "parent": {
               "type": "string"
             }
           }
@@ -1675,6 +1812,30 @@
                   "description": "With the switchable and conditional effects on (the bracket); only when it differs from augmented.",
                   "type": "number"
                 }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "animalForm": {
+          "description": "A shifter's animal form (Bestial Nature; optional): its form quality's name, each core attribute as the animal has it (the metahuman form's augmented rating plus the shifter add-ons' animal bonuses) and its built-in weapons. Absent for a runner who is no shifter.",
+          "type": "object",
+          "required": ["form", "attributes", "weapons"],
+          "properties": {
+            "form": { "type": "string" },
+            "attributes": { "type": "object", "additionalProperties": { "type": "number" } },
+            "weapons": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["name", "dv"],
+                "properties": {
+                  "name": { "type": "string" },
+                  "dv": { "type": "string" },
+                  "skill": { "type": "string" },
+                  "ar": { "description": "Attack Rating by range band: the animal form's Reaction + Strength, close only.", "type": "array", "items": { "type": ["number", "null"] } }
+                },
+                "additionalProperties": false
               }
             }
           },
@@ -2016,6 +2177,14 @@
                 "$ref": "#/$defs/pool"
               }
             },
+            "rigging": {
+              "description": "The rigger's own pools for a vehicle or drone (CRB pp. 197-201): by hand and jumped in.",
+              "type": "object",
+              "properties": {
+                "driving": { "type": "array", "items": { "type": "object", "properties": { "test": { "type": "string" }, "pool": { "type": "number" } } } },
+                "jumpedIn": { "type": "array", "items": { "type": "object", "properties": { "test": { "type": "string" }, "pool": { "type": "number" } } } }
+              }
+            },
             "monitorBonus": {
               "description": "The boxes the monitors have beyond base + attribute / divisor (Built Tough's Physical boxes): what the module writes as Eden's physical.mod and stun.mod.",
               "type": "object",
@@ -2186,6 +2355,14 @@
               "type": "array",
               "items": {
                 "$ref": "#/$defs/pool"
+              }
+            },
+            "rigging": {
+              "description": "The rigger's own pools for a vehicle or drone (CRB pp. 197-201): by hand and jumped in.",
+              "type": "object",
+              "properties": {
+                "driving": { "type": "array", "items": { "type": "object", "properties": { "test": { "type": "string" }, "pool": { "type": "number" } } } },
+                "jumpedIn": { "type": "array", "items": { "type": "object", "properties": { "test": { "type": "string" }, "pool": { "type": "number" } } } }
               }
             },
             "monitorBonus": {

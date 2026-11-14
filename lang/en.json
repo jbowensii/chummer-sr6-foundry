@@ -1,5 +1,6 @@
 {
   "SR6I": {
+    "Sheet": { "Label": "Nova Prime Chummer" },
     "Button": "Import from Nova Prime Chummer",
     "Title": "Import from Nova Prime Chummer (SR6)",
     "ChooseFile": "Choose a Nova Prime Chummer SR6 file",
@@ -66,6 +67,26 @@
       "Ask": "{what} for {name}",
       "Hits": "Net hits",
       "Force": "Force"
+    },
+    "Panels": {
+      "Snapshot": "(imported snapshot)",
+      "SnapshotHint": "Numbers from the Nova Prime Chummer export; re-import to refresh them.",
+      "Ammo": "Ammo",
+      "Standard": "Standard (regular)",
+      "RollWeapon": "Roll with this ammunition",
+      "Club": "As a club",
+      "RollClub": "Attack with it as a club (Close Combat)",
+      "Approved": "Design ✓",
+      "Unapproved": "Design (not approved)",
+      "DesignHint": "Bought from a saved item design",
+      "Rigging": "Rigging pools",
+      "Driving": "By hand",
+      "JumpedIn": "Jumped in",
+      "Autonomous": "Acting on its own",
+      "Rcc": "Slaved to the RCC",
+      "DronePools": "Drone pools",
+      "AnimalForm": "Animal form",
+      "Attack": "Attack"
     }
   }
 }

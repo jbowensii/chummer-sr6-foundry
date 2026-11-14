@@ -12,6 +12,9 @@ import { INDEX_FIELDS } from '../lib/chummer-id.js'
 import { iconFor, MODULE_ICON_ROOT } from '../lib/icons.js'
 import { importBooks } from './books.js'
 import { applyIcons, loadIconIndex } from './icons.js'
+import { ANIMAL_TAB, setAmmo } from './panels.js'
+import { alternateItem, animalWeapons, clubData, rollAlternate, rollPool, rollWeapon } from './rolls.js'
+import { SHEET_ID } from './sheet.js'
 
 const TEST_FOLDER = 'Chummer SR6 Importer tests'
 const SAMPLE = `modules/${MODULE_ID}/samples/test-runners.json`
@@ -745,6 +748,178 @@ export function registerQuench(quench) {
         assert.equal(now.items.get(stock.id).img, iconFor(f.key, f.name, f.book, index))
         assert.equal(now.items.get(mine.id).img, 'user/art.webp')
         assert.equal(now.img, actorImg)
+      })
+    })
+  })
+
+  batch('panels', ({ describe, it, assert, before, after }) => {
+    // 0.14: the sample runner with the 0.13 fields (as test/panels-fields.test.js richMara) imported, its sheets rendered, the
+    // ammunition switched and the alternate attacks rolled through Eden's dialog (submitted by the test; chat stubbed).
+    describe('panels on Eden’s sheets', function () {
+      this.timeout(60000)
+      const APDS = { id: 'ammo.apds', name: 'APDS', dv: 2, ar: [11, 9, null, null, null] }
+      const CLUB = { dv: 3, stun: true, ar: [4, null, null, null, null], skill: 'Close Combat', spec: 'Clubs' }
+      let tag, folder, file, runner, a, zap
+      const enrich = (r, { club = true } = {}) => {
+        const p = uid => r.purchases.find(x => x.uid === uid)
+        Object.assign(p('w1').values, { ammoTypes: [APDS, { id: 'zz.capsule', name: 'Made-up Capsule', ar: [10, 7, null, null, null], stun: true }] })
+        if (club) p('w1').values.meleeAlternate = CLUB; else delete p('w1').values.meleeAlternate
+        p('w1').design = 'design-1'
+        p('v2').values.dronePools = [{ mode: 'autonomous', test: 'Targeting', autosoft: 'Targeting', pool: 6 }]
+        r.derived.rigging = { driving: [{ test: 'Piloting (ground)', pool: 7 }], jumpedIn: [{ test: 'Piloting (ground)', pool: 9 }] }
+        r.animalForm = { form: 'Made-up Wolf Shifter', attributes: { bod: 5, agi: 4, rea: 5, str: 6, wil: 3, log: 2, int: 4, cha: 2 },
+          weapons: [{ name: 'Made-up Bite', dv: '4P', skill: 'Close Combat' }] }
+        return r
+      }
+      const render = async (doc, hook) => {
+        const done = new Promise(res => Hooks.once(hook, (app, html) => res(html instanceof HTMLElement ? html : html[0])))
+        doc.sheet.render(true)
+        return done
+      }
+      // an Eden roll with its dialog submitted ("normal") and ChatMessage.create stubbed: what would have gone to chat
+      async function rollThrough(fn) {
+        const C = CONFIG.ChatMessage.documentClass, own = Object.hasOwn(C, 'create'), orig = C.create, made = []
+        C.create = async data => { made.push(data); return null }
+        const hook = Hooks.once('renderRollDialog', app => setTimeout(() => app.submit(app.data.buttons.normal), 100))
+        try {
+          await Promise.race([fn(), new Promise((_, rej) => setTimeout(() => rej(new Error('roll timed out')), 15000))])
+        } finally { if (own) C.create = orig; else delete C.create; Hooks.off('renderRollDialog', hook) }
+        return made
+      }
+      before(async function () {
+        const s = await loadSample(); tag = s.tag; file = s.file; runner = enrich(file.runners[0])
+        folder = await makeFolder()
+        const res = await importRunner(file, runner, 'create', folder)
+        assert.equal(res.action, 'create', res.error?.message)
+        a = res.actor; zap = () => byName(game.actors.get(a.id), 'Pocket Zapper')
+      })
+      after(async () => {
+        for (const x of game.actors.filter(x => flagOf(x)?.runner === runner.id || x.id === a?.id)) await x.sheet?.close()
+        await cleanUp(tag, folder)
+      })
+
+      it('the player sheet shows the ammo switch, the club, the design badge, the rigging pools and an Animal form tab', async () => {
+        const root = await render(a, 'renderShadowrun6ActorSheetPC')
+        const row = root.querySelector(`.item[data-item-id="${zap().id}"]`)
+        assert.ok(row?.querySelector('select.sr6i-ammo'), 'ammo select')
+        assert.include(row.querySelector('.sr6i-club')?.textContent ?? '', '3S')
+        assert.ok(row.querySelector('.sr6i-badge'), 'design badge')
+        assert.include(root.querySelector('.tab[data-tab="vehicles"] .sr6i-panel')?.textContent ?? '', 'Piloting (ground)')
+        assert.ok(root.querySelector(`nav.sheet-tabs [data-tab="${ANIMAL_TAB}"]`), 'animal tab link')
+        assert.include(root.querySelector(`.tab[data-tab="${ANIMAL_TAB}"]`)?.textContent ?? '', 'Made-up Wolf Shifter')
+      })
+      it('switching to APDS changes the weapon’s stored stats; Eden’s getters agree; ammoLoaded stays regular', async () => {
+        assert.isTrue(await setAmmo(zap(), 'ammo.apds'))
+        const w = zap()
+        assert.equal(w.system.ammoLoaded, 'regular')
+        assert.equal(w.calculatedDamage, 2)
+        assert.equal(w.calculatedAttackRating[0], 11)
+        assert.equal(flagOf(w).ammoActive, 'ammo.apds')
+        await w.update({ 'system.ammoLoaded': 'apds' })
+        assert.equal(zap().system.ammoLoaded, 'regular', 'Eden’s own ammo stays regular on a managed weapon (keepRegular)')
+      })
+      it('the club shows AR 4 through Eden’s Strength-adding getter and rolls without touching the firearm', async () => {
+        const fresh = game.actors.get(a.id), w = zap(), size = fresh.items.size, ammo = w.system.ammocount
+        const club = alternateItem(fresh, clubData(w, flagOf(w).meleeAlternate))
+        assert.equal(club.calculatedAttackRating[0], 4)
+        assert.notOk(club.id && fresh.items.get(club.id), 'not saved')
+        const made = await rollThrough(() => rollAlternate(fresh, clubData(w, flagOf(w).meleeAlternate)))
+        assert.isAtLeast(made.length, 1, 'a chat message')
+        assert.equal(game.actors.get(a.id).items.size, size)
+        assert.equal(zap().system.ammocount, ammo)
+      })
+      it('the weapon and an animal-form attack roll through Eden', async () => {
+        const fresh = game.actors.get(a.id)
+        assert.isAtLeast((await rollThrough(() => rollWeapon(fresh, zap()))).length, 1)
+        const [bite] = animalWeapons(flagOf(fresh).animalForm)
+        assert.equal(alternateItem(fresh, bite).calculatedAttackRating[0], 11)
+        assert.isAtLeast((await rollThrough(() => rollAlternate(fresh, bite))).length, 1)
+      })
+      it('the drone sheet shows its pools; a pool rolls without wound modifiers', async () => {
+        const drone = game.actors.find(x => flagOf(x)?.runner === runner.id && flagOf(x)?.id === 'v2')
+        const root = await render(drone, 'renderShadowrun6ActorSheetVehicle')
+        assert.include(root.querySelector('.sr6i-panel')?.textContent ?? '', 'Targeting')
+        assert.isAtLeast((await rollThrough(() => rollPool(drone, { pool: 6, label: 'Targeting', wounds: false }))).length, 1)
+      })
+      it('re-import keeps APDS (same ids); a later one without Melee Hardening drops the club', async () => {
+        const id = zap().id
+        const again = enrich(structuredClone(runner)); again.exportedAt = '2026-12-01T12:00:00.000Z'
+        assert.equal((await importRunner(file, again, 'replace', folder)).action, 'replace')
+        assert.equal(zap().id, id)
+        assert.equal(flagOf(zap()).ammoActive, 'ammo.apds')
+        assert.equal(zap().calculatedAttackRating[0], 11)
+        const third = enrich(structuredClone(runner), { club: false }); third.exportedAt = '2026-12-02T12:00:00.000Z'
+        assert.equal((await importRunner(file, third, 'replace', folder)).action, 'replace')
+        assert.notProperty(flagOf(zap()), 'meleeAlternate')
+        const root = await render(game.actors.get(a.id), 'renderShadowrun6ActorSheetPC')
+        assert.notOk(root.querySelector(`.item[data-item-id="${id}"] .sr6i-club`), 'no club')
+      })
+    })
+  })
+
+  batch('sheet', ({ describe, it, assert, before, after }) => {
+    // The optional Nova Prime Chummer sheet (foundry/sheet.js) on this batch's own imported sample runner: chosen for that
+    // actor only (its core.sheetClass flag), rendered, edited, rolled from, then switched back to Eden's sheet.
+    describe('Nova Prime Chummer sheet', function () {
+      this.timeout(30000)
+      let tag, folder, a
+      const EDEN = 'shadowrun6-eden.Shadowrun6ActorSheetPC'
+      const waitFor = async (ok, ms = 5000) => {
+        for (const end = Date.now() + ms; Date.now() < end; await new Promise(r => setTimeout(r, 50))) if (ok()) return true
+        return false
+      }
+      const el = () => { const e = a.sheet?.element; return e?.[0] ?? e }
+      before(async function () {
+        const s = await loadSample(); tag = s.tag
+        folder = await makeFolder()
+        const res = await importRunner(s.file, s.file.runners[0], 'create', folder)
+        assert.equal(res.action, 'create', res.error?.message)
+        a = res.actor
+      })
+      after(async () => { await a?.sheet?.close(); await cleanUp(tag, folder) })
+
+      it('is offered for Player actors and is not the default', () => {
+        const cfg = CONFIG.Actor.sheetClasses.Player?.[SHEET_ID]
+        assert.ok(cfg, `${SHEET_ID} registered for Player`)
+        assert.isFalse(!!cfg.default)
+        assert.notOk(CONFIG.Actor.sheetClasses.NPC?.[SHEET_ID], 'not offered for NPCs')
+      })
+      it('renders the print sheet\'s sections when chosen for the actor', async () => {
+        await a.setFlag('core', 'sheetClass', SHEET_ID)
+        assert.equal(a.sheet.constructor.name, 'NovaPrimeSheet')
+        a.sheet.render(true)
+        assert.isTrue(await waitFor(() => a.sheet.rendered && el()?.querySelector('.sr6i-paper')), 'rendered')
+        for (const sel of ['.s-head h1 input', '.s-attrs', 'table.sr6-pools', '.sr6i-condition .sr6i-box', '.sr6-derived-t',
+          '.sr6i-weapons', 'nav.sheet-tabs[data-group="primary"]', '.tab[data-tab="sheet"]', '.tab[data-tab="effects"]', '.sr6i-notes'])
+          assert.ok(el().querySelector(sel), sel)
+      })
+      it('editing an attribute updates the actor (Eden\'s data-field listener)', async () => {
+        const input = el().querySelector('input[data-field="system.attributes.bod.base"]')
+        const want = Number(a.system.attributes.bod.base) === 4 ? 5 : 4
+        input.value = String(want)
+        input.dispatchEvent(new Event('change', { bubbles: true }))
+        assert.isTrue(await waitFor(() => Number(a.system.attributes.bod.base) === want), `Body base ${want}`)
+      })
+      it('a skill name rolls through Eden (rollSkill called, no chat message)', async () => {
+        await waitFor(() => a.sheet.rendered && el()?.querySelector('a.skill-roll[data-skill]'))
+        const link = el().querySelector('a.skill-roll[data-skill]')
+        const rolled = [], made = [], create = ChatMessage.create
+        a.rollSkill = roll => { rolled.push(roll) }
+        ChatMessage.create = async (...args) => { made.push(args) }
+        try {
+          link.click()
+          assert.isTrue(await waitFor(() => rolled.length > 0), 'rollSkill called')
+          assert.equal(rolled[0].skillId, link.dataset.skill)
+          assert.lengthOf(made, 0)
+        } finally {
+          ChatMessage.create = create
+          delete a.rollSkill
+        }
+      })
+      it('switching back gives Eden\'s sheet', async () => {
+        await a.sheet.close()
+        await a.setFlag('core', 'sheetClass', EDEN)
+        assert.equal(a.sheet.constructor.name, 'Shadowrun6ActorSheetPC')
       })
     })
   })

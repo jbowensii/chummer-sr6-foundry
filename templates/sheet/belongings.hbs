@@ -1,0 +1,75 @@
+{{!-- Gear, contacts, SINs & lifestyles, effects (a summary: the Effects tab edits them), vehicles & drones (drone pools from the
+      import's flags, shown only), critters (their own actors), the import's other extras --}}
+<div class="s-cols">
+  <section class="sr6i-gear">
+    <h2>Gear</h2>
+    <ul>
+      {{#each nova.gear as |x|}}
+      <li class="item" data-item-id="{{x.id}}">{{#if x.qty}}{{x.qty}}× {{/if}}{{x.name}}{{#if x.rating}}<span class="s-small"> ({{x.rating}})</span>{{/if}}
+        <span class="sr6i-ctl"><a class="item-control item-edit" title="Edit"><i class="fas fa-edit"></i></a><a class="item-control item-delete" title="Delete"><i class="fas fa-trash"></i></a></span></li>
+      {{/each}}
+    </ul>
+    {{#unless nova.gear.length}}<p>—</p>{{/unless}}
+  </section>
+  <section class="sr6i-contacts">
+    <h2>Contacts <a class="item-control contact-create sr6i-add" title="Add a contact"><i class="fas fa-plus"></i></a></h2>
+    <ul>
+      {{#each nova.contacts as |x|}}
+      <li class="item" data-item-id="{{x.id}}">{{x.name}}{{#if x.type}}, {{x.type}}{{/if}}
+        <span class="s-small"> connection {{x.connection}}, loyalty {{x.loyalty}}</span>
+        <span class="sr6i-ctl"><a class="item-control item-edit" title="Edit"><i class="fas fa-edit"></i></a><a class="item-control item-delete" title="Delete"><i class="fas fa-trash"></i></a></span></li>
+      {{/each}}
+    </ul>
+    {{#unless nova.contacts.length}}<p>—</p>{{/unless}}
+    <h2>SINs &amp; lifestyles</h2>
+    {{#unless nova.lifestyles.length}}<p>No lifestyle</p>{{/unless}}
+    <ul>
+      {{#each nova.sins as |s|}}
+      <li class="item" data-item-id="{{s.id}}">{{s.name}} <span class="s-small">({{localize (lookup @root.config.SIN_QUALITY s.quality)}})</span>
+        <span class="sr6i-ctl"><a class="item-control item-edit" title="Edit"><i class="fas fa-edit"></i></a><a class="item-control item-delete" title="Delete"><i class="fas fa-trash"></i></a></span></li>
+      {{/each}}
+      {{#each nova.lifestyles as |l|}}
+      <li class="item" data-item-id="{{l.id}}">{{l.name}} <span class="s-small">({{l.type}})</span>
+        <span class="sr6i-ctl"><a class="item-control item-edit" title="Edit"><i class="fas fa-edit"></i></a><a class="item-control item-delete" title="Delete"><i class="fas fa-trash"></i></a></span></li>
+      {{/each}}
+    </ul>
+  </section>
+</div>
+{{#if nova.effects.length}}
+<section class="sr6i-effects">
+  <h2>Effects</h2>
+  <ul class="s-small">
+    {{#each nova.effects as |x|}}<li class="{{#if x.disabled}}sr6i-off{{/if}}">{{#if x.from}}<b>{{x.from}}:</b> {{/if}}{{x.name}}{{#if x.disabled}} (off){{/if}}</li>{{/each}}
+  </ul>
+</section>
+{{/if}}
+{{#if nova.vehicles.length}}
+<section class="sr6i-vehicles">
+  <h2>Vehicles &amp; drones</h2>
+  <table>
+    <thead><tr><th>Vehicle</th><th>Handling</th><th>Body</th><th>Armor</th><th>Pilot</th><th>Sensor</th><th></th></tr></thead>
+    <tbody>
+      {{#each nova.vehicles as |v|}}
+      <tr class="item" data-item-id="{{v.id}}">
+        <td><b>{{v.name}}</b>
+          {{#each v.dronePools as |p|}}<div class="s-small">{{p.mode}}: {{p.test}} ({{p.autosoft}}) {{p.pool}}</div>{{/each}}</td>
+        <td>{{v.handling}}</td><td>{{v.body}}</td><td>{{v.armor}}</td><td>{{v.pilot}}</td><td>{{v.sensor}}</td>
+        <td class="sr6i-ctl"><a class="item-control item-edit" title="Edit"><i class="fas fa-edit"></i></a><a class="item-control item-delete" title="Delete"><i class="fas fa-trash"></i></a></td>
+      </tr>
+      {{/each}}
+    </tbody>
+  </table>
+</section>
+{{/if}}
+{{#if nova.critters.length}}
+<section class="sr6i-critters">
+  <h2>Critters</h2>
+  <ul>{{#each nova.critters as |c|}}<li><a class="sr6i-open-actor" data-uuid="{{c.uuid}}"><b>{{c.name}}</b></a></li>{{/each}}</ul>
+</section>
+{{/if}}
+{{#if nova.extras.length}}
+<section class="sr6i-extras">
+  <h2>From Nova Prime Chummer</h2>
+  <table class="sr6-derived-t"><tbody>{{#each nova.extras as |x|}}<tr><td>{{x.label}}</td><td><b>{{x.value}}</b></td></tr>{{/each}}</tbody></table>
+</section>
+{{/if}}

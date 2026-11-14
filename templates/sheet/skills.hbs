@@ -1,0 +1,43 @@
+{{!-- Skills (Skill / Rank / Att. / = Dice; spec and expertise; untrained dimmed; a name rolls through Eden), languages
+      and knowledge, qualities. Edit/delete: Eden's .item-edit / .item-delete on the .item[data-item-id] row. --}}
+<h2>Skills</h2>
+<table class="sr6-pools">
+  <thead><tr><th>Skill</th><th>Rank</th><th>Att.</th><th>= Dice</th></tr></thead>
+  <tbody>
+    {{#each nova.skills as |s|}}
+    <tr class="{{#if s.untrained}}untrained{{/if}}" data-skill-id="{{s.id}}">
+      <td>
+        <a class="skill-roll rollable" data-skill="{{s.id}}">{{s.label}}</a>
+        {{#if s.spec}}<div class="s-small"><a class="skill-roll" data-skill="{{s.id}}" data-skillspec="{{s.spec.key}}">{{s.spec.label}} {{s.spec.dice}}</a></div>{{/if}}
+        {{#if s.expertise}}<div class="s-small"><a class="skill-roll" data-skill="{{s.id}}" data-skillspec="{{s.expertise.key}}">{{s.expertise.label}} (expertise) {{s.expertise.dice}}</a></div>{{/if}}
+      </td>
+      <td><input name="sr6iSkill{{s.id}}" class="sr6i-num" type="number" data-dtype="Number" data-field="{{s.field}}" value="{{s.rank}}" min="0" /></td>
+      <td>{{s.attr}}</td>
+      <td><b>{{s.dice}}</b></td>
+    </tr>
+    {{/each}}
+  </tbody>
+</table>
+<h2>Languages &amp; knowledge
+  <a class="item-control skill-language-create sr6i-add" title="{{localize 'shadowrun6.section.skills.language_add'}}"><i class="fas fa-plus"></i></a>
+  <a class="item-control skill-knowledge-create sr6i-add" title="{{localize 'shadowrun6.section.skills.knowledge_add'}}"><i class="fas fa-book"></i></a></h2>
+<ul>
+  {{#each nova.languages as |x|}}
+  <li class="item" data-item-id="{{x.id}}">{{x.name}}{{#if x.detail}}<span class="s-small"> ({{x.detail}})</span>{{/if}}
+    <span class="sr6i-ctl"><a class="item-control item-edit" title="Edit"><i class="fas fa-edit"></i></a><a class="item-control item-delete" title="Delete"><i class="fas fa-trash"></i></a></span></li>
+  {{/each}}
+  {{#each nova.knowledge as |x|}}
+  <li class="item" data-item-id="{{x.id}}">{{x.name}}
+    <span class="sr6i-ctl"><a class="item-control item-edit" title="Edit"><i class="fas fa-edit"></i></a><a class="item-control item-delete" title="Delete"><i class="fas fa-trash"></i></a></span></li>
+  {{/each}}
+</ul>
+{{#unless nova.languages.length}}{{#unless nova.knowledge.length}}<p>—</p>{{/unless}}{{/unless}}
+<h2>Qualities <a class="item-control quality-create sr6i-add" title="{{localize 'shadowrun6.section.qualities_add'}}"><i class="fas fa-plus"></i></a></h2>
+<ul>
+  {{#each nova.qualities as |q|}}
+  <li class="item" data-item-id="{{q.id}}">{{q.name}}{{#if q.level}} {{q.level}}{{/if}}
+    <span class="sr6i-ctl"><a class="item-control item-edit" title="Edit"><i class="fas fa-edit"></i></a><a class="item-control item-delete" title="Delete"><i class="fas fa-trash"></i></a></span>
+    {{#if q.detail}}<div class="s-small">{{q.detail}}</div>{{/if}}</li>
+  {{/each}}
+</ul>
+{{#unless nova.qualities.length}}<p>—</p>{{/unless}}

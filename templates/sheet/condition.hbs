@@ -1,0 +1,27 @@
+{{!-- Condition monitors (physical, stun, overflow boxes and Edge points: click a box, or type the number), derived, karma & nuyen --}}
+<h2>Condition monitors</h2>
+<p class="s-small">Physical {{nova.monitors.physical.max}}
+  <input name="sr6iPhysDmg" class="sr6i-num" type="number" data-dtype="Number" data-field="system.physical.dmg" value="{{nova.monitors.physical.dmg}}" min="0" title="Damage" /></p>
+<div class="s-boxes sr6-boxes">{{#each nova.monitors.physical.boxes as |b|}}<button type="button" class="sr6i-box {{#if b.filled}}on{{/if}}" data-monitor="physical" data-n="{{b.n}}" aria-label="Physical box {{b.n}}"></button>{{/each}}</div>
+<p class="s-small">Stun {{nova.monitors.stun.max}}
+  <input name="sr6iStunDmg" class="sr6i-num" type="number" data-dtype="Number" data-field="system.stun.dmg" value="{{nova.monitors.stun.dmg}}" min="0" title="Damage" /></p>
+<div class="s-boxes sr6-boxes">{{#each nova.monitors.stun.boxes as |b|}}<button type="button" class="sr6i-box s {{#if b.filled}}on{{/if}}" data-monitor="stun" data-n="{{b.n}}" aria-label="Stun box {{b.n}}"></button>{{/each}}</div>
+<p class="s-small">Overflow {{nova.monitors.overflow.max}}
+  <input name="sr6iOverflowDmg" class="sr6i-num" type="number" data-dtype="Number" data-field="system.overflow.dmg" value="{{nova.monitors.overflow.dmg}}" min="0" title="Damage" /></p>
+<div class="s-boxes sr6-boxes">{{#each nova.monitors.overflow.boxes as |b|}}<button type="button" class="sr6i-box i {{#if b.filled}}on{{/if}}" data-monitor="overflow" data-n="{{b.n}}" aria-label="Overflow box {{b.n}}"></button>{{/each}}</div>
+<p class="s-small">Edge points {{nova.monitors.edge.value}} of {{nova.monitors.edge.max}}
+  <input name="sr6iEdgeValue" class="sr6i-num" type="number" data-dtype="Number" data-field="system.edge.value" value="{{nova.monitors.edge.value}}" min="0" title="Edge points" /></p>
+<div class="s-boxes sr6-edge">{{#each nova.monitors.edge.boxes as |b|}}<button type="button" class="sr6i-box e {{#if b.filled}}on{{/if}}" data-monitor="edge" data-n="{{b.n}}" aria-label="Edge point {{b.n}}"></button>{{/each}}</div>
+<table class="sr6-derived-t">
+  <tbody>
+    {{#each nova.derived as |d|}}
+    <tr><td>{{#if d.rollId}}<a class="attributeonly-roll" data-pool="{{d.value}}" data-roll-id="{{d.rollId}}">{{d.label}}</a>{{else}}{{d.label}}{{/if}}</td><td><b>{{d.value}}</b></td></tr>
+    {{/each}}
+  </tbody>
+</table>
+<h2>Karma &amp; nuyen</h2>
+<p class="sr6i-money">
+  <input name="sr6iKarma" class="sr6i-num" type="number" data-dtype="Number" data-field="system.karma" value="{{nova.karma}}" /> karma
+  <span class="s-small">({{nova.karmaTotal}} earned)</span> ·
+  <input name="sr6iNuyen" class="sr6i-wide" type="number" data-dtype="Number" data-field="system.nuyen" value="{{nova.nuyen}}" />¥
+</p>

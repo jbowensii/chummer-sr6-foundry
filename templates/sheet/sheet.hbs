@@ -1,0 +1,33 @@
+{{!-- Nova Prime Chummer sheet (foundry/sheet.js): the app's SR6 print sheet layout (Sheet.tsx), Eden's controls.
+      Inputs use Eden's data-field (its change listener updates the actor); rows .item[data-item-id] for Eden's item controls. --}}
+<form class="sr6i-paper {{cssClass}}" autocomplete="off">
+  {{#if nova}}
+  {{> "modules/chummer-sr6-importer/templates/sheet/header.hbs"}}
+  <nav class="sheet-tabs tabs sr6i-tabs" data-group="primary">
+    <a class="item" data-tab="sheet">Sheet</a>
+    <a class="item" data-tab="effects">{{localize 'shadowrun6.effect.Label'}}</a>
+  </nav>
+  <section class="sheet-body">
+    <div class="tab sheet" data-group="primary" data-tab="sheet">
+      <div class="s-cols">
+        <section class="sr6i-skills">{{> "modules/chummer-sr6-importer/templates/sheet/skills.hbs"}}</section>
+        <section class="sr6i-condition">{{> "modules/chummer-sr6-importer/templates/sheet/condition.hbs"}}</section>
+      </div>
+      {{> "modules/chummer-sr6-importer/templates/sheet/combat.hbs"}}
+      {{> "modules/chummer-sr6-importer/templates/sheet/magic.hbs"}}
+      {{> "modules/chummer-sr6-importer/templates/sheet/belongings.hbs"}}
+      <section class="sr6i-notes">
+        <h2>Background &amp; notes</h2>
+        {{> "systems/shadowrun6-eden/templates/parts/section-description.hbs"}}
+        {{> "systems/shadowrun6-eden/templates/parts/section-notes.html"}}
+      </section>
+    </div>
+    {{!-- Eden's own effects editor (create, edit, toggle, delete) --}}
+    <div class="tab effects flexrow" data-group="primary" data-tab="effects">
+      {{> "systems/shadowrun6-eden/templates/parts/tab-effects.hbs"}}
+    </div>
+  </section>
+  {{else}}
+  <p class="sr6i-error">This sheet could not lay out {{actor.name}} (see the console). Choose the Eden sheet in this sheet's Sheet setting.</p>
+  {{/if}}
+</form>

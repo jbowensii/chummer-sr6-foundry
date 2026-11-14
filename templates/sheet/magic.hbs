@@ -1,0 +1,18 @@
+{{!-- Magic or Resonance: tradition, drain or fading, grades; spells, rituals, powers, complex forms, metamagics, echoes, foci --}}
+{{#if nova.magic}}
+<section class="sr6i-magic">
+  <h2>{{nova.magic.title}}</h2>
+  {{#if nova.magic.summary}}<p class="s-small">{{nova.magic.summary}}</p>{{/if}}
+  <table class="sr6-picks">
+    <tbody>
+      {{#each nova.magic.picks as |x|}}
+      <tr class="item" data-item-id="{{x.id}}">
+        <td>{{#if x.roll}}<a class="{{x.roll}} rollable" data-item-id="{{x.id}}"><b>{{x.name}}</b></a>{{else}}<b>{{x.name}}</b>{{/if}}{{#if x.level}} {{x.level}}{{/if}}</td>
+        <td>{{x.kind}}</td>
+        <td class="sr6i-ctl"><a class="item-control item-edit" title="Edit"><i class="fas fa-edit"></i></a><a class="item-control item-delete" title="Delete"><i class="fas fa-trash"></i></a></td>
+      </tr>
+      {{/each}}
+    </tbody>
+  </table>
+</section>
+{{/if}}

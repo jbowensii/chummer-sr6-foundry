@@ -1,10 +1,21 @@
 // applyRunner (scripts/foundry/apply.js) against a tiny fake of the Foundry globals it uses: create order, effect shape,
 // Replace order and rollback. The real thing runs in Foundry's Quench batches (scripts/foundry/quench.js).
-import { beforeEach, expect, test, vi } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { MODULE_ID } from '../scripts/lib/constants.js'
 import { applyRunner, dedupeUnarmed, effectData, refreshPersona } from '../scripts/foundry/apply.js'
+import { ammoFlags, switchAmmo } from '../scripts/lib/ammo.js'
 
 let log, world, n, failCreateItems
+// Foundry's update: a deep merge (arrays replaced), dotted keys expanded, `-=key: null` deleting the key
+function foundryMerge(target, src) {
+  for (const [k, v] of Object.entries(src ?? {})) {
+    if (k.startsWith('-=')) { delete target[k.slice(2)]; continue }
+    if (k.includes('.')) { const [h, ...t] = k.split('.'); target[h] ??= {}; foundryMerge(target[h], { [t.join('.')]: v }); continue }
+    if (v && typeof v === 'object' && !Array.isArray(v)) { if (!target[k] || typeof target[k] !== 'object' || Array.isArray(target[k])) target[k] = {}; foundryMerge(target[k], v) }
+    else target[k] = structuredClone(v)
+  }
+  return target
+}
 const flags = f => ({ [MODULE_ID]: { exportedAt: '2026-10-04T09:00:00.000Z', ...f } })
 // an owned item with its effects, as the replace path touches them
 const fakeItem = i => Object.assign(i, { effects: (i.effects ?? []).map(e => ({ id: e.id ?? `e${++n}`, ...e })),
@@ -18,14 +29,14 @@ class FakeActor {
   }
   set items(v) { this._items = Object.assign(v, { get: id => v.find(i => i.id === id) }) }
   get items() { return this._items }
-  async update(u) { log.push(['update', u]); Object.assign(this.system, u.system ?? {}) }
+  async update(u) { log.push(['update', u]); const { name, ...rest } = u; foundryMerge(this, rest); if (name) this.name = name }
   async updatePersona() { log.push(['persona', this.name]) }
   async createEmbeddedDocuments(_, arr) {
     log.push(['items', arr])
     if (failCreateItems) throw new Error('items failed')
     const made = arr.map(i => fakeItem({ ...i, id: `i${++n}` })); this.items.push(...made); return made
   }
-  async updateEmbeddedDocuments(_, ups) { log.push(['updateItems', ups]); for (const u of ups) Object.assign(this.items.find(i => i.id === u._id) ?? {}, u) }
+  async updateEmbeddedDocuments(_, ups) { log.push(['updateItems', ups]); for (const { _id, ...u } of ups) foundryMerge(this.items.find(i => i.id === _id) ?? {}, u) }
   async deleteEmbeddedDocuments(_, ids) {
     log.push(['deleteItems', ids])
     if (this.failDelete && ids.some(id => this.items.find(i => i.id === id)?.old)) throw new Error('delete failed')
@@ -257,4 +268,61 @@ test('create: a runner’s critter becomes a linked, friendly Critter actor in "
   await applyRunner(t, 'replace')
   expect(world.filter(a => a.type === 'Critter')).toEqual([hound])  // the same actor, updated
   expect(log.filter(([k, u]) => k === 'update' && u.system?.attributes?.bod?.base === 6)).toHaveLength(1)
+})
+
+// Re-import reconciliation (0.13 fields): Foundry merges an update into the document, so a key of ours the new export
+// dropped has to be deleted; an ammunition choice survives while its type exists. The fake above merges like Foundry.
+describe('replace: our flags reconciled, play state kept', () => {
+  const APDS = { id: 'apds', name: 'APDS', dv: 2, ar: [11, 9, null, null, null] }
+  const club = { dv: 3, stun: true, ar: [4, null, null, null, null], skill: 'Close Combat', spec: 'Clubs' }
+  const zapper = ({ types = [APDS], ar = [9, 7, null, null, null], extra = {} } = {}) => ({ name: 'Zapper', type: 'gear',
+    flags: flags({ id: 'w1', ...ammoFlags({ dv: 3, stun: true, ar, ammoTypes: types }), ...extra }),
+    system: { dmg: 3, stun: true, attackRating: ar.map(v => v ?? 0), ammocap: 4 } })
+  const runner = ({ weapon, actorExtra = {}, drone = {} }) => ({
+    actor: { name: 'Mara', type: 'Player', flags: flags({ id: 'r1', ...actorExtra }), prototypeToken: { actorLink: true }, system: { edge: { max: 3 } } },
+    items: [weapon], vehicles: [{ actor: { name: 'Rotor', type: 'Vehicle', flags: flags({ id: 'v2', runner: 'r1', ...drone }), system: { vehicle: { opMode: 'autonomous' } } }, items: [] }] })
+  const first = () => runner({ weapon: zapper({ extra: { design: 'd1', approved: true, meleeAlternate: club } }),
+    actorExtra: { animalForm: { form: 'Wolf', attributes: { rea: 5, str: 6 }, weapons: [] }, rigging: { driving: [], jumpedIn: [{ test: 'Pilot', pool: 9 }] } },
+    drone: { dronePools: [{ mode: 'autonomous', test: 'Targeting', autosoft: 'Targeting', pool: 6 }] } })
+
+  test('import, pick APDS, re-import without the approval, the club, the animal form or the drone pools, then without APDS', async () => {
+    const { actor: doc } = await applyRunner(first(), 'create')
+    const zap = () => doc.items.find(i => i.name === 'Zapper'), id = zap().id
+    // play: damage, ammo fired, another module's flag, a user's effect, APDS picked (lib/ammo.js, as panels.js writes it)
+    doc.system.physical = { dmg: 2 }
+    doc.flags.other = { keep: 1 }
+    Object.assign(zap().system, { ammocount: 1 })
+    zap().flags.other = { keep: 2 }
+    zap().effects.push({ id: 'mine', name: 'My effect', flags: {} })
+    const u = switchAmmo(zap().system, zap().flags[MODULE_ID], 'apds')
+    foundryMerge(zap(), { system: u.system, flags: { [MODULE_ID]: u.flags } })
+    expect(zap().system.attackRating).toEqual([11, 9, 0, 0, 0])
+
+    // re-import 1: approval revoked, Melee Hardening removed, the animal form and the drone pools gone; APDS still there
+    await applyRunner(runner({ weapon: zapper({ extra: { design: 'd1' } }), actorExtra: { rigging: { driving: [], jumpedIn: [] } } }), 'replace')
+    expect(zap().id).toBe(id)
+    expect(zap().flags[MODULE_ID]).not.toHaveProperty('approved')
+    expect(zap().flags[MODULE_ID]).not.toHaveProperty('meleeAlternate')
+    expect(zap().flags[MODULE_ID]).toMatchObject({ design: 'd1', ammoActive: 'apds' })
+    expect(zap().system).toMatchObject({ dmg: 2, attackRating: [11, 9, 0, 0, 0], ammocount: 1 })
+    expect(zap().flags.other).toEqual({ keep: 2 })
+    expect(zap().effects.map(e => e.id)).toContain('mine')
+    expect(doc.flags[MODULE_ID]).not.toHaveProperty('animalForm')
+    expect(doc.flags[MODULE_ID].rigging).toEqual({ driving: [], jumpedIn: [] })
+    expect(doc.flags.other).toEqual({ keep: 1 })
+    expect(doc.system.physical).toEqual({ dmg: 2 })
+    const rotor = world.find(a => a.name === 'Rotor')
+    expect(rotor.flags[MODULE_ID]).not.toHaveProperty('dronePools')
+    expect(rotor.system.vehicle).toMatchObject({ opMode: 'autonomous' })
+
+    // re-import 2: APDS no longer owned and the weapon’s numbers changed: stats and selection reset together
+    await applyRunner(runner({ weapon: zapper({ types: [{ ...APDS, id: 'other' }], ar: [10, 7, null, null, null] }) }), 'replace')
+    expect(zap().id).toBe(id)
+    expect(zap().flags[MODULE_ID]).not.toHaveProperty('ammoActive')
+    expect(zap().flags[MODULE_ID]).not.toHaveProperty('design')
+    expect(zap().flags[MODULE_ID].ammoBase.attackRating).toEqual([10, 7, 0, 0, 0])
+    expect(zap().system).toMatchObject({ dmg: 3, attackRating: [10, 7, 0, 0, 0], ammocount: 1 })
+    expect(doc.flags[MODULE_ID]).not.toHaveProperty('rigging')
+    expect(JSON.stringify(doc.flags)).not.toContain('-=')
+  })
 })
