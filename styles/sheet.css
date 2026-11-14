@@ -1,0 +1,209 @@
+/* The Nova Prime Chummer sheet (foundry/sheet.js): the app's SR6 print sheet look (Nova Prime Chummer
+   src/features/appearance/sheet.css + src/sr6/print/ui/sheet.css, printer-friendly style) inside a Foundry window.
+   Everything is scoped under .sr6i-sheet so Eden's and Foundry's own sheets are untouched. */
+.sr6i-sheet {
+  --s-ink: #12120c;
+  --s-ink-2: #44443e;
+  --s-line: #b9b6ab;
+  --s-rust: #73311b;
+  --s-yellow: #f1bb00;
+  --s-indigo: #36305b;
+  --s-cream: #fcf1d1;
+  --sr6i-display: 'Play', 'Oswald', 'Arial Narrow', sans-serif;
+  --sr6i-sans: 'Signika', 'Segoe UI', sans-serif;
+}
+.sr6i-sheet .window-content {
+  background: #fff;
+  color: var(--s-ink);
+  padding: 0;
+}
+.sr6i-sheet form.sr6i-paper {
+  padding: 1rem 1.3rem;
+  font: 10.5pt/1.35 var(--sr6i-sans);
+  color: var(--s-ink);
+  background: #fff;
+}
+.sr6i-sheet h1 {
+  font-family: var(--sr6i-display);
+  font-size: 22pt;
+  margin: 0.1rem 0;
+  border: 0;
+}
+.sr6i-sheet h1 input {
+  font: inherit;
+  color: var(--s-rust);
+  text-transform: uppercase;
+  height: auto;
+  border: 0;
+  background: transparent;
+  width: 100%;
+}
+.sr6i-sheet h2 {
+  font-family: var(--sr6i-display);
+  font-size: 11.5pt;
+  color: var(--s-indigo);
+  margin: 0.9rem 0 0.3rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border: 0;
+  border-bottom: 2px solid var(--s-indigo);
+  padding-bottom: 0.1rem;
+}
+.sr6i-sheet p { margin: 0 0 0.3rem; }
+.sr6i-sheet ul { margin: 0; padding-left: 1.1rem; }
+.sr6i-sheet li::marker { color: var(--s-yellow); }
+.sr6i-sheet table { width: 100%; border-collapse: collapse; background: transparent; border: 0; margin: 0; }
+.sr6i-sheet thead { background: transparent; text-shadow: none; }
+.sr6i-sheet th {
+  text-align: left;
+  font-weight: 700;
+  font-size: 8pt;
+  color: var(--s-indigo);
+  text-transform: uppercase;
+  border-bottom: 1.5px solid var(--s-indigo);
+  padding: 0.1rem 0.25rem;
+}
+.sr6i-sheet td {
+  padding: 0.12rem 0.25rem;
+  border-bottom: 1px solid #e3e1da;
+  vertical-align: top;
+}
+.sr6i-sheet tbody tr:nth-child(even) { background: transparent; }
+.sr6i-sheet a { color: inherit; }
+.sr6i-sheet a.rollable:hover, .sr6i-sheet a[class*='-roll']:hover { color: var(--s-rust); text-shadow: none; }
+.sr6i-sheet input, .sr6i-sheet select {
+  color: var(--s-ink);
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom-color: var(--s-line);
+  border-radius: 0;
+  height: 1.4rem;
+}
+.sr6i-sheet input:hover, .sr6i-sheet input:focus, .sr6i-sheet select:hover { border-color: var(--s-indigo); box-shadow: none; }
+.sr6i-sheet input:disabled, .sr6i-sheet select:disabled { border-color: transparent; }
+.sr6i-sheet .sr6i-num { width: 3.2em; text-align: center; }
+.sr6i-sheet .sr6i-wide { width: 7em; text-align: right; }
+.sr6i-sheet .sr6i-add { font-size: 9pt; margin-left: 0.4rem; color: var(--s-ink-2); }
+.sr6i-sheet .sr6i-ctl { white-space: nowrap; color: var(--s-ink-2); font-size: 8.5pt; }
+.sr6i-sheet .sr6i-ctl a { margin-left: 0.25rem; }
+.sr6i-sheet .s-small { font-size: 8.5pt; color: var(--s-ink-2); }
+
+/* the top: name over the attributes, the portrait beside them */
+.sr6i-sheet .s-top { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+.sr6i-sheet .s-top > .portrait {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  width: 10rem;
+  height: 10rem;
+  margin-left: 1rem;
+  object-fit: cover;
+  border: 0;
+  cursor: pointer;
+}
+.sr6i-sheet .s-head {
+  grid-column: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 1rem;
+  border-bottom: 4px solid var(--s-yellow);
+  padding-bottom: 0.4rem;
+}
+.sr6i-sheet .s-head > div { flex: 1; min-width: 0; }
+.sr6i-sheet .s-label { font-size: 8pt; color: var(--s-ink-2); text-transform: uppercase; letter-spacing: 0.06em; }
+.sr6i-sheet .s-role { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+.sr6i-sheet .s-role input, .sr6i-sheet .s-role select {
+  color: var(--s-rust);
+  font-family: var(--sr6i-display);
+  text-transform: uppercase;
+  font-size: 9pt;
+  letter-spacing: 0.05em;
+  width: 9rem;
+}
+.sr6i-sheet .sr6i-real { display: flex; gap: 0.4rem; align-items: center; }
+.sr6i-sheet .sr6i-real input { flex: 1; font-size: 9pt; }
+.sr6i-sheet .s-head .brand { font-size: 0.85rem; white-space: nowrap; color: var(--s-ink); }
+.sr6i-sheet .s-head .brand b { color: #fff; background: var(--s-rust); padding: 0 0.25rem; }
+.sr6i-sheet .s-attrs {
+  grid-column: 1;
+  grid-row: 2;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.35rem;
+  margin: 0.7rem 0 0.2rem;
+}
+.sr6i-sheet .s-attrs > div {
+  border: 1.5px solid var(--s-indigo);
+  text-align: center;
+  padding: 0.1rem 0.15rem;
+  background: #fff;
+}
+.sr6i-sheet .s-attrs span {
+  display: block;
+  font-size: 7pt;
+  color: var(--s-indigo);
+  text-transform: uppercase;
+  font-family: var(--sr6i-display);
+  letter-spacing: 0.03em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sr6i-sheet .s-attrs b { display: block; font-family: var(--sr6i-display); font-size: 14pt; font-weight: 400; color: var(--s-rust); }
+.sr6i-sheet .s-attrs input { width: 2.6em; height: 1.1rem; font-size: 8pt; text-align: center; color: var(--s-ink-2); }
+
+/* tabs: a plain row under the header */
+.sr6i-sheet nav.sr6i-tabs {
+  display: flex;
+  gap: 1rem;
+  margin: 0.6rem 0 0.2rem;
+  border-bottom: 1px solid var(--s-line);
+  font-family: var(--sr6i-display);
+  text-transform: uppercase;
+  font-size: 9pt;
+}
+.sr6i-sheet nav.sr6i-tabs .item { color: var(--s-ink-2); padding: 0.1rem 0; }
+.sr6i-sheet nav.sr6i-tabs .item.active { color: var(--s-indigo); border-bottom: 2px solid var(--s-yellow); text-shadow: none; }
+.sr6i-sheet .sheet-body { overflow-y: auto; }
+
+.sr6i-sheet .s-cols { display: grid; grid-template-columns: 1.1fr 1fr; gap: 1.2rem; }
+.sr6i-sheet tr.untrained td, .sr6i-sheet tr.untrained a { color: var(--s-ink-2); opacity: 0.75; }
+.sr6i-sheet .sr6-derived-t { margin-top: 0.5rem; }
+.sr6i-sheet .sr6-weapons td:nth-child(5) { white-space: nowrap; }
+.sr6i-sheet .sr6i-ammo.active { color: var(--s-rust); }
+.sr6i-sheet .sr6i-off { opacity: 0.6; }
+.sr6i-sheet .sr6i-error { color: var(--s-rust); padding: 1rem; }
+
+/* condition boxes: physical plain, stun yellow, overflow hatched rust, Edge round; marked boxes filled */
+.sr6i-sheet .s-boxes { display: flex; flex-wrap: wrap; gap: 0.25rem; margin: 0.2rem 0 0.4rem; }
+.sr6i-sheet .sr6i-box {
+  flex: none;
+  width: 1.1rem;
+  height: 1.1rem;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+  border: 1.5px solid var(--s-ink);
+  border-radius: 0;
+  background: #fff;
+  box-shadow: none;
+  cursor: pointer;
+}
+.sr6i-sheet .sr6i-box.s { border-color: var(--s-yellow); border-width: 2.5px; }
+.sr6i-sheet .sr6i-box.i { border-color: var(--s-rust); background: repeating-linear-gradient(45deg, transparent 0 3px, var(--s-rust) 3px 4px); }
+.sr6i-sheet .sr6i-box.e { border-radius: 50%; border-color: var(--s-indigo); }
+.sr6i-sheet .sr6i-box.on { background: var(--s-ink); }
+.sr6i-sheet .sr6i-box.s.on { background: var(--s-yellow); }
+.sr6i-sheet .sr6i-box.i.on { background: var(--s-rust); }
+.sr6i-sheet .sr6i-box.e.on { background: var(--s-indigo); }
+.sr6i-sheet .sr6i-box:disabled { cursor: default; }
+.sr6i-sheet .sr6i-box:focus-visible { outline: 2px solid var(--s-rust); outline-offset: 1px; }
+
+/* Eden's notes editors and effects tab, on paper */
+.sr6i-sheet .sr6i-notes .section-head h2 { font-size: 9pt; border-bottom-width: 1px; }
+.sr6i-sheet .editor { min-height: 6rem; color: var(--s-ink); }
+.sr6i-sheet .tab.effects { color: var(--s-ink); }
+
+@media (max-width: 700px) {
+  .sr6i-sheet .s-cols { grid-template-columns: 1fr; }
+  .sr6i-sheet .s-attrs { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}

@@ -21,6 +21,14 @@ Panels and rolls (0.14.0):
 - Controls appear only on an editable sheet, and roll buttons only for an owner. Everything that comes from a file goes in as plain text.
 - New files: `scripts/lib/ammo.js`, `scripts/foundry/panels.js`, `scripts/foundry/rolls.js`, `styles/panels.css`. Tests: `test/panels-fields.test.js`, plus a re-import test in `test/apply.test.js` (its fake now merges like Foundry). New Quench batch: `panels`.
 
+Optional actor sheet:
+
+- New optional actor sheet, **Nova Prime Chummer**, for Eden Player actors: the Nova Prime Chummer app's SR6 print sheet layout (header with street name, metatype, gender, magic kind, real name and portrait; attribute strip with Edge, Magic or Resonance and Essence; skills with rank, attribute and dice, specializations and expertise, untrained dimmed; languages and knowledge; qualities; condition monitors with clickable physical, stun, overflow and Edge boxes; derived numbers; karma and nuyen; weapons; armor; augmentations; magic or resonance; gear; contacts; SINs and lifestyles; effects; vehicles and drones; critters; background and notes). Eden's sheet stays the default: pick this one per actor from the sheet's Sheet setting.
+- It is Eden's own Player sheet with a different layout: every number is Eden's (its effects included), and editing, item edit/delete, rolls (attributes, skills, weapons, spells), ammo reload and Eden's effects editor (its own tab) work as on Eden's sheet. Observers get it read-only.
+- Shows, read-only, what the import keeps in the module's flags and Eden has no field for: a weapon's ammunition types (the loaded one marked) and club use, a drone's dice pools, and the runner's design, approval, rigging and animal form.
+- If Eden's Player sheet is missing or the sheet can't be set up, it logs one warning and Eden's sheet is untouched.
+- New `scripts/foundry/sheet.js`, `scripts/lib/sheet-view.js`, `templates/sheet/`, `styles/sheet.css`; `test/sheet.test.js`; a new Quench batch `sheet`.
+
 ## 0.12.1 (2026-10-30)
 
 - Release fix: module.json download link now points at this release (0.12.0 was tagged with the 0.11.1 link and never published). Same code as 0.12.0.

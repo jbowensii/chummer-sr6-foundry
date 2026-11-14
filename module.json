@@ -11,7 +11,7 @@
   },
   "esmodules": ["scripts/main.js"],
   "socket": true,
-  "styles": ["styles/importer.css", "styles/panels.css"],
+  "styles": ["styles/importer.css", "styles/panels.css", "styles/sheet.css"],
   "languages": [{ "lang": "en", "name": "English", "path": "lang/en.json" }],
   "url": "https://github.com/jbowensii/chummer-sr6-foundry",
   "manifest": "https://github.com/jbowensii/chummer-sr6-foundry/releases/latest/download/module.json",

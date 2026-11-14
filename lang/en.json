@@ -1,5 +1,6 @@
 {
   "SR6I": {
+    "Sheet": { "Label": "Nova Prime Chummer" },
     "Button": "Import from Nova Prime Chummer",
     "Title": "Import from Nova Prime Chummer (SR6)",
     "ChooseFile": "Choose a Nova Prime Chummer SR6 file",

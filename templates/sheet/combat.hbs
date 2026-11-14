@@ -1,0 +1,59 @@
+{{!-- Weapons (DV / Attack Ratings / dice pool, accessories; ammunition types and club use from the import's flags, shown only),
+      armor, augmentations --}}
+<section class="sr6i-weapons">
+  <h2>Weapons <a class="item-control weapon-create sr6i-add" title="{{localize 'shadowrun6.section.weapon.add'}}"><i class="fas fa-plus"></i></a></h2>
+  <table class="sr6-weapons">
+    <thead><tr><th>Weapon</th><th>DV</th><th>Attack Ratings</th><th>Ammo</th><th>Dice pool</th><th></th></tr></thead>
+    <tbody>
+      {{#each nova.weapons as |w|}}
+      <tr class="item" data-item-id="{{w.id}}">
+        <td><b>{{w.name}}</b>
+          {{#if w.accessories}}<div class="s-small">with {{w.accessories}}</div>{{/if}}
+          {{#each w.ammoTypes as |t|}}<div class="s-small sr6i-ammo {{#if t.active}}active{{/if}}">{{t.name}}: {{t.dv}} · {{t.ar}}{{#if t.active}} (loaded){{/if}}</div>{{/each}}
+          {{#if w.melee}}<div class="s-small">As a club ({{w.melee.skill}}): {{w.melee.dv}} · {{w.melee.ar}}</div>{{/if}}
+        </td>
+        <td>{{w.dv}}</td>
+        <td>{{w.ar}}</td>
+        <td>{{#if w.ammo}}{{w.ammo}} <a class="item-control weapon-ammo-reload" data-item-uuid="{{w.uuid}}" title="{{localize 'shadowrun6.weapon.reload_ammo'}}"><i class="fas fa-rotate-right"></i></a>{{/if}}</td>
+        <td><a class="weapon-roll rollable" data-item-id="{{w.id}}" data-uuid="{{w.uuid}}" data-skill="{{w.skill}}" data-defend-with="physical"><i class="fas fa-dice-six"></i> {{w.pool}}</a></td>
+        <td class="sr6i-ctl"><a class="item-control item-edit" title="Edit"><i class="fas fa-edit"></i></a><a class="item-control item-delete" title="Delete"><i class="fas fa-trash"></i></a></td>
+      </tr>
+      {{/each}}
+    </tbody>
+  </table>
+</section>
+{{#if nova.armor.length}}
+<section>
+  <h2>Armor</h2>
+  <table>
+    <thead><tr><th>Armor</th><th>Defense</th><th>Social</th><th>Worn</th><th></th></tr></thead>
+    <tbody>
+      {{#each nova.armor as |x|}}
+      <tr class="item" data-item-id="{{x.id}}">
+        <td><b>{{x.name}}</b>{{#if x.accessories}}<div class="s-small">with {{x.accessories}}</div>{{/if}}</td>
+        <td>{{x.defense}}</td><td>{{x.social}}</td>
+        <td><input name="sr6iWorn{{x.id}}" type="checkbox" data-check="system.usedForPool" {{checked x.worn}} title="Worn" /></td>
+        <td class="sr6i-ctl"><a class="item-control item-edit" title="Edit"><i class="fas fa-edit"></i></a><a class="item-control item-delete" title="Delete"><i class="fas fa-trash"></i></a></td>
+      </tr>
+      {{/each}}
+    </tbody>
+  </table>
+</section>
+{{/if}}
+{{#if nova.augmentations.length}}
+<section>
+  <h2>Augmentations</h2>
+  <table>
+    <thead><tr><th>Augmentation</th><th>Essence</th><th></th></tr></thead>
+    <tbody>
+      {{#each nova.augmentations as |x|}}
+      <tr class="item" data-item-id="{{x.id}}">
+        <td><b>{{x.name}}</b>{{#if x.rating}}<span class="s-small"> rating {{x.rating}}</span>{{/if}}{{#if x.accessories}}<div class="s-small">with {{x.accessories}}</div>{{/if}}</td>
+        <td>{{x.essence}}</td>
+        <td class="sr6i-ctl"><a class="item-control item-edit" title="Edit"><i class="fas fa-edit"></i></a><a class="item-control item-delete" title="Delete"><i class="fas fa-trash"></i></a></td>
+      </tr>
+      {{/each}}
+    </tbody>
+  </table>
+</section>
+{{/if}}
