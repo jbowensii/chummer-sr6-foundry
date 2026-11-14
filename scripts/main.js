@@ -8,6 +8,7 @@ import { createIconsApp, loadIconIndex } from './foundry/icons.js'
 import { MODULE_ID } from './lib/constants.js'
 import { registerQuench } from './foundry/quench.js'
 import { registerTargets } from './foundry/targets.js'
+import { registerNovaSheet } from './foundry/sheet.js'
 
 let ImportApp = null
 let icons = null  // icons/index.json, loaded once at init; null = no icons
@@ -38,6 +39,7 @@ function addButton(root, tab) {
 }
 
 Hooks.once('init', () => {
+  registerNovaSheet()  // the optional "Nova Prime Chummer" Player sheet, on Eden's (foundry/sheet.js; Eden's init ran first)
   guardEdenItemHooks()  // Eden's item update hooks need an actor; a compendium entry has none (eden-guard.js)
   addIndexFields()  // chummerID and its aliases in every compendium's index (lib/chummer-id.js)
   iconsLoaded = loadIconIndex().then(i => { icons = i })

@@ -1,0 +1,40 @@
+{{!-- Header: street name, metatype / gender / magic kind, real name, portrait; the attribute strip (augmented value, base editable) --}}
+<div class="s-top">
+  <header class="s-head">
+    <div>
+      <div class="s-label">Street name</div>
+      <h1><input name="name" data-field="name" type="text" value="{{nova.header.name}}" placeholder="Street name" /></h1>
+      <div class="s-role sr6i-role">
+        <input name="metatype" data-field="system.metatype" type="text" value="{{nova.header.metatype}}" placeholder="Metatype" />
+        <input name="gender" data-field="system.gender" type="text" value="{{nova.header.gender}}" placeholder="Gender" />
+        <select name="mortype" data-field="system.mortype">{{selectOptions config.MOR_TYPES selected=nova.header.mortype localize=true}}</select>
+      </div>
+      <div class="s-small sr6i-real"><label>Real name</label>
+        <input name="realName" data-field="system.name" type="text" value="{{nova.header.realName}}" placeholder="Real name" /></div>
+    </div>
+    <span class="brand">Nova Prime Chummer <b>Shadowrun</b> 6</span>
+  </header>
+  <img class="portrait" src="{{nova.header.img}}" alt="" data-action="onClickImage" data-image-path="img" data-tooltip="{{actor.name}}" />
+  <section class="s-attrs sr6-attrs">
+    {{#each nova.attrs as |a|}}
+    <div data-attr="{{a.key}}">
+      <span><a class="attributeonly-roll attribute-poolmod" data-pool="{{a.value}}" data-roll-id="{{a.key}}">{{a.label}}</a></span>
+      <b>{{a.value}}</b>
+      <input name="sr6iBase{{a.key}}" type="number" data-dtype="Number" data-field="{{a.field}}" value="{{a.base}}" min="1" title="Base" />
+    </div>
+    {{/each}}
+    <div data-attr="edg">
+      <span><a class="attributeonly-roll attribute-poolmod" data-pool="{{nova.edge.value}}" data-roll-id="edg">{{nova.edge.label}}</a></span>
+      <b>{{nova.edge.value}}</b>
+      <input name="sr6iEdgeMax" type="number" data-dtype="Number" data-field="{{nova.edge.field}}" value="{{nova.edge.value}}" min="1" title="Edge" />
+    </div>
+    {{#if nova.magRes}}
+    <div data-attr="{{nova.magRes.key}}">
+      <span><a class="attributeonly-roll attribute-poolmod" data-pool="{{nova.magRes.value}}" data-roll-id="{{nova.magRes.key}}">{{nova.magRes.label}}</a></span>
+      <b>{{nova.magRes.value}}</b>
+      <input name="sr6iBase{{nova.magRes.key}}" type="number" data-dtype="Number" data-field="{{nova.magRes.field}}" value="{{nova.magRes.base}}" min="0" title="Base" />
+    </div>
+    {{/if}}
+    <div data-attr="ess"><span>Essence</span><b>{{nova.essence}}</b></div>
+  </section>
+</div>

@@ -12,6 +12,7 @@ import { INDEX_FIELDS } from '../lib/chummer-id.js'
 import { iconFor, MODULE_ICON_ROOT } from '../lib/icons.js'
 import { importBooks } from './books.js'
 import { applyIcons, loadIconIndex } from './icons.js'
+import { SHEET_ID } from './sheet.js'
 
 const TEST_FOLDER = 'Chummer SR6 Importer tests'
 const SAMPLE = `modules/${MODULE_ID}/samples/test-runners.json`
@@ -745,6 +746,73 @@ export function registerQuench(quench) {
         assert.equal(now.items.get(stock.id).img, iconFor(f.key, f.name, f.book, index))
         assert.equal(now.items.get(mine.id).img, 'user/art.webp')
         assert.equal(now.img, actorImg)
+      })
+    })
+  })
+
+  batch('sheet', ({ describe, it, assert, before, after }) => {
+    // The optional Nova Prime Chummer sheet (foundry/sheet.js) on this batch's own imported sample runner: chosen for that
+    // actor only (its core.sheetClass flag), rendered, edited, rolled from, then switched back to Eden's sheet.
+    describe('Nova Prime Chummer sheet', function () {
+      this.timeout(30000)
+      let tag, folder, a
+      const EDEN = 'shadowrun6-eden.Shadowrun6ActorSheetPC'
+      const waitFor = async (ok, ms = 5000) => {
+        for (const end = Date.now() + ms; Date.now() < end; await new Promise(r => setTimeout(r, 50))) if (ok()) return true
+        return false
+      }
+      const el = () => { const e = a.sheet?.element; return e?.[0] ?? e }
+      before(async function () {
+        const s = await loadSample(); tag = s.tag
+        folder = await makeFolder()
+        const res = await importRunner(s.file, s.file.runners[0], 'create', folder)
+        assert.equal(res.action, 'create', res.error?.message)
+        a = res.actor
+      })
+      after(async () => { await a?.sheet?.close(); await cleanUp(tag, folder) })
+
+      it('is offered for Player actors and is not the default', () => {
+        const cfg = CONFIG.Actor.sheetClasses.Player?.[SHEET_ID]
+        assert.ok(cfg, `${SHEET_ID} registered for Player`)
+        assert.isFalse(!!cfg.default)
+        assert.notOk(CONFIG.Actor.sheetClasses.NPC?.[SHEET_ID], 'not offered for NPCs')
+      })
+      it('renders the print sheet\'s sections when chosen for the actor', async () => {
+        await a.setFlag('core', 'sheetClass', SHEET_ID)
+        assert.equal(a.sheet.constructor.name, 'NovaPrimeSheet')
+        a.sheet.render(true)
+        assert.isTrue(await waitFor(() => a.sheet.rendered && el()?.querySelector('.sr6i-paper')), 'rendered')
+        for (const sel of ['.s-head h1 input', '.s-attrs', 'table.sr6-pools', '.sr6i-condition .sr6i-box', '.sr6-derived-t',
+          '.sr6i-weapons', 'nav.sheet-tabs[data-group="primary"]', '.tab[data-tab="sheet"]', '.tab[data-tab="effects"]', '.sr6i-notes'])
+          assert.ok(el().querySelector(sel), sel)
+      })
+      it('editing an attribute updates the actor (Eden\'s data-field listener)', async () => {
+        const input = el().querySelector('input[data-field="system.attributes.bod.base"]')
+        const want = Number(a.system.attributes.bod.base) === 4 ? 5 : 4
+        input.value = String(want)
+        input.dispatchEvent(new Event('change', { bubbles: true }))
+        assert.isTrue(await waitFor(() => Number(a.system.attributes.bod.base) === want), `Body base ${want}`)
+      })
+      it('a skill name rolls through Eden (rollSkill called, no chat message)', async () => {
+        await waitFor(() => a.sheet.rendered && el()?.querySelector('a.skill-roll[data-skill]'))
+        const link = el().querySelector('a.skill-roll[data-skill]')
+        const rolled = [], made = [], create = ChatMessage.create
+        a.rollSkill = roll => { rolled.push(roll) }
+        ChatMessage.create = async (...args) => { made.push(args) }
+        try {
+          link.click()
+          assert.isTrue(await waitFor(() => rolled.length > 0), 'rollSkill called')
+          assert.equal(rolled[0].skillId, link.dataset.skill)
+          assert.lengthOf(made, 0)
+        } finally {
+          ChatMessage.create = create
+          delete a.rollSkill
+        }
+      })
+      it('switching back gives Eden\'s sheet', async () => {
+        await a.sheet.close()
+        await a.setFlag('core', 'sheetClass', EDEN)
+        assert.equal(a.sheet.constructor.name, 'Shadowrun6ActorSheetPC')
       })
     })
   })
