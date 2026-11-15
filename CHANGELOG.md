@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.14.2 (2026-11-14)
+
+- Quench `panels` batch: submit Eden's roll dialog after 1 second instead of 100 ms. Submitting before the dialog's opening animation finished made Eden's firing-mode handler run on a closed dialog and throw, which Quench pinned on the next test. Module code unchanged.
+
 ## 0.14.1 (2026-11-14)
 
 - Quench `panels` batch: load the sample weapon before the test fires it. It is imported with no rounds loaded and Eden refuses to fire an empty gun; the two later failures in that batch were knock-on errors from this one. Module code unchanged.
