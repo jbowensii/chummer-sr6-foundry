@@ -830,6 +830,7 @@ export function registerQuench(quench) {
       })
       it('the weapon and an animal-form attack roll through Eden', async () => {
         const fresh = game.actors.get(a.id)
+        await zap().update({ 'system.ammocount': zap().system.ammocap })  // imported empty; Eden refuses to fire an unloaded gun
         assert.isAtLeast((await rollThrough(() => rollWeapon(fresh, zap()))).length, 1)
         const [bite] = animalWeapons(flagOf(fresh).animalForm)
         assert.equal(alternateItem(fresh, bite).calculatedAttackRating[0], 11)
