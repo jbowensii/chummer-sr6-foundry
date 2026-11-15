@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.14.1 (2026-11-14)
+
+- Quench `panels` batch: load the sample weapon before the test fires it. It is imported with no rounds loaded and Eden refuses to fire an empty gun; the two later failures in that batch were knock-on errors from this one. Module code unchanged.
+
 ## 0.14.0 (2026-11-14)
 
 Panels on Eden's own sheets for the new export fields, rolled with Eden's own rolls. Needs a Nova Prime Chummer export with `ammoTypes`, `meleeAlternate`, `dronePools`, `derived.rigging`, `design`/`approved` and `animalForm`. The import side, planned as 0.13.0, ships here too:
