@@ -780,7 +780,7 @@ export function registerQuench(quench) {
       async function rollThrough(fn) {
         const C = CONFIG.ChatMessage.documentClass, own = Object.hasOwn(C, 'create'), orig = C.create, made = []
         C.create = async data => { made.push(data); return null }
-        const hook = Hooks.once('renderRollDialog', app => setTimeout(() => app.submit(app.data.buttons.normal), 100))
+        const hook = Hooks.once('renderRollDialog', app => setTimeout(() => app.submit(app.data.buttons.normal), 1000))  // after Eden's own open animation, or its firing-mode handler runs on a closed dialog
         try {
           await Promise.race([fn(), new Promise((_, rej) => setTimeout(() => rej(new Error('roll timed out')), 15000))])
         } finally { if (own) C.create = orig; else delete C.create; Hooks.off('renderRollDialog', hook) }
